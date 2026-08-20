@@ -1,0 +1,32 @@
+import { describe, expect, it } from 'vitest'
+import en from '@/i18n/locales/en'
+import zh from '@/i18n/locales/zh'
+
+function flattenKeys(obj: Record<string, any>, prefix = ''): string[] {
+  const keys: string[] = []
+  for (const [k, v] of Object.entries(obj)) {
+    const fullKey = prefix ? `${prefix}.${k}` : k
+    if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
+      keys.push(...flattenKeys(v, fullKey))
+    } else {
+      keys.push(fullKey)
+    }
+  }
+  return keys
+}
+
+describe('ops locale key completeness', () => {
+  const requiredKeys = [
+    'admin.ops.result',
+    'admin.ops.timeRange.custom',
+    'admin.ops.customTimeRange.startTime',
+    'admin.ops.customTimeRange.endTime',
+  ]
+
+  for (const key of requiredKeys) {
+    it(`en and zh locales both have ${key}`, () => {
+      expect(flattenKeys(en)).toContain(key)
+      expect(flattenKeys(zh)).toContain(key)
+    })
+  }
+})

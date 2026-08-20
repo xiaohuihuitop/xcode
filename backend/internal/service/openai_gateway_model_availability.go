@@ -1,0 +1,52 @@
+package service
+
+import (
+	"context"
+	"strings"
+)
+
+// DiagnoseModelAvailabilityForPlatform reports whether the requested model
+// is configured to be served by any persistently eligible OpenAI-compatible
+// account in the group for the given platform (e.g. PlatformOpenAI,
+// PlatformGrok). The platform scopes the candidate pool so distinct
+// OpenAI-compatible platforms do not cross-contaminate diagnosis results.
+// The query bypasses scheduler snapshots and ignores transient runtime state.
+//
+// Safe to call on the error path: returns {true,true} on any internal
+// failure or when the inputs preclude meaningful diagnosis (empty model,
+// nil service), so callers stay on the 503 fallback branch.
+func (s *OpenAIGatewayService) DiagnoseModelAvailabilityForPlatform(
+	ctx context.Context,
+	requestedModel string,
+	platform string,
+) ModelAvailabilityDiagnosis {
+	if s == nil {
+		return ModelAvailabilityDiagnosis{HasAccountsInPool: true, HasModelSupport: true}
+	}
+	requestedModel = strings.TrimSpace(requestedModel)
+	if requestedModel == "" {
+		return ModelAvailabilityDiagnosis{HasAccountsInPool: true, HasModelSupport: true}
+	}
+	if s.accountRepo == nil {
+		return ModelAvailabilityDiagnosis{HasAccountsInPool: true, HasModelSupport: true}
+	}
+
+	platform = normalizeOpenAICompatiblePlatform(platform)
+	scope, ok := PlatformSchedulingScopeFromContext(ctx)
+	if !ok || scope.AccountPlatform != platform {
+		return ModelAvailabilityDiagnosis{HasAccountsInPool: true, HasModelSupport: true}
+	}
+	accounts, err := s.accountRepo.ListModelAvailabilityCandidates(
+		ctx,
+		scope.PlatformID,
+		scope.AccountPlatform,
+	)
+	if err != nil {
+		// Conservative fallback so the caller keeps returning 503; we do not
+		// want a transient lookup failure to flip into 404 model_not_found.
+		return ModelAvailabilityDiagnosis{HasAccountsInPool: true, HasModelSupport: true}
+	}
+
+	available := len(accounts) > 0
+	return ModelAvailabilityDiagnosis{HasAccountsInPool: available, HasModelSupport: available}
+}
