@@ -10,7 +10,9 @@ import (
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/gatewayruntime"
+	"github.com/Wei-Shaw/sub2api/internal/runtimebridge"
 	"github.com/Wei-Shaw/sub2api/internal/service"
+	v1 "github.com/Wei-Shaw/sub2api/pkg/runtimebridge/v1"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
@@ -115,4 +117,30 @@ func TestGeminiForwardUsageFactsPreservesAccountAndUsage(t *testing.T) {
 	require.Equal(t, 12, facts.InputTokens)
 	require.Equal(t, 7, facts.OutputTokens)
 	require.Equal(t, "gemini-2.5-flash-preview", facts.UpstreamModel)
+}
+
+func TestSub2APIGeminiMediaExecutorUsesPureDriverForOpenAIImages(t *testing.T) {
+	sink := &messagesExecutorSink{}
+	executor := sub2APIGeminiMediaExecutor{
+		endpoint: gatewayruntime.EndpointImages,
+		mediaDriver: productionDriverFunc(func(ctx context.Context, request v1.Request, events runtimebridge.EventSink) (v1.Result, error) {
+			if request.Endpoint != v1.EndpointImages {
+				t.Fatalf("contract endpoint = %q, want images", request.Endpoint)
+			}
+			if err := events.Publish(ctx, v1.Event{Sequence: 1, Kind: v1.EventUsageFinal, Usage: &v1.UsageFacts{AccountID: 404, ImageCount: 1, TerminalStatus: "success"}}); err != nil {
+				return v1.Result{}, err
+			}
+			return v1.Result{StatusCode: http.StatusOK, AccountID: 404}, nil
+		}),
+	}
+	result, err := executor.Execute(context.Background(), gatewayruntime.Request{
+		RequestID:      "pure-media-driver",
+		PlatformID:     42,
+		Adapter:        service.PlatformOpenAI,
+		Endpoint:       gatewayruntime.EndpointImages,
+		RequestedModel: "gpt-image-test",
+	}, sink)
+	if err != nil || result.AccountID != 404 || len(sink.events) != 1 || !sink.events[0].Success {
+		t.Fatalf("pure media result/error/events = %#v/%v/%#v", result, err, sink.events)
+	}
 }

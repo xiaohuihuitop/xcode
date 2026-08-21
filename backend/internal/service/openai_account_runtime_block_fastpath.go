@@ -365,3 +365,18 @@ func (s *OpenAIGatewayService) ShouldStopOpenAIOAuth429Failover(account *Account
 	}
 	return s.isOpenAIOAuth429Storm()
 }
+
+// ShouldStopOpenAIOAuth429FailoverRuntime keeps the request-local storm state
+// transport-neutral for RuntimeBridge ports. The runtime package owns only a
+// boolean snapshot; service-specific state remains private here.
+func (s *OpenAIGatewayService) ShouldStopOpenAIOAuth429FailoverRuntime(account *Account, statusCode int, failedSwitches int, followupPending *bool) bool {
+	var state OpenAIOAuth429FailoverState
+	if followupPending != nil {
+		state.grokOAuth429FollowupPending = *followupPending
+	}
+	stop := s.ShouldStopOpenAIOAuth429Failover(account, statusCode, failedSwitches, &state)
+	if followupPending != nil {
+		*followupPending = state.grokOAuth429FollowupPending
+	}
+	return stop
+}

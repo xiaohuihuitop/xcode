@@ -10,6 +10,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"github.com/Wei-Shaw/sub2api/internal/gatewayruntime"
+	"github.com/Wei-Shaw/sub2api/internal/runtimebridge"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
 
@@ -35,11 +36,15 @@ type sub2APISyncExecutor struct {
 	reportSchedule     func(*service.Account, string, *service.OpenAIForwardResult, bool)
 	recordSwitch       func()
 	maxSwitches        int
+	syncDriver         runtimebridge.Driver
 }
 
 func (e sub2APISyncExecutor) Execute(ctx context.Context, request gatewayruntime.Request, sink gatewayruntime.UsageSink) (gatewayruntime.Result, error) {
 	if sink == nil {
 		return gatewayruntime.Result{}, gatewayruntime.ErrUsageSinkUnavailable
+	}
+	if e.syncDriver != nil && strings.EqualFold(strings.TrimSpace(request.Adapter), service.PlatformOpenAI) {
+		return runtimebridge.NewLocalRuntime(e.syncDriver).Dispatch(ctx, request, sink)
 	}
 	trackingSink := &messagesExecutorTerminalSink{sink: sink}
 	ctx = gatewayruntime.WithUsageSink(ctx, trackingSink)

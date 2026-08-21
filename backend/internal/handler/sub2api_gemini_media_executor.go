@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/gatewayruntime"
+	"github.com/Wei-Shaw/sub2api/internal/runtimebridge"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
 
@@ -20,10 +21,14 @@ type sub2APIGeminiMediaExecutor struct {
 	gatewayHandler *GatewayHandler
 	openAIHandler  *OpenAIGatewayHandler
 	endpoint       gatewayruntime.Endpoint
+	mediaDriver    runtimebridge.Driver
 	maxSwitches    int
 }
 
 func (e sub2APIGeminiMediaExecutor) Execute(ctx context.Context, request gatewayruntime.Request, sink gatewayruntime.UsageSink) (gatewayruntime.Result, error) {
+	if e.mediaDriver != nil && request.Endpoint == gatewayruntime.EndpointImages && strings.EqualFold(strings.TrimSpace(request.Adapter), service.PlatformOpenAI) {
+		return runtimebridge.NewLocalRuntime(e.mediaDriver).Dispatch(ctx, request, sink)
+	}
 	if sink == nil {
 		return gatewayruntime.Result{}, gatewayruntime.ErrUsageSinkUnavailable
 	}

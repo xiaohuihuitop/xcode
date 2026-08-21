@@ -8,16 +8,19 @@ HTTP API / Admin UI
    ProductCore
   用户、Key、平台、套餐、余额、计费、用量
         |
- GatewayRuntime Port
-  Request / HTTPExchange / UsageSink
+ RuntimeBridge v1
+  Request / HTTPExchange / UsageSink / Events
         |
- Sub2API Adapter（当前唯一 Runtime）
+ 本地 RuntimeBridge 端口
+  ProductCore 与 Runtime 的进程内边界
+        |
+ Sub2API Driver（当前唯一内核）
   调度、OAuth、协议转换、重试、冷却、失败切换
         |
   OpenAI / 上游服务
 ```
 
-`ProductCore` 只拥有产品和财产语义；`GatewayRuntime` 只拥有上游执行语义。适配器把两者连接起来，不能把 Gin context、公开 Handler 或 Sub2API 内部类型泄漏到 ProductCore。
+`ProductCore` 只拥有产品和财产语义；`RuntimeBridge v1` 只拥有上游执行语义。当前通过本地端口保持单进程部署，未来可以替换为进程外 Bridge。适配器把两者连接起来，不能把 Gin context、公开 Handler 或 Sub2API 内部类型泄漏到 ProductCore。
 
 ## 主要实体
 
@@ -46,7 +49,7 @@ HTTP API / Admin UI
 
 当前生产路径为：
 
-`ApplicationGateway -> Sub2API OpenAI Executor -> HTTPExchange`
+`ApplicationGateway -> RuntimeBridge LocalPort -> Sub2API Driver -> HTTPExchange`
 
 覆盖 Images、Chat Completions、Responses 和 Messages，包含 JSON/SSE 转换、usage 提取、端点 marker、错误透传、失败切换和 exactly-once 终态。生产执行器不重新接收 Gin context，也不回调旧公开 Handler。
 
@@ -59,4 +62,4 @@ HTTP API / Admin UI
 
 ## 内核替换边界
 
-替换上游内核时，只实现同一组 Runtime 端口，不修改 ProductCore、前端、计费和业务 schema。Sub2API 的调度、OAuth 和协议算法在当前适配器内保持原样；后续内核必须通过纯 Go 请求和交换接口接入。
+替换上游内核时，只实现同一组 RuntimeBridge 端口，不修改 ProductCore、前端、计费和业务 schema。Sub2API 的调度、OAuth 和协议算法位于 `internal/runtime/sub2api` Driver；后续内核必须通过 `pkg/runtimebridge/v1` 的纯 Go 请求、事件、交换和用量接口接入。

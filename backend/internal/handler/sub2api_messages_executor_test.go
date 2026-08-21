@@ -10,13 +10,21 @@ import (
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/gatewayruntime"
+	"github.com/Wei-Shaw/sub2api/internal/runtimebridge"
 	"github.com/Wei-Shaw/sub2api/internal/service"
+	v1 "github.com/Wei-Shaw/sub2api/pkg/runtimebridge/v1"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
 
 type messagesExecutorSink struct {
 	events []gatewayruntime.UsageEvent
+}
+
+type productionDriverFunc func(context.Context, v1.Request, runtimebridge.EventSink) (v1.Result, error)
+
+func (f productionDriverFunc) Dispatch(ctx context.Context, request v1.Request, sink runtimebridge.EventSink) (v1.Result, error) {
+	return f(ctx, request, sink)
 }
 
 func (s *messagesExecutorSink) RecordFinal(_ context.Context, event gatewayruntime.UsageEvent) error {
@@ -178,4 +186,31 @@ func TestSub2APIMessagesExecutorBuildsSchedulingRouteFromRuntimeRequest(t *testi
 	require.Equal(t, int64(42), route.Platform.PlatformID)
 	require.Equal(t, service.PlatformOpenAI, route.SchedulingScope.AccountPlatform)
 	require.Equal(t, []string{"responses"}, route.Platform.EndpointCapabilities)
+}
+
+func TestSub2APIMessagesExecutorUsesPureDriverForOpenAIProductionRoute(t *testing.T) {
+	sink := &messagesExecutorSink{}
+	executor := sub2APIMessagesExecutor{
+		endpoint: gatewayruntime.EndpointResponses,
+		openAIDriver: productionDriverFunc(func(ctx context.Context, request v1.Request, events runtimebridge.EventSink) (v1.Result, error) {
+			if request.Endpoint != v1.EndpointResponses || request.Platform.RuntimeAdapter != service.PlatformOpenAI {
+				t.Fatalf("contract request = %#v, want OpenAI responses route", request)
+			}
+			if err := events.Publish(ctx, v1.Event{Sequence: 1, Kind: v1.EventUsageFinal, Usage: &v1.UsageFacts{AccountID: 202, TerminalStatus: "success"}}); err != nil {
+				return v1.Result{}, err
+			}
+			return v1.Result{StatusCode: http.StatusOK, AccountID: 202}, nil
+		}),
+	}
+	result, err := executor.Execute(context.Background(), gatewayruntime.Request{
+		RequestID:      "pure-production-route",
+		PlatformID:     42,
+		PlatformCode:   "openai-main",
+		Adapter:        service.PlatformOpenAI,
+		Endpoint:       gatewayruntime.EndpointResponses,
+		RequestedModel: "gpt-test",
+	}, sink)
+	if err != nil || result.AccountID != 202 || len(sink.events) != 1 || !sink.events[0].Success {
+		t.Fatalf("pure production result/error/events = %#v/%v/%#v", result, err, sink.events)
+	}
 }

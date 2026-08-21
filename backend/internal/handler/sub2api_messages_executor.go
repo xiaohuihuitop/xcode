@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/Wei-Shaw/sub2api/internal/gatewayruntime"
+	"github.com/Wei-Shaw/sub2api/internal/runtimebridge"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
 
@@ -26,6 +27,7 @@ type sub2APIMessagesExecutor struct {
 	openaiHandler  *OpenAIGatewayHandler
 	endpoint       gatewayruntime.Endpoint
 	executeGateway gatewayEndpointExecution
+	openAIDriver   runtimebridge.Driver
 }
 
 func (e sub2APIMessagesExecutor) Execute(ctx context.Context, request gatewayruntime.Request, sink gatewayruntime.UsageSink) (gatewayruntime.Result, error) {
@@ -39,6 +41,9 @@ func (e sub2APIMessagesExecutor) Execute(ctx context.Context, request gatewayrun
 	if route != nil && route.Platform != nil {
 		switch route.Platform.AccountPlatform {
 		case service.PlatformOpenAI, service.PlatformGrok:
+			if e.openAIDriver != nil {
+				return runtimebridge.NewLocalRuntime(e.openAIDriver).Dispatch(ctx, request, sink)
+			}
 			return (sub2APIOpenAIExecutor{
 				handler:        e.openaiHandler,
 				gatewayHandler: e.gatewayHandler,

@@ -12,8 +12,10 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/applicationgateway"
 	"github.com/Wei-Shaw/sub2api/internal/gatewayruntime"
+	"github.com/Wei-Shaw/sub2api/internal/runtimebridge"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
+	v1 "github.com/Wei-Shaw/sub2api/pkg/runtimebridge/v1"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
@@ -151,4 +153,30 @@ func TestGrokCountTokensPublicHandlerUsesRuntimeIngress(t *testing.T) {
 	var body map[string]int
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &body))
 	require.Positive(t, body["input_tokens"])
+}
+
+func TestSub2APISyncExecutorUsesPureDriverForOpenAIEmbeddings(t *testing.T) {
+	sink := &messagesExecutorSink{}
+	executor := sub2APISyncExecutor{
+		endpoint: gatewayruntime.EndpointEmbeddings,
+		syncDriver: productionDriverFunc(func(ctx context.Context, request v1.Request, events runtimebridge.EventSink) (v1.Result, error) {
+			if request.Endpoint != v1.EndpointEmbeddings {
+				t.Fatalf("contract endpoint = %q, want embeddings", request.Endpoint)
+			}
+			if err := events.Publish(ctx, v1.Event{Sequence: 1, Kind: v1.EventUsageFinal, Usage: &v1.UsageFacts{AccountID: 303, InputTokens: 2, TerminalStatus: "success"}}); err != nil {
+				return v1.Result{}, err
+			}
+			return v1.Result{StatusCode: http.StatusOK, AccountID: 303}, nil
+		}),
+	}
+	result, err := executor.Execute(context.Background(), gatewayruntime.Request{
+		RequestID:      "pure-sync-driver",
+		PlatformID:     42,
+		Adapter:        service.PlatformOpenAI,
+		Endpoint:       gatewayruntime.EndpointEmbeddings,
+		RequestedModel: "text-embedding-test",
+	}, sink)
+	if err != nil || result.AccountID != 303 || len(sink.events) != 1 || !sink.events[0].Success {
+		t.Fatalf("pure sync result/error/events = %#v/%v/%#v", result, err, sink.events)
+	}
 }
