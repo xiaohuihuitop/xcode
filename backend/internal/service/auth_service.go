@@ -948,7 +948,11 @@ func (s *AuthService) updateUserSignupSource(ctx context.Context, userID int64, 
 	if strings.TrimSpace(signupSource) == "" {
 		return
 	}
-	if err := s.entClient.User.UpdateOneID(userID).
+	client := s.entClient
+	if tx := dbent.TxFromContext(ctx); tx != nil {
+		client = tx.Client()
+	}
+	if err := client.User.UpdateOneID(userID).
 		SetSignupSource(signupSource).
 		Exec(ctx); err != nil {
 		logger.LegacyPrintf("service.auth", "[Auth] Failed to update signup source: user_id=%d source=%s err=%v", userID, signupSource, err)
