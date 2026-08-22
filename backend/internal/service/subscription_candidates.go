@@ -6,6 +6,17 @@ import (
 	"time"
 )
 
+// ListActiveSubscriptions exposes all active user subscriptions to billing
+// candidate selectors such as API keys. Keep this name aligned with the
+// narrow resolver interface so new subscription purchases are picked up
+// without changing API-key wiring.
+func (s *SubscriptionService) ListActiveSubscriptions(
+	ctx context.Context,
+	userID int64,
+) ([]UserSubscription, error) {
+	return s.ListActiveUserSubscriptions(ctx, userID)
+}
+
 // ListActiveSubscriptionsByPlanIDs returns all active candidates for the
 // explicitly authorized plans.
 func (s *SubscriptionService) ListActiveSubscriptionsByPlanIDs(

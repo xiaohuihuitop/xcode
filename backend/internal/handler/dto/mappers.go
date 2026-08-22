@@ -84,6 +84,7 @@ func APIKeyFromService(k *service.APIKey) *APIKey {
 		Name:                k.Name,
 		PlatformIDs:         append([]int64{}, k.AllowedPlatformIDs...),
 		SubscriptionPlanIDs: append([]int64{}, k.AllowedSubscriptionPlanIDs...),
+		AllowAllSubscriptions: k.AllowAllSubscriptions,
 		AllowBalance:        k.AllowBalance,
 		Status:              k.Status,
 		IPWhitelist:         k.IPWhitelist,

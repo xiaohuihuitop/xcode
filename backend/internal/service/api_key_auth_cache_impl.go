@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 19 // v19: include platform, plan, and balance asset permissions
+const apiKeyAuthSnapshotVersion = 20 // v20: include all-subscriptions billing permission
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -341,6 +341,7 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 		UserID:                     apiKey.UserID,
 		AllowedPlatformIDs:         append([]int64(nil), apiKey.AllowedPlatformIDs...),
 		AllowedSubscriptionPlanIDs: append([]int64(nil), apiKey.AllowedSubscriptionPlanIDs...),
+		AllowAllSubscriptions:      apiKey.AllowAllSubscriptions,
 		AllowBalance:               apiKey.AllowBalance,
 		Name:                       apiKey.Name,
 		Status:                     apiKey.Status,
@@ -382,6 +383,7 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 		UserID:                     snapshot.UserID,
 		AllowedPlatformIDs:         append([]int64(nil), snapshot.AllowedPlatformIDs...),
 		AllowedSubscriptionPlanIDs: append([]int64(nil), snapshot.AllowedSubscriptionPlanIDs...),
+		AllowAllSubscriptions:      snapshot.AllowAllSubscriptions,
 		AllowBalance:               snapshot.AllowBalance,
 		Key:                        key,
 		Name:                       snapshot.Name,

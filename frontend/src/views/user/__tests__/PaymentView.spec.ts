@@ -290,6 +290,51 @@ describe('PaymentView subscription plan grid', () => {
   })
 })
 
+describe('PaymentView recharge amount preview', () => {
+  it('starts at one, hides quick amounts, and computes credited balance from the multiplier', async () => {
+    routeState.path = '/purchase'
+    routeState.query = {}
+    routerReplace.mockReset().mockResolvedValue(undefined)
+    routerPush.mockReset().mockResolvedValue(undefined)
+    routerResolve.mockClear()
+    createOrder.mockReset()
+    refreshUser.mockReset()
+    fetchActiveSubscriptions.mockReset().mockResolvedValue(undefined)
+    showError.mockReset()
+    showInfo.mockReset()
+    showWarning.mockReset()
+    getCheckoutInfo.mockReset().mockResolvedValue(checkoutInfoFixture({
+      balance_recharge_multiplier: 2,
+    }))
+    bridgeInvoke.mockReset()
+    window.localStorage.clear()
+    ;(window as Window & { WeixinJSBridge?: { invoke: typeof bridgeInvoke } }).WeixinJSBridge = undefined
+
+    const wrapper = shallowMount(PaymentView, {
+      global: {
+        stubs: {
+          AppLayout: {
+            template: '<div><slot /></div>',
+          },
+          Teleport: true,
+          Transition: false,
+          AmountInput: {
+            props: ['modelValue', 'amounts'],
+            template: '<div data-test="amount-input" :data-model-value="modelValue" :data-amounts="JSON.stringify(amounts)" />',
+          },
+        },
+      },
+    })
+    await flushPromises()
+    await flushPromises()
+
+    const amountInput = wrapper.get('[data-test="amount-input"]')
+    expect(amountInput.attributes('data-model-value')).toBe('1')
+    expect(amountInput.attributes('data-amounts')).toBe('[]')
+    expect((wrapper.vm as unknown as { creditedAmount: number }).creditedAmount).toBe(2)
+  })
+})
+
 describe('PaymentView subscription confirmation amounts', () => {
   it('selects the exact plan from a repeat-purchase URL', async () => {
     const firstPlan = checkoutInfoWithPlansFixture().data.plans[0]

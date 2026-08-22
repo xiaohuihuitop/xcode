@@ -167,6 +167,7 @@ func (s *AuthService) RegisterOAuthEmailAccount(
 		slog.Error("oauth email register: userRepo.Create failed", "email", email, "signup_source", signupSource, "error", err.Error())
 		return nil, nil, ErrServiceUnavailable
 	}
+	s.postAuthUserBootstrap(ctx, user, signupSource, false)
 
 	tokenPair, err := s.GenerateTokenPair(ctx, user, "")
 	if err != nil {
@@ -249,6 +250,7 @@ func (s *AuthService) RegisterVerifiedOAuthEmailAccount(
 		}
 		return nil, nil, ErrServiceUnavailable
 	}
+	s.postAuthUserBootstrap(ctx, user, signupSource, false)
 
 	tokenPair, err := s.GenerateTokenPair(ctx, user, "")
 	if err != nil {
@@ -283,6 +285,7 @@ func (s *AuthService) FinalizeOAuthEmailAccount(
 	}
 
 	s.updateOAuthSignupSource(ctx, user.ID, signupSource)
+	s.postAuthUserBootstrap(ctx, user, signupSource, false)
 	grantPlan := s.resolveSignupGrantPlan(ctx, signupSource)
 	s.assignSubscriptions(ctx, user.ID, grantPlan.Subscriptions, "auto assigned by signup defaults")
 	// snapshot user × platform quota（fail-open）
@@ -477,6 +480,7 @@ func (s *AuthService) RecordSuccessfulLogin(ctx context.Context, userID int64) {
 		user, err := s.userRepo.GetByID(ctx, userID)
 		if err == nil && user != nil && !isReservedEmail(user.Email) {
 			s.backfillEmailIdentityOnSuccessfulLogin(ctx, user)
+			s.ensureDefaultAPIKey(ctx, user.ID)
 		}
 	}
 	s.touchUserLogin(ctx, userID)

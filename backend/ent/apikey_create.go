@@ -100,6 +100,20 @@ func (_c *APIKeyCreate) SetNillableAllowBalance(v *bool) *APIKeyCreate {
 	return _c
 }
 
+// SetAllowAllSubscriptions sets the "allow_all_subscriptions" field.
+func (_c *APIKeyCreate) SetAllowAllSubscriptions(v bool) *APIKeyCreate {
+	_c.mutation.SetAllowAllSubscriptions(v)
+	return _c
+}
+
+// SetNillableAllowAllSubscriptions sets the "allow_all_subscriptions" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableAllowAllSubscriptions(v *bool) *APIKeyCreate {
+	if v != nil {
+		_c.SetAllowAllSubscriptions(*v)
+	}
+	return _c
+}
+
 // SetStatus sets the "status" field.
 func (_c *APIKeyCreate) SetStatus(v string) *APIKeyCreate {
 	_c.mutation.SetStatus(v)
@@ -413,6 +427,10 @@ func (_c *APIKeyCreate) defaults() error {
 		v := apikey.DefaultAllowBalance
 		_c.mutation.SetAllowBalance(v)
 	}
+	if _, ok := _c.mutation.AllowAllSubscriptions(); !ok {
+		v := apikey.DefaultAllowAllSubscriptions
+		_c.mutation.SetAllowAllSubscriptions(v)
+	}
 	if _, ok := _c.mutation.Status(); !ok {
 		v := apikey.DefaultStatus
 		_c.mutation.SetStatus(v)
@@ -481,6 +499,9 @@ func (_c *APIKeyCreate) check() error {
 	}
 	if _, ok := _c.mutation.AllowBalance(); !ok {
 		return &ValidationError{Name: "allow_balance", err: errors.New(`ent: missing required field "APIKey.allow_balance"`)}
+	}
+	if _, ok := _c.mutation.AllowAllSubscriptions(); !ok {
+		return &ValidationError{Name: "allow_all_subscriptions", err: errors.New(`ent: missing required field "APIKey.allow_all_subscriptions"`)}
 	}
 	if _, ok := _c.mutation.Status(); !ok {
 		return &ValidationError{Name: "status", err: errors.New(`ent: missing required field "APIKey.status"`)}
@@ -567,6 +588,10 @@ func (_c *APIKeyCreate) createSpec() (*APIKey, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.AllowBalance(); ok {
 		_spec.SetField(apikey.FieldAllowBalance, field.TypeBool, value)
 		_node.AllowBalance = value
+	}
+	if value, ok := _c.mutation.AllowAllSubscriptions(); ok {
+		_spec.SetField(apikey.FieldAllowAllSubscriptions, field.TypeBool, value)
+		_node.AllowAllSubscriptions = value
 	}
 	if value, ok := _c.mutation.Status(); ok {
 		_spec.SetField(apikey.FieldStatus, field.TypeString, value)
@@ -824,6 +849,18 @@ func (u *APIKeyUpsert) SetAllowBalance(v bool) *APIKeyUpsert {
 // UpdateAllowBalance sets the "allow_balance" field to the value that was provided on create.
 func (u *APIKeyUpsert) UpdateAllowBalance() *APIKeyUpsert {
 	u.SetExcluded(apikey.FieldAllowBalance)
+	return u
+}
+
+// SetAllowAllSubscriptions sets the "allow_all_subscriptions" field.
+func (u *APIKeyUpsert) SetAllowAllSubscriptions(v bool) *APIKeyUpsert {
+	u.Set(apikey.FieldAllowAllSubscriptions, v)
+	return u
+}
+
+// UpdateAllowAllSubscriptions sets the "allow_all_subscriptions" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateAllowAllSubscriptions() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldAllowAllSubscriptions)
 	return u
 }
 
@@ -1242,6 +1279,20 @@ func (u *APIKeyUpsertOne) SetAllowBalance(v bool) *APIKeyUpsertOne {
 func (u *APIKeyUpsertOne) UpdateAllowBalance() *APIKeyUpsertOne {
 	return u.Update(func(s *APIKeyUpsert) {
 		s.UpdateAllowBalance()
+	})
+}
+
+// SetAllowAllSubscriptions sets the "allow_all_subscriptions" field.
+func (u *APIKeyUpsertOne) SetAllowAllSubscriptions(v bool) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetAllowAllSubscriptions(v)
+	})
+}
+
+// UpdateAllowAllSubscriptions sets the "allow_all_subscriptions" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateAllowAllSubscriptions() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateAllowAllSubscriptions()
 	})
 }
 
@@ -1873,6 +1924,20 @@ func (u *APIKeyUpsertBulk) SetAllowBalance(v bool) *APIKeyUpsertBulk {
 func (u *APIKeyUpsertBulk) UpdateAllowBalance() *APIKeyUpsertBulk {
 	return u.Update(func(s *APIKeyUpsert) {
 		s.UpdateAllowBalance()
+	})
+}
+
+// SetAllowAllSubscriptions sets the "allow_all_subscriptions" field.
+func (u *APIKeyUpsertBulk) SetAllowAllSubscriptions(v bool) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetAllowAllSubscriptions(v)
+	})
+}
+
+// UpdateAllowAllSubscriptions sets the "allow_all_subscriptions" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateAllowAllSubscriptions() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateAllowAllSubscriptions()
 	})
 }
 

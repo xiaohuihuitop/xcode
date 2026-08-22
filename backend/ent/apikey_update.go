@@ -115,6 +115,20 @@ func (_u *APIKeyUpdate) SetNillableAllowBalance(v *bool) *APIKeyUpdate {
 	return _u
 }
 
+// SetAllowAllSubscriptions sets the "allow_all_subscriptions" field.
+func (_u *APIKeyUpdate) SetAllowAllSubscriptions(v bool) *APIKeyUpdate {
+	_u.mutation.SetAllowAllSubscriptions(v)
+	return _u
+}
+
+// SetNillableAllowAllSubscriptions sets the "allow_all_subscriptions" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableAllowAllSubscriptions(v *bool) *APIKeyUpdate {
+	if v != nil {
+		_u.SetAllowAllSubscriptions(*v)
+	}
+	return _u
+}
+
 // SetStatus sets the "status" field.
 func (_u *APIKeyUpdate) SetStatus(v string) *APIKeyUpdate {
 	_u.mutation.SetStatus(v)
@@ -652,6 +666,9 @@ func (_u *APIKeyUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.AllowBalance(); ok {
 		_spec.SetField(apikey.FieldAllowBalance, field.TypeBool, value)
 	}
+	if value, ok := _u.mutation.AllowAllSubscriptions(); ok {
+		_spec.SetField(apikey.FieldAllowAllSubscriptions, field.TypeBool, value)
+	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(apikey.FieldStatus, field.TypeString, value)
 	}
@@ -1017,6 +1034,20 @@ func (_u *APIKeyUpdateOne) SetAllowBalance(v bool) *APIKeyUpdateOne {
 func (_u *APIKeyUpdateOne) SetNillableAllowBalance(v *bool) *APIKeyUpdateOne {
 	if v != nil {
 		_u.SetAllowBalance(*v)
+	}
+	return _u
+}
+
+// SetAllowAllSubscriptions sets the "allow_all_subscriptions" field.
+func (_u *APIKeyUpdateOne) SetAllowAllSubscriptions(v bool) *APIKeyUpdateOne {
+	_u.mutation.SetAllowAllSubscriptions(v)
+	return _u
+}
+
+// SetNillableAllowAllSubscriptions sets the "allow_all_subscriptions" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableAllowAllSubscriptions(v *bool) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetAllowAllSubscriptions(*v)
 	}
 	return _u
 }
@@ -1587,6 +1618,9 @@ func (_u *APIKeyUpdateOne) sqlSave(ctx context.Context) (_node *APIKey, err erro
 	}
 	if value, ok := _u.mutation.AllowBalance(); ok {
 		_spec.SetField(apikey.FieldAllowBalance, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.AllowAllSubscriptions(); ok {
+		_spec.SetField(apikey.FieldAllowAllSubscriptions, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(apikey.FieldStatus, field.TypeString, value)

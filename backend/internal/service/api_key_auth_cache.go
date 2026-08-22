@@ -14,6 +14,7 @@ type APIKeyAuthSnapshot struct {
 	User                       APIKeyAuthUserSnapshot `json:"user"`
 	AllowedPlatformIDs         []int64                `json:"allowed_platform_ids,omitempty"`
 	AllowedSubscriptionPlanIDs []int64                `json:"allowed_subscription_plan_ids,omitempty"`
+	AllowAllSubscriptions      bool                   `json:"allow_all_subscriptions"`
 	AllowBalance               bool                   `json:"allow_balance"`
 
 	// Quota fields for API Key independent quota feature

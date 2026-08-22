@@ -42,7 +42,7 @@
             </div>
             <div>
               <span class="font-medium text-gray-700 dark:text-gray-300">{{ t('dashboard.subscriptionPlansLabel') }}:</span>
-              {{ key.subscription_plan_ids?.join(', ') || t('admin.users.none') }}
+              {{ key.allow_all_subscriptions ? t('dashboard.allSubscriptionsEnabled') : t('admin.users.none') }}
             </div>
             <div>
               <span class="font-medium text-gray-700 dark:text-gray-300">{{ t('dashboard.balanceLabel') }}:</span>

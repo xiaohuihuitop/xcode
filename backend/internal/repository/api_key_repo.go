@@ -52,6 +52,7 @@ func (r *apiKeyRepository) Create(ctx context.Context, key *service.APIKey) erro
 		SetKey(key.Key).
 		SetName(key.Name).
 		SetStatus(key.Status).
+		SetAllowAllSubscriptions(key.AllowAllSubscriptions).
 		SetAllowBalance(key.AllowBalance).
 		SetNillableLastUsedAt(key.LastUsedAt).
 		SetQuota(key.Quota).
@@ -144,6 +145,7 @@ func apiKeyAuthFieldSelection() []string {
 		apikey.FieldID,
 		apikey.FieldUserID,
 		apikey.FieldAllowBalance,
+		apikey.FieldAllowAllSubscriptions,
 		apikey.FieldName,
 		apikey.FieldStatus,
 		apikey.FieldIPWhitelist,
@@ -661,12 +663,14 @@ func (r *apiKeyRepository) loadAssetPermissions(ctx context.Context, keys []*ser
 	}
 	for _, key := range keyByID {
 		permissions := service.NormalizeAPIKeyAssetPermissions(service.APIKeyAssetPermissions{
-			PlatformIDs:         key.AllowedPlatformIDs,
-			SubscriptionPlanIDs: key.AllowedSubscriptionPlanIDs,
-			AllowBalance:        key.AllowBalance,
+			PlatformIDs:           key.AllowedPlatformIDs,
+			SubscriptionPlanIDs:   key.AllowedSubscriptionPlanIDs,
+			AllowAllSubscriptions: key.AllowAllSubscriptions,
+			AllowBalance:          key.AllowBalance,
 		})
 		key.AllowedPlatformIDs = permissions.PlatformIDs
 		key.AllowedSubscriptionPlanIDs = permissions.SubscriptionPlanIDs
+		key.AllowAllSubscriptions = permissions.AllowAllSubscriptions
 	}
 	return nil
 }
@@ -814,11 +818,11 @@ func (r *apiKeyRepository) ReplaceAssetPermissions(
 			FOR UPDATE
 		), normalized_platforms AS (
 			SELECT DISTINCT platform_id
-			FROM unnest($3::bigint[]) AS platform_id
+			FROM unnest($4::bigint[]) AS platform_id
 			WHERE platform_id > 0
 		), normalized_plans AS (
 			SELECT DISTINCT subscription_plan_id
-			FROM unnest($4::bigint[]) AS subscription_plan_id
+			FROM unnest($5::bigint[]) AS subscription_plan_id
 			WHERE subscription_plan_id > 0
 		), deleted_platforms AS (
 			DELETE FROM api_key_platforms AS links
@@ -840,7 +844,7 @@ func (r *apiKeyRepository) ReplaceAssetPermissions(
 			  )
 		), updated AS (
 			UPDATE api_keys
-			SET allow_balance = $2, updated_at = NOW()
+			SET allow_balance = $2, allow_all_subscriptions = $3, updated_at = NOW()
 			WHERE id IN (SELECT id FROM target)
 		), inserted_platforms AS (
 			INSERT INTO api_key_platforms (api_key_id, platform_id)
@@ -852,7 +856,7 @@ func (r *apiKeyRepository) ReplaceAssetPermissions(
 		SELECT target.id, normalized_plans.subscription_plan_id
 		FROM target CROSS JOIN normalized_plans
 		ON CONFLICT (api_key_id, subscription_plan_id) DO NOTHING
-	`, keyID, permissions.AllowBalance, pq.Array(permissions.PlatformIDs), pq.Array(permissions.SubscriptionPlanIDs))
+	`, keyID, permissions.AllowBalance, permissions.AllowAllSubscriptions, pq.Array(permissions.PlatformIDs), pq.Array(permissions.SubscriptionPlanIDs))
 	return err
 }
 
@@ -902,29 +906,30 @@ func apiKeyEntityToService(m *dbent.APIKey) *service.APIKey {
 		return nil
 	}
 	out := &service.APIKey{
-		ID:            m.ID,
-		UserID:        m.UserID,
-		Key:           m.Key,
-		Name:          m.Name,
-		Status:        m.Status,
-		IPWhitelist:   m.IPWhitelist,
-		IPBlacklist:   m.IPBlacklist,
-		LastUsedAt:    m.LastUsedAt,
-		CreatedAt:     m.CreatedAt,
-		UpdatedAt:     m.UpdatedAt,
-		AllowBalance:  m.AllowBalance,
-		Quota:         m.Quota,
-		QuotaUsed:     m.QuotaUsed,
-		ExpiresAt:     m.ExpiresAt,
-		RateLimit5h:   m.RateLimit5h,
-		RateLimit1d:   m.RateLimit1d,
-		RateLimit7d:   m.RateLimit7d,
-		Usage5h:       m.Usage5h,
-		Usage1d:       m.Usage1d,
-		Usage7d:       m.Usage7d,
-		Window5hStart: m.Window5hStart,
-		Window1dStart: m.Window1dStart,
-		Window7dStart: m.Window7dStart,
+		ID:                    m.ID,
+		UserID:                m.UserID,
+		Key:                   m.Key,
+		Name:                  m.Name,
+		Status:                m.Status,
+		IPWhitelist:           m.IPWhitelist,
+		IPBlacklist:           m.IPBlacklist,
+		LastUsedAt:            m.LastUsedAt,
+		CreatedAt:             m.CreatedAt,
+		UpdatedAt:             m.UpdatedAt,
+		AllowBalance:          m.AllowBalance,
+		AllowAllSubscriptions: m.AllowAllSubscriptions,
+		Quota:                 m.Quota,
+		QuotaUsed:             m.QuotaUsed,
+		ExpiresAt:             m.ExpiresAt,
+		RateLimit5h:           m.RateLimit5h,
+		RateLimit1d:           m.RateLimit1d,
+		RateLimit7d:           m.RateLimit7d,
+		Usage5h:               m.Usage5h,
+		Usage1d:               m.Usage1d,
+		Usage7d:               m.Usage7d,
+		Window5hStart:         m.Window5hStart,
+		Window1dStart:         m.Window1dStart,
+		Window7dStart:         m.Window7dStart,
 	}
 	if m.Edges.User != nil {
 		out.User = userEntityToService(m.Edges.User)

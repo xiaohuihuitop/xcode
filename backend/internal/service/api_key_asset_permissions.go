@@ -14,16 +14,18 @@ var (
 // APIKeyAssetPermissions separates account-pool access from the user assets
 // that the key may spend once a platform has been resolved.
 type APIKeyAssetPermissions struct {
-	PlatformIDs         []int64 `json:"platform_ids"`
-	SubscriptionPlanIDs []int64 `json:"subscription_plan_ids"`
-	AllowBalance        bool    `json:"allow_balance"`
+	PlatformIDs           []int64 `json:"platform_ids"`
+	SubscriptionPlanIDs   []int64 `json:"subscription_plan_ids"`
+	AllowAllSubscriptions bool    `json:"allow_all_subscriptions"`
+	AllowBalance          bool    `json:"allow_balance"`
 }
 
 func NormalizeAPIKeyAssetPermissions(permissions APIKeyAssetPermissions) APIKeyAssetPermissions {
 	return APIKeyAssetPermissions{
-		PlatformIDs:         normalizePositiveIDs(permissions.PlatformIDs),
-		SubscriptionPlanIDs: normalizePositiveIDs(permissions.SubscriptionPlanIDs),
-		AllowBalance:        permissions.AllowBalance,
+		PlatformIDs:           normalizePositiveIDs(permissions.PlatformIDs),
+		SubscriptionPlanIDs:   normalizePositiveIDs(permissions.SubscriptionPlanIDs),
+		AllowAllSubscriptions: permissions.AllowAllSubscriptions,
+		AllowBalance:          permissions.AllowBalance,
 	}
 }
 
@@ -32,7 +34,7 @@ func ValidateAPIKeyAssetPermissions(permissions APIKeyAssetPermissions) error {
 	if len(normalized.PlatformIDs) == 0 {
 		return ErrAPIKeyPlatformRequired
 	}
-	if len(normalized.SubscriptionPlanIDs) == 0 && !normalized.AllowBalance {
+	if !normalized.AllowAllSubscriptions && len(normalized.SubscriptionPlanIDs) == 0 && !normalized.AllowBalance {
 		return ErrAPIKeyBillingSourceRequired
 	}
 	return nil
@@ -43,10 +45,19 @@ func newAPIKeyFromCreateRequest(req CreateAPIKeyRequest) *APIKey {
 	if req.AllowBalance != nil {
 		allowBalance = *req.AllowBalance
 	}
+	allowAllSubscriptions := true
+	if req.AllowAllSubscriptions != nil {
+		allowAllSubscriptions = *req.AllowAllSubscriptions
+	} else if len(req.SubscriptionPlanIDs) > 0 {
+		// Old clients that still submit concrete plan IDs retain their old
+		// restricted behavior during the rolling deployment window.
+		allowAllSubscriptions = false
+	}
 	permissions := NormalizeAPIKeyAssetPermissions(APIKeyAssetPermissions{
-		PlatformIDs:         req.PlatformIDs,
-		SubscriptionPlanIDs: req.SubscriptionPlanIDs,
-		AllowBalance:        allowBalance,
+		PlatformIDs:           req.PlatformIDs,
+		SubscriptionPlanIDs:   req.SubscriptionPlanIDs,
+		AllowAllSubscriptions: allowAllSubscriptions,
+		AllowBalance:          allowBalance,
 	})
 	return &APIKey{
 		Name:                       req.Name,
@@ -58,16 +69,17 @@ func newAPIKeyFromCreateRequest(req CreateAPIKeyRequest) *APIKey {
 		RateLimit7d:                req.RateLimit7d,
 		AllowedPlatformIDs:         permissions.PlatformIDs,
 		AllowedSubscriptionPlanIDs: permissions.SubscriptionPlanIDs,
+		AllowAllSubscriptions:      permissions.AllowAllSubscriptions,
 		AllowBalance:               permissions.AllowBalance,
 	}
 }
 
 func createAPIKeyAssetPermissionsProvided(req CreateAPIKeyRequest) bool {
-	return req.PlatformIDs != nil || req.SubscriptionPlanIDs != nil || req.AllowBalance != nil
+	return req.PlatformIDs != nil || req.SubscriptionPlanIDs != nil || req.AllowAllSubscriptions != nil || req.AllowBalance != nil
 }
 
 func updateAPIKeyAssetPermissionsProvided(req UpdateAPIKeyRequest) bool {
-	return req.PlatformIDs != nil || req.SubscriptionPlanIDs != nil || req.AllowBalance != nil
+	return req.PlatformIDs != nil || req.SubscriptionPlanIDs != nil || req.AllowAllSubscriptions != nil || req.AllowBalance != nil
 }
 
 func updatedAPIKeyAssetPermissions(key *APIKey, req UpdateAPIKeyRequest) APIKeyAssetPermissions {
@@ -75,6 +87,7 @@ func updatedAPIKeyAssetPermissions(key *APIKey, req UpdateAPIKeyRequest) APIKeyA
 	if key != nil {
 		permissions.PlatformIDs = key.AllowedPlatformIDs
 		permissions.SubscriptionPlanIDs = key.AllowedSubscriptionPlanIDs
+		permissions.AllowAllSubscriptions = key.AllowAllSubscriptions
 		permissions.AllowBalance = key.AllowBalance
 	}
 	if req.PlatformIDs != nil {
@@ -82,6 +95,12 @@ func updatedAPIKeyAssetPermissions(key *APIKey, req UpdateAPIKeyRequest) APIKeyA
 	}
 	if req.SubscriptionPlanIDs != nil {
 		permissions.SubscriptionPlanIDs = *req.SubscriptionPlanIDs
+		if req.AllowAllSubscriptions == nil {
+			permissions.AllowAllSubscriptions = false
+		}
+	}
+	if req.AllowAllSubscriptions != nil {
+		permissions.AllowAllSubscriptions = *req.AllowAllSubscriptions
 	}
 	if req.AllowBalance != nil {
 		permissions.AllowBalance = *req.AllowBalance

@@ -18,18 +18,18 @@ describe('API Key asset permissions API', () => {
     post.mockResolvedValue({ data: { id: 7 } })
   })
 
-  it('creates a key with independent platform, subscription, and balance permissions', async () => {
+  it('creates a key with platform, all-subscriptions, and balance permissions', async () => {
     await create({
       name: 'multi-asset-key',
       platform_ids: [11, 12],
-      subscription_plan_ids: [21, 22],
+      allow_all_subscriptions: true,
       allow_balance: true,
     })
 
     expect(post).toHaveBeenCalledWith('/keys', {
       name: 'multi-asset-key',
       platform_ids: [11, 12],
-      subscription_plan_ids: [21, 22],
+      allow_all_subscriptions: true,
       allow_balance: true,
     })
   })

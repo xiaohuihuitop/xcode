@@ -29,6 +29,8 @@ const (
 	FieldName = "name"
 	// FieldAllowBalance holds the string denoting the allow_balance field in the database.
 	FieldAllowBalance = "allow_balance"
+	// FieldAllowAllSubscriptions holds the string denoting the allow_all_subscriptions field in the database.
+	FieldAllowAllSubscriptions = "allow_all_subscriptions"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
 	// FieldLastUsedAt holds the string denoting the last_used_at field in the database.
@@ -107,6 +109,7 @@ var Columns = []string{
 	FieldKey,
 	FieldName,
 	FieldAllowBalance,
+	FieldAllowAllSubscriptions,
 	FieldStatus,
 	FieldLastUsedAt,
 	FieldIPWhitelist,
@@ -164,6 +167,8 @@ var (
 	NameValidator func(string) error
 	// DefaultAllowBalance holds the default value on creation for the "allow_balance" field.
 	DefaultAllowBalance bool
+	// DefaultAllowAllSubscriptions holds the default value on creation for the "allow_all_subscriptions" field.
+	DefaultAllowAllSubscriptions bool
 	// DefaultStatus holds the default value on creation for the "status" field.
 	DefaultStatus string
 	// StatusValidator is a validator for the "status" field. It is called by the builders before save.
@@ -227,6 +232,11 @@ func ByName(opts ...sql.OrderTermOption) OrderOption {
 // ByAllowBalance orders the results by the allow_balance field.
 func ByAllowBalance(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldAllowBalance, opts...).ToFunc()
+}
+
+// ByAllowAllSubscriptions orders the results by the allow_all_subscriptions field.
+func ByAllowAllSubscriptions(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAllowAllSubscriptions, opts...).ToFunc()
 }
 
 // ByStatus orders the results by the status field.

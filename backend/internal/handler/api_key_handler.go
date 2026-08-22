@@ -59,6 +59,7 @@ type CreateAPIKeyRequest struct {
 	Name                string   `json:"name" binding:"required"`
 	PlatformIDs         []int64  `json:"platform_ids"`
 	SubscriptionPlanIDs []int64  `json:"subscription_plan_ids"`
+	AllowAllSubscriptions *bool  `json:"allow_all_subscriptions"`
 	AllowBalance        *bool    `json:"allow_balance"`
 	CustomKey           *string  `json:"custom_key"`      // 可选的自定义key
 	IPWhitelist         []string `json:"ip_whitelist"`    // IP 白名单
@@ -77,6 +78,7 @@ type UpdateAPIKeyRequest struct {
 	Name                string    `json:"name"`
 	PlatformIDs         *[]int64  `json:"platform_ids"`
 	SubscriptionPlanIDs *[]int64  `json:"subscription_plan_ids"`
+	AllowAllSubscriptions *bool   `json:"allow_all_subscriptions"`
 	AllowBalance        *bool     `json:"allow_balance"`
 	Status              string    `json:"status" binding:"omitempty,oneof=active inactive"`
 	IPWhitelist         *[]string `json:"ip_whitelist"` // IP 白名单（nil 不修改，空数组清空）
@@ -180,6 +182,7 @@ func (h *APIKeyHandler) Create(c *gin.Context) {
 		Name:                req.Name,
 		PlatformIDs:         req.PlatformIDs,
 		SubscriptionPlanIDs: req.SubscriptionPlanIDs,
+		AllowAllSubscriptions: req.AllowAllSubscriptions,
 		AllowBalance:        req.AllowBalance,
 		CustomKey:           req.CustomKey,
 		IPWhitelist:         req.IPWhitelist,
@@ -232,6 +235,7 @@ func (h *APIKeyHandler) Update(c *gin.Context) {
 	svcReq := service.UpdateAPIKeyRequest{
 		PlatformIDs:         req.PlatformIDs,
 		SubscriptionPlanIDs: req.SubscriptionPlanIDs,
+		AllowAllSubscriptions: req.AllowAllSubscriptions,
 		AllowBalance:        req.AllowBalance,
 		IPWhitelist:         req.IPWhitelist,
 		IPBlacklist:         req.IPBlacklist,

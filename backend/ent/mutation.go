@@ -115,6 +115,7 @@ type APIKeyMutation struct {
 	key                       *string
 	name                      *string
 	allow_balance             *bool
+	allow_all_subscriptions   *bool
 	status                    *string
 	last_used_at              *time.Time
 	ip_whitelist              *[]string
@@ -519,6 +520,42 @@ func (m *APIKeyMutation) OldAllowBalance(ctx context.Context) (v bool, err error
 // ResetAllowBalance resets all changes to the "allow_balance" field.
 func (m *APIKeyMutation) ResetAllowBalance() {
 	m.allow_balance = nil
+}
+
+// SetAllowAllSubscriptions sets the "allow_all_subscriptions" field.
+func (m *APIKeyMutation) SetAllowAllSubscriptions(b bool) {
+	m.allow_all_subscriptions = &b
+}
+
+// AllowAllSubscriptions returns the value of the "allow_all_subscriptions" field in the mutation.
+func (m *APIKeyMutation) AllowAllSubscriptions() (r bool, exists bool) {
+	v := m.allow_all_subscriptions
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAllowAllSubscriptions returns the old "allow_all_subscriptions" field's value of the APIKey entity.
+// If the APIKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *APIKeyMutation) OldAllowAllSubscriptions(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAllowAllSubscriptions is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAllowAllSubscriptions requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAllowAllSubscriptions: %w", err)
+	}
+	return oldValue.AllowAllSubscriptions, nil
+}
+
+// ResetAllowAllSubscriptions resets all changes to the "allow_all_subscriptions" field.
+func (m *APIKeyMutation) ResetAllowAllSubscriptions() {
+	m.allow_all_subscriptions = nil
 }
 
 // SetStatus sets the "status" field.
@@ -1603,7 +1640,7 @@ func (m *APIKeyMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *APIKeyMutation) Fields() []string {
-	fields := make([]string, 0, 23)
+	fields := make([]string, 0, 24)
 	if m.created_at != nil {
 		fields = append(fields, apikey.FieldCreatedAt)
 	}
@@ -1624,6 +1661,9 @@ func (m *APIKeyMutation) Fields() []string {
 	}
 	if m.allow_balance != nil {
 		fields = append(fields, apikey.FieldAllowBalance)
+	}
+	if m.allow_all_subscriptions != nil {
+		fields = append(fields, apikey.FieldAllowAllSubscriptions)
 	}
 	if m.status != nil {
 		fields = append(fields, apikey.FieldStatus)
@@ -1695,6 +1735,8 @@ func (m *APIKeyMutation) Field(name string) (ent.Value, bool) {
 		return m.Name()
 	case apikey.FieldAllowBalance:
 		return m.AllowBalance()
+	case apikey.FieldAllowAllSubscriptions:
+		return m.AllowAllSubscriptions()
 	case apikey.FieldStatus:
 		return m.Status()
 	case apikey.FieldLastUsedAt:
@@ -1750,6 +1792,8 @@ func (m *APIKeyMutation) OldField(ctx context.Context, name string) (ent.Value, 
 		return m.OldName(ctx)
 	case apikey.FieldAllowBalance:
 		return m.OldAllowBalance(ctx)
+	case apikey.FieldAllowAllSubscriptions:
+		return m.OldAllowAllSubscriptions(ctx)
 	case apikey.FieldStatus:
 		return m.OldStatus(ctx)
 	case apikey.FieldLastUsedAt:
@@ -1839,6 +1883,13 @@ func (m *APIKeyMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetAllowBalance(v)
+		return nil
+	case apikey.FieldAllowAllSubscriptions:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAllowAllSubscriptions(v)
 		return nil
 	case apikey.FieldStatus:
 		v, ok := value.(string)
@@ -2171,6 +2222,9 @@ func (m *APIKeyMutation) ResetField(name string) error {
 		return nil
 	case apikey.FieldAllowBalance:
 		m.ResetAllowBalance()
+		return nil
+	case apikey.FieldAllowAllSubscriptions:
+		m.ResetAllowAllSubscriptions()
 		return nil
 	case apikey.FieldStatus:
 		m.ResetStatus()

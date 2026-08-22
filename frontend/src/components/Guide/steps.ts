@@ -190,8 +190,8 @@ function getKeySteps(t: (key: string) => string, admin: boolean): DriveStep[] {
     {
       element: '[data-tour="key-form-subscription-plans"]',
       popover: {
-        title: t('keys.subscriptionPlansLabel'),
-        description: t('keys.subscriptionPlansHint'),
+        title: t('keys.billingLabel'),
+        description: t('keys.billingHint'),
         side: 'right',
         align: 'start',
         showButtons: [...navigable]
@@ -201,7 +201,7 @@ function getKeySteps(t: (key: string) => string, admin: boolean): DriveStep[] {
       element: '[data-tour="key-form-submit"]',
       popover: {
         title: t('keys.createKey'),
-        description: admin ? t('keys.platformsHint') : t('keys.subscriptionPlansHint'),
+        description: admin ? t('keys.platformsHint') : t('keys.billingHint'),
         side: 'left',
         align: 'center',
         showButtons: [...interactive]

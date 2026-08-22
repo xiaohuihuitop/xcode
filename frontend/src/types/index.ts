@@ -499,6 +499,7 @@ export interface ApiKey {
   name: string
   platform_ids?: number[]
   subscription_plan_ids?: number[]
+  allow_all_subscriptions?: boolean
   allow_balance?: boolean
   status: 'active' | 'inactive' | 'quota_exhausted' | 'expired'
   ip_whitelist: string[]
@@ -529,6 +530,7 @@ export interface CreateApiKeyRequest {
   name: string
   platform_ids?: number[]
   subscription_plan_ids?: number[]
+  allow_all_subscriptions?: boolean
   allow_balance?: boolean
   custom_key?: string // Optional custom API Key
   ip_whitelist?: string[]
@@ -544,6 +546,7 @@ export interface UpdateApiKeyRequest {
   name?: string
   platform_ids?: number[]
   subscription_plan_ids?: number[]
+  allow_all_subscriptions?: boolean
   allow_balance?: boolean
   status?: 'active' | 'inactive'
   ip_whitelist?: string[]

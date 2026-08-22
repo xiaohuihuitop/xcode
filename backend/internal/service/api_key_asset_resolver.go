@@ -30,6 +30,10 @@ type apiKeySubscriptionPlanCandidateLister interface {
 	ListActiveSubscriptionsByPlanIDs(ctx context.Context, userID int64, planIDs []int64) ([]UserSubscription, error)
 }
 
+type apiKeyAllSubscriptionLister interface {
+	ListActiveSubscriptions(ctx context.Context, userID int64) ([]UserSubscription, error)
+}
+
 type apiKeySubscriptionResolver interface {
 	ValidateAndCheckLimits(sub *UserSubscription) (bool, error)
 	EnsureWindowMaintenance(ctx context.Context, sub *UserSubscription) (*UserSubscription, error)
@@ -84,8 +88,22 @@ func (s *APIKeyService) resolveSubscriptionBillingAsset(
 	apiKey *APIKey,
 	subscriptions apiKeySubscriptionResolver,
 ) (*ResolvedBillingAsset, error) {
-	if len(apiKey.AllowedSubscriptionPlanIDs) == 0 || !hasSubscriptionResolver(subscriptions) {
+	if (!apiKey.AllowAllSubscriptions && len(apiKey.AllowedSubscriptionPlanIDs) == 0) || !hasSubscriptionResolver(subscriptions) {
 		return nil, nil
+	}
+	if apiKey.AllowAllSubscriptions {
+		lister, ok := subscriptions.(apiKeyAllSubscriptionLister)
+		if !ok {
+			return nil, nil
+		}
+		candidates, err := lister.ListActiveSubscriptions(ctx, apiKey.UserID)
+		if err != nil {
+			if isSubscriptionCandidateUnavailableError(err) {
+				return nil, nil
+			}
+			return nil, err
+		}
+		return s.firstUsableSubscriptionAsset(ctx, nil, candidates, subscriptions)
 	}
 	lister, ok := subscriptions.(apiKeySubscriptionPlanCandidateLister)
 	if !ok {
@@ -107,7 +125,10 @@ func (s *APIKeyService) firstUsableSubscriptionAsset(
 	candidates []UserSubscription,
 	subscriptions apiKeySubscriptionResolver,
 ) (*ResolvedBillingAsset, error) {
-	allowed := makeAllowedPlanIDSet(allowedPlanIDs)
+	var allowed map[int64]struct{}
+	if allowedPlanIDs != nil {
+		allowed = makeAllowedPlanIDSet(allowedPlanIDs)
+	}
 	sortSubscriptionCandidates(candidates)
 	for index := range candidates {
 		subscription := &candidates[index]
@@ -158,6 +179,9 @@ func makeAllowedPlanIDSet(planIDs []int64) map[int64]struct{} {
 func subscriptionUsesAllowedPlan(subscription *UserSubscription, allowed map[int64]struct{}) bool {
 	if subscription == nil || subscription.SubscriptionPlanID == nil {
 		return false
+	}
+	if allowed == nil {
+		return true
 	}
 	_, ok := allowed[*subscription.SubscriptionPlanID]
 	return ok

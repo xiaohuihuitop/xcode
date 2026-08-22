@@ -46,6 +46,7 @@ type APIKey struct {
 	AllowedPlatformIDs         []int64
 	AllowedPlatforms           []Platform
 	AllowedSubscriptionPlanIDs []int64
+	AllowAllSubscriptions      bool
 	AllowBalance               bool
 	CurrentConcurrency         int
 

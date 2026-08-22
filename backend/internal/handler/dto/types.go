@@ -52,6 +52,7 @@ type APIKey struct {
 	Name                string     `json:"name"`
 	PlatformIDs         []int64    `json:"platform_ids"`
 	SubscriptionPlanIDs []int64    `json:"subscription_plan_ids"`
+	AllowAllSubscriptions bool     `json:"allow_all_subscriptions"`
 	AllowBalance        bool       `json:"allow_balance"`
 	Status              string     `json:"status"`
 	IPWhitelist         []string   `json:"ip_whitelist"`

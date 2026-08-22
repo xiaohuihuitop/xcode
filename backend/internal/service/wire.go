@@ -675,18 +675,60 @@ func ProvideAPIKeyService(
 	billingCacheService *BillingCacheService,
 	concurrencyService *ConcurrencyService,
 	paymentConfigService *PaymentConfigService,
+	platformService *PlatformService,
 ) *APIKeyService {
 	svc := NewAPIKeyService(apiKeyRepo, userRepo, userSubRepo, cache, cfg)
 	svc.SetRateLimitCacheInvalidator(billingCacheService)
 	svc.SetConcurrencyService(concurrencyService)
 	svc.SetGlobalBalanceRateProvider(paymentConfigService)
+	svc.SetPlatformLister(platformService)
 	return svc
+}
+
+func ProvideAuthService(
+	entClient *dbent.Client,
+	userRepo UserRepository,
+	redeemRepo RedeemCodeRepository,
+	refreshTokenCache RefreshTokenCache,
+	cfg *config.Config,
+	settingService *SettingService,
+	emailService *EmailService,
+	turnstileService *TurnstileService,
+	emailQueueService *EmailQueueService,
+	promoService *PromoService,
+	defaultSubAssigner DefaultSubscriptionAssigner,
+	affiliateService *AffiliateService,
+	userPlatformQuotaRepo UserPlatformQuotaRepository,
+	defaultAPIKeyProvisioner DefaultAPIKeyProvisioner,
+) *AuthService {
+	svc := NewAuthService(
+		entClient,
+		userRepo,
+		redeemRepo,
+		refreshTokenCache,
+		cfg,
+		settingService,
+		emailService,
+		turnstileService,
+		emailQueueService,
+		promoService,
+		defaultSubAssigner,
+		affiliateService,
+		userPlatformQuotaRepo,
+	)
+	svc.SetDefaultAPIKeyProvisioner(defaultAPIKeyProvisioner)
+	return svc
+}
+
+func ProvideDefaultAPIKeyProvisioner(apiKeyService *APIKeyService) DefaultAPIKeyProvisioner {
+	return apiKeyService
 }
 
 // ProviderSet is the Wire provider set for all services
 var ProviderSet = wire.NewSet(
 	// Core services
-	NewAuthService,
+	ProvideAuthService,
+	ProvideDefaultAPIKeyProvisioner,
 	NewPasskeyService,
 	NewUserService,
 	ProvideAPIKeyService,

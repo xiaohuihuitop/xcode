@@ -66,23 +66,28 @@ type JWTClaims struct {
 
 // AuthService 认证服务
 type AuthService struct {
-	entClient             *dbent.Client
-	userRepo              UserRepository
-	redeemRepo            RedeemCodeRepository
-	refreshTokenCache     RefreshTokenCache
-	cfg                   *config.Config
-	settingService        *SettingService
-	emailService          *EmailService
-	turnstileService      *TurnstileService
-	emailQueueService     *EmailQueueService
-	promoService          *PromoService
-	affiliateService      *AffiliateService
-	defaultSubAssigner    DefaultSubscriptionAssigner
-	userPlatformQuotaRepo UserPlatformQuotaRepository
+	entClient                *dbent.Client
+	userRepo                 UserRepository
+	redeemRepo               RedeemCodeRepository
+	refreshTokenCache        RefreshTokenCache
+	cfg                      *config.Config
+	settingService           *SettingService
+	emailService             *EmailService
+	turnstileService         *TurnstileService
+	emailQueueService        *EmailQueueService
+	promoService             *PromoService
+	affiliateService         *AffiliateService
+	defaultSubAssigner       DefaultSubscriptionAssigner
+	userPlatformQuotaRepo    UserPlatformQuotaRepository
+	defaultAPIKeyProvisioner DefaultAPIKeyProvisioner
 }
 
 type DefaultSubscriptionAssigner interface {
 	AssignSubscriptionFromPlan(ctx context.Context, input *AssignSubscriptionFromPlanInput) (*UserSubscription, error)
+}
+
+type DefaultAPIKeyProvisioner interface {
+	EnsureDefaultAPIKey(ctx context.Context, userID int64) error
 }
 
 type signupGrantPlan struct {
@@ -122,6 +127,14 @@ func NewAuthService(
 		affiliateService:      affiliateService,
 		defaultSubAssigner:    defaultSubAssigner,
 		userPlatformQuotaRepo: userPlatformQuotaRepo,
+	}
+}
+
+// SetDefaultAPIKeyProvisioner wires the optional registration bootstrapper
+// after service construction, avoiding a dependency cycle in the auth graph.
+func (s *AuthService) SetDefaultAPIKeyProvisioner(provisioner DefaultAPIKeyProvisioner) {
+	if s != nil {
+		s.defaultAPIKeyProvisioner = provisioner
 	}
 }
 
@@ -912,9 +925,19 @@ func (s *AuthService) postAuthUserBootstrap(ctx context.Context, user *User, sig
 		signupSource = "email"
 	}
 	s.updateUserSignupSource(ctx, user.ID, signupSource)
+	s.ensureDefaultAPIKey(ctx, user.ID)
 
 	if touchLogin {
 		s.touchUserLogin(ctx, user.ID)
+	}
+}
+
+func (s *AuthService) ensureDefaultAPIKey(ctx context.Context, userID int64) {
+	if s == nil || s.defaultAPIKeyProvisioner == nil || userID <= 0 {
+		return
+	}
+	if err := s.defaultAPIKeyProvisioner.EnsureDefaultAPIKey(ctx, userID); err != nil {
+		logger.LegacyPrintf("service.auth", "[Auth] Failed to ensure default API key: user_id=%d err=%v", userID, err)
 	}
 }
 
@@ -946,7 +969,7 @@ func (s *AuthService) touchUserLogin(ctx context.Context, userID int64) {
 }
 
 func (s *AuthService) backfillEmailIdentityOnSuccessfulLogin(ctx context.Context, user *User) {
-	if s == nil || user == nil || user.ID <= 0 {
+	if s == nil || s.entClient == nil || user == nil || user.ID <= 0 {
 		return
 	}
 	identity, created := s.ensureEmailAuthIdentity(ctx, user, "auth_service_login_backfill")

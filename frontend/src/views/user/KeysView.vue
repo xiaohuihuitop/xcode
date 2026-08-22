@@ -67,7 +67,7 @@
               </button>
             </div>
           </div>
-          <button @click="showCreateModal = true" class="btn btn-primary" data-tour="keys-create-btn">
+          <button @click="openCreateModal" class="btn btn-primary" data-tour="keys-create-btn">
             <Icon name="plus" size="md" class="mr-2" />
             {{ t('keys.createKey') }}
           </button>
@@ -396,7 +396,7 @@
               :title="t('keys.noKeysYet')"
               :description="t('keys.createFirstKey')"
               :action-text="t('keys.createKey')"
-              @action="showCreateModal = true"
+              @action="openCreateModal"
             />
           </template>
         </DataTable>
@@ -436,12 +436,11 @@
 
         <KeyAssetPermissionsForm
           :platforms="platformOptions"
-          :subscription-plans="subscriptionPlanOptions"
           :platform-ids="formData.platform_ids"
-          :subscription-plan-ids="formData.subscription_plan_ids"
+          :allow-all-subscriptions="formData.allow_all_subscriptions"
           :allow-balance="formData.allow_balance"
           @update:platform-ids="formData.platform_ids = $event"
-          @update:subscription-plan-ids="formData.subscription_plan_ids = $event"
+          @update:allow-all-subscriptions="formData.allow_all_subscriptions = $event"
           @update:allow-balance="formData.allow_balance = $event"
         />
 
@@ -996,7 +995,6 @@ import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 
 const { t } = useI18n()
 import { keysAPI, authAPI, usageAPI } from '@/api'
-import { getActiveSubscriptions } from '@/api/subscriptions'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 	import DataTable from '@/components/common/DataTable.vue'
@@ -1009,9 +1007,9 @@ import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 	import Icon from '@/components/icons/Icon.vue'
 	import UseKeyModal from '@/components/keys/UseKeyModal.vue'
 	import EndpointPopover from '@/components/keys/EndpointPopover.vue'
-	import KeyAssetPermissionsForm, { type SubscriptionPlanPermissionOption } from '@/components/keys/KeyAssetPermissionsForm.vue'
+	import KeyAssetPermissionsForm from '@/components/keys/KeyAssetPermissionsForm.vue'
 	import PlatformIcon from '@/components/common/PlatformIcon.vue'
-	import type { ApiKey, AvailablePlatformPool, CreateApiKeyRequest, PublicSettings, UpdateApiKeyRequest, UserSubscription } from '@/types'
+import type { ApiKey, AvailablePlatformPool, CreateApiKeyRequest, PublicSettings, UpdateApiKeyRequest } from '@/types'
 import type { Column } from '@/components/common/types'
 import type { BatchApiKeyUsageStats } from '@/api/usage'
 import { formatDateTime } from '@/utils/format'
@@ -1128,7 +1126,6 @@ const columns = computed<Column[]>(() =>
 
 const apiKeys = ref<ApiKey[]>([])
 const platforms = ref<AvailablePlatformPool[]>([])
-const activeSubscriptions = ref<UserSubscription[]>([])
 const loading = ref(false)
 const submitting = ref(false)
 const now = ref(new Date())
@@ -1168,7 +1165,7 @@ let abortController: AbortController | null = null
 const formData = ref({
   name: '',
   platform_ids: [] as number[],
-  subscription_plan_ids: [] as number[],
+  allow_all_subscriptions: true,
   allow_balance: true,
   status: 'active' as 'active' | 'inactive',
   use_custom_key: false,
@@ -1250,19 +1247,6 @@ const platformOptions = computed<AvailablePlatformPool[]>(() => {
   return [...byID.values()].sort((left, right) => left.name.localeCompare(right.name) || left.id - right.id)
 })
 
-const subscriptionPlanOptions = computed<SubscriptionPlanPermissionOption[]>(() => {
-  const byID = new Map<number, string>()
-  for (const subscription of activeSubscriptions.value) {
-    const id = subscription.subscription_plan_id
-    if (!id || id <= 0 || byID.has(id)) continue
-    byID.set(id, subscription.plan_name_snapshot?.trim() || t('keys.subscriptionPlanFallback', { id }))
-  }
-  for (const id of formData.value.subscription_plan_ids) {
-    if (!byID.has(id)) byID.set(id, t('keys.unavailableSubscriptionPlan', { id }))
-  }
-  return [...byID].map(([id, name]) => ({ id, name })).sort((left, right) => left.name.localeCompare(right.name) || left.id - right.id)
-})
-
 const displayPlatforms = (key: ApiKey | null): AvailablePlatformPool[] => {
   if (!key?.platform_ids?.length) return []
   return key.platform_ids.map(id => platforms.value.find(platform => platform.id === id) ?? {
@@ -1274,12 +1258,14 @@ const displayPlatforms = (key: ApiKey | null): AvailablePlatformPool[] => {
 }
 
 const billingSourceSummary = (key: ApiKey): string => {
-  const planNames = (key.subscription_plan_ids ?? []).map(id => {
-    return subscriptionPlanOptions.value.find(plan => plan.id === id)?.name ?? t('keys.subscriptionPlanFallback', { id })
-  })
-  if (key.allow_balance !== false) planNames.push(t('keys.balanceEnabled'))
-  if (planNames.length) return planNames.join(' / ')
-  return t('keys.noBillingSource')
+  const sources: string[] = []
+  if (key.allow_all_subscriptions || (key.allow_all_subscriptions === undefined && (key.subscription_plan_ids ?? []).length > 0)) {
+    sources.push(t('keys.allSubscriptionsEnabled'))
+  } else if ((key.subscription_plan_ids ?? []).length > 0) {
+    sources.push(t('keys.selectedSubscriptions', { count: key.subscription_plan_ids?.length ?? 0 }))
+  }
+  if (key.allow_balance !== false) sources.push(t('keys.balanceEnabled'))
+  return sources.length ? sources.join(' / ') : t('keys.noBillingSource')
 }
 
 const primaryUsePlatform = (key: ApiKey | null) => {
@@ -1356,12 +1342,8 @@ const loadApiKeys = async () => {
 
 const loadAssetOptions = async () => {
   try {
-    const [availablePlatforms, subscriptions] = await Promise.all([
-      keysAPI.getAvailablePlatforms(),
-      getActiveSubscriptions(),
-    ])
+    const availablePlatforms = await keysAPI.getAvailablePlatforms()
     platforms.value = availablePlatforms
-    activeSubscriptions.value = subscriptions
   } catch (error) {
     console.error('Failed to load API key asset options:', error)
   }
@@ -1410,7 +1392,7 @@ const editKey = (key: ApiKey) => {
   formData.value = {
     name: key.name,
     platform_ids: [...(key.platform_ids ?? [])],
-    subscription_plan_ids: [...(key.subscription_plan_ids ?? [])],
+    allow_all_subscriptions: key.allow_all_subscriptions ?? (key.subscription_plan_ids ?? []).length > 0,
     allow_balance: key.allow_balance ?? true,
     status: key.status === 'quota_exhausted' || key.status === 'expired' ? 'inactive' : key.status,
     use_custom_key: false,
@@ -1458,12 +1440,11 @@ const confirmDelete = (key: ApiKey) => {
 
 const handleSubmit = async () => {
   const platformIDs = [...new Set(formData.value.platform_ids)].sort((left, right) => left - right)
-  const subscriptionPlanIDs = [...new Set(formData.value.subscription_plan_ids)].sort((left, right) => left - right)
   if (platformIDs.length === 0) {
     appStore.showError(t('keys.platformRequired'))
     return
   }
-  if (subscriptionPlanIDs.length === 0 && !formData.value.allow_balance) {
+  if (!formData.value.allow_all_subscriptions && !formData.value.allow_balance) {
     appStore.showError(t('keys.billingSourceRequired'))
     return
   }
@@ -1520,7 +1501,7 @@ const handleSubmit = async () => {
       const updates: UpdateApiKeyRequest = {
         name: formData.value.name,
         platform_ids: platformIDs,
-        subscription_plan_ids: subscriptionPlanIDs,
+        allow_all_subscriptions: formData.value.allow_all_subscriptions,
         allow_balance: formData.value.allow_balance,
         ip_whitelist: ipWhitelist,
         ip_blacklist: ipBlacklist,
@@ -1540,7 +1521,7 @@ const handleSubmit = async () => {
       const createRequest: CreateApiKeyRequest = {
         name: formData.value.name,
         platform_ids: platformIDs,
-        subscription_plan_ids: subscriptionPlanIDs,
+        allow_all_subscriptions: formData.value.allow_all_subscriptions,
         allow_balance: formData.value.allow_balance,
         custom_key: customKey,
         ip_whitelist: ipWhitelist,
@@ -1596,7 +1577,7 @@ const closeModals = () => {
   formData.value = {
     name: '',
     platform_ids: [],
-    subscription_plan_ids: [],
+    allow_all_subscriptions: true,
     allow_balance: true,
     status: 'active',
     use_custom_key: false,
@@ -1614,6 +1595,13 @@ const closeModals = () => {
     expiration_preset: '30',
     expiration_date: ''
   }
+}
+
+const openCreateModal = () => {
+  formData.value.platform_ids = platforms.value.map(platform => platform.id).sort((left, right) => left - right)
+  formData.value.allow_all_subscriptions = true
+  formData.value.allow_balance = true
+  showCreateModal.value = true
 }
 
 // Show reset quota confirmation dialog

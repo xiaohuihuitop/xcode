@@ -43,6 +43,8 @@ func (APIKey) Fields() []ent.Field {
 			NotEmpty(),
 		field.Bool("allow_balance").
 			Default(true),
+		field.Bool("allow_all_subscriptions").
+			Default(false),
 		field.String("status").
 			MaxLen(20).
 			Default(domain.StatusActive),

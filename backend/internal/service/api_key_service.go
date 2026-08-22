@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"html"
 	"sort"
@@ -122,6 +123,10 @@ type apiKeyAllByUserIDLister interface {
 	ListAllByUserID(ctx context.Context, userID int64, filters APIKeyListFilters) ([]APIKey, error)
 }
 
+type apiKeyPlatformLister interface {
+	List(ctx context.Context) ([]Platform, error)
+}
+
 // APIKeyRateLimitData holds rate limit usage and window state for an API key.
 type APIKeyRateLimitData struct {
 	Usage5h       float64
@@ -205,13 +210,14 @@ type APIKeyAuthCacheInvalidator interface {
 
 // CreateAPIKeyRequest 创建API Key请求
 type CreateAPIKeyRequest struct {
-	Name                string   `json:"name"`
-	PlatformIDs         []int64  `json:"platform_ids"`
-	SubscriptionPlanIDs []int64  `json:"subscription_plan_ids"`
-	AllowBalance        *bool    `json:"allow_balance"`
-	CustomKey           *string  `json:"custom_key"`   // 可选的自定义key
-	IPWhitelist         []string `json:"ip_whitelist"` // IP 白名单
-	IPBlacklist         []string `json:"ip_blacklist"` // IP 黑名单
+	Name                  string   `json:"name"`
+	PlatformIDs           []int64  `json:"platform_ids"`
+	SubscriptionPlanIDs   []int64  `json:"subscription_plan_ids"`
+	AllowAllSubscriptions *bool    `json:"allow_all_subscriptions"`
+	AllowBalance          *bool    `json:"allow_balance"`
+	CustomKey             *string  `json:"custom_key"`   // 可选的自定义key
+	IPWhitelist           []string `json:"ip_whitelist"` // IP 白名单
+	IPBlacklist           []string `json:"ip_blacklist"` // IP 黑名单
 
 	// Quota fields
 	Quota         float64 `json:"quota"`           // Quota limit in USD (0 = unlimited)
@@ -225,13 +231,14 @@ type CreateAPIKeyRequest struct {
 
 // UpdateAPIKeyRequest 更新API Key请求
 type UpdateAPIKeyRequest struct {
-	Name                *string   `json:"name"`
-	PlatformIDs         *[]int64  `json:"platform_ids"`
-	SubscriptionPlanIDs *[]int64  `json:"subscription_plan_ids"`
-	AllowBalance        *bool     `json:"allow_balance"`
-	Status              *string   `json:"status"`
-	IPWhitelist         *[]string `json:"ip_whitelist"` // IP 白名单（nil 不修改，空数组清空）
-	IPBlacklist         *[]string `json:"ip_blacklist"` // IP 黑名单（nil 不修改，空数组清空）
+	Name                  *string   `json:"name"`
+	PlatformIDs           *[]int64  `json:"platform_ids"`
+	SubscriptionPlanIDs   *[]int64  `json:"subscription_plan_ids"`
+	AllowAllSubscriptions *bool     `json:"allow_all_subscriptions"`
+	AllowBalance          *bool     `json:"allow_balance"`
+	Status                *string   `json:"status"`
+	IPWhitelist           *[]string `json:"ip_whitelist"` // IP 白名单（nil 不修改，空数组清空）
+	IPBlacklist           *[]string `json:"ip_blacklist"` // IP 黑名单（nil 不修改，空数组清空）
 
 	// Quota fields
 	Quota           *float64   `json:"quota"`       // Quota limit in USD (nil = no change, 0 = unlimited)
@@ -278,6 +285,8 @@ type APIKeyService struct {
 	authInvalidationFailures  atomic.Uint64
 	lastUsedTouchL1           sync.Map // keyID -> nextAllowedAt(time.Time)
 	lastUsedTouchSF           singleflight.Group
+	defaultKeyGroup           singleflight.Group
+	platformLister            apiKeyPlatformLister
 }
 
 type APIKeyAuthLookupMetrics struct {
@@ -338,6 +347,12 @@ func (s *APIKeyService) SetConcurrencyService(concurrencyService *ConcurrencySer
 // billing. Subscription instances always keep their own immutable snapshot.
 func (s *APIKeyService) SetGlobalBalanceRateProvider(provider GlobalBalanceRateProvider) {
 	s.globalBalanceRateProvider = provider
+}
+
+func (s *APIKeyService) SetPlatformLister(lister apiKeyPlatformLister) {
+	if s != nil {
+		s.platformLister = lister
+	}
 }
 
 func (s *APIKeyService) compileAPIKeyIPRules(apiKey *APIKey) {
@@ -422,10 +437,25 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 	if err != nil {
 		return nil, fmt.Errorf("get user: %w", err)
 	}
+	// Direct API callers may omit platform_ids. Match the user-facing create
+	// form by authorizing every currently active platform in that case. An
+	// explicitly supplied empty slice remains invalid and is handled below.
+	if req.PlatformIDs == nil && s.platformLister != nil {
+		platforms, err := s.platformLister.List(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("list platforms: %w", err)
+		}
+		for index := range platforms {
+			if platforms[index].ID > 0 && platforms[index].IsActive() {
+				req.PlatformIDs = append(req.PlatformIDs, platforms[index].ID)
+			}
+		}
+	}
 	if err := ValidateAPIKeyAssetPermissions(APIKeyAssetPermissions{
-		PlatformIDs:         req.PlatformIDs,
-		SubscriptionPlanIDs: req.SubscriptionPlanIDs,
-		AllowBalance:        req.AllowBalance == nil || *req.AllowBalance,
+		PlatformIDs:           req.PlatformIDs,
+		SubscriptionPlanIDs:   req.SubscriptionPlanIDs,
+		AllowAllSubscriptions: req.AllowAllSubscriptions == nil || *req.AllowAllSubscriptions,
+		AllowBalance:          req.AllowBalance == nil || *req.AllowBalance,
 	}); err != nil {
 		return nil, err
 	}
@@ -498,6 +528,60 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 	s.compileAPIKeyIPRules(apiKey)
 
 	return apiKey, nil
+}
+
+// EnsureDefaultAPIKey creates the one implicit key used by newly registered
+// users. The singleflight prevents duplicate work during concurrent callbacks
+// in one process; the active-key check makes retries after a failed bootstrap
+// idempotent.
+func (s *APIKeyService) EnsureDefaultAPIKey(ctx context.Context, userID int64) error {
+	if s == nil || s.apiKeyRepo == nil || userID <= 0 {
+		return ErrAPIKeyNotFound
+	}
+	_, err, _ := s.defaultKeyGroup.Do(strconv.FormatInt(userID, 10), func() (any, error) {
+		lister, ok := s.apiKeyRepo.(apiKeyAllByUserIDLister)
+		if !ok {
+			return nil, fmt.Errorf("list api keys by user: repository does not support unpaginated listing")
+		}
+		keys, err := lister.ListAllByUserID(ctx, userID, APIKeyListFilters{})
+		if err != nil {
+			return nil, fmt.Errorf("list api keys by user: %w", err)
+		}
+		for index := range keys {
+			if keys[index].IsActive() {
+				return nil, nil
+			}
+		}
+		if s.platformLister == nil {
+			return nil, fmt.Errorf("list platforms: platform lister is not configured")
+		}
+		platforms, err := s.platformLister.List(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("list platforms: %w", err)
+		}
+		platformIDs := make([]int64, 0, len(platforms))
+		for index := range platforms {
+			if platforms[index].ID > 0 && platforms[index].IsActive() {
+				platformIDs = append(platformIDs, platforms[index].ID)
+			}
+		}
+		if len(platformIDs) == 0 {
+			return nil, ErrAPIKeyPlatformRequired
+		}
+		allowAllSubscriptions := true
+		allowBalance := true
+		_, err = s.Create(ctx, userID, CreateAPIKeyRequest{
+			Name:                  "Default API Key",
+			PlatformIDs:           platformIDs,
+			AllowAllSubscriptions: &allowAllSubscriptions,
+			AllowBalance:          &allowBalance,
+		})
+		if errors.Is(err, ErrAPIKeyExists) {
+			return nil, nil
+		}
+		return nil, err
+	})
+	return err
 }
 
 // List 获取用户的API Key列表
@@ -719,6 +803,7 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 		assetPermissionsWriter = writer
 		apiKey.AllowedPlatformIDs = assetPermissions.PlatformIDs
 		apiKey.AllowedSubscriptionPlanIDs = assetPermissions.SubscriptionPlanIDs
+		apiKey.AllowAllSubscriptions = assetPermissions.AllowAllSubscriptions
 		apiKey.AllowBalance = assetPermissions.AllowBalance
 	}
 

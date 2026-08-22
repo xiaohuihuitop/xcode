@@ -33,6 +33,8 @@ type APIKey struct {
 	Name string `json:"name,omitempty"`
 	// AllowBalance holds the value of the "allow_balance" field.
 	AllowBalance bool `json:"allow_balance,omitempty"`
+	// AllowAllSubscriptions holds the value of the "allow_all_subscriptions" field.
+	AllowAllSubscriptions bool `json:"allow_all_subscriptions,omitempty"`
 	// Status holds the value of the "status" field.
 	Status string `json:"status,omitempty"`
 	// Last usage time of this API key
@@ -131,7 +133,7 @@ func (*APIKey) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case apikey.FieldIPWhitelist, apikey.FieldIPBlacklist:
 			values[i] = new([]byte)
-		case apikey.FieldAllowBalance:
+		case apikey.FieldAllowBalance, apikey.FieldAllowAllSubscriptions:
 			values[i] = new(sql.NullBool)
 		case apikey.FieldQuota, apikey.FieldQuotaUsed, apikey.FieldRateLimit5h, apikey.FieldRateLimit1d, apikey.FieldRateLimit7d, apikey.FieldUsage5h, apikey.FieldUsage1d, apikey.FieldUsage7d:
 			values[i] = new(sql.NullFloat64)
@@ -204,6 +206,12 @@ func (_m *APIKey) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field allow_balance", values[i])
 			} else if value.Valid {
 				_m.AllowBalance = value.Bool
+			}
+		case apikey.FieldAllowAllSubscriptions:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field allow_all_subscriptions", values[i])
+			} else if value.Valid {
+				_m.AllowAllSubscriptions = value.Bool
 			}
 		case apikey.FieldStatus:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -388,6 +396,9 @@ func (_m *APIKey) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("allow_balance=")
 	builder.WriteString(fmt.Sprintf("%v", _m.AllowBalance))
+	builder.WriteString(", ")
+	builder.WriteString("allow_all_subscriptions=")
+	builder.WriteString(fmt.Sprintf("%v", _m.AllowAllSubscriptions))
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(_m.Status)

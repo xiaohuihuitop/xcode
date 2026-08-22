@@ -14,6 +14,14 @@ type subscriptionPlanCandidatesRepoStub struct {
 	calls            int
 }
 
+func (r *subscriptionPlanCandidatesRepoStub) ListActiveByUserID(
+	_ context.Context,
+	_ int64,
+) ([]UserSubscription, error) {
+	r.calls++
+	return append([]UserSubscription(nil), r.candidates...), nil
+}
+
 func (r *subscriptionPlanCandidatesRepoStub) ListActiveByUserIDAndPlanIDs(
 	_ context.Context,
 	_ int64,
@@ -51,4 +59,17 @@ func TestListActiveSubscriptionsByPlanIDsSkipsRepositoryForNoPlans(t *testing.T)
 	require.NoError(t, err)
 	require.Empty(t, subscriptions)
 	require.Zero(t, repo.calls)
+}
+
+func TestListActiveSubscriptionsUsesAllActiveUserSubscriptions(t *testing.T) {
+	repo := &subscriptionPlanCandidatesRepoStub{
+		candidates: []UserSubscription{{ID: 11}, {ID: 12}},
+	}
+	svc := &SubscriptionService{userSubRepo: repo}
+
+	subscriptions, err := svc.ListActiveSubscriptions(context.Background(), 10)
+
+	require.NoError(t, err)
+	require.Equal(t, []int64{11, 12}, []int64{subscriptions[0].ID, subscriptions[1].ID})
+	require.Equal(t, 1, repo.calls)
 }

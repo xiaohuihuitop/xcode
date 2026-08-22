@@ -29,6 +29,13 @@ func (s *assetSubscriptionResolverStub) ListActiveSubscriptionsByPlanIDs(
 	return cloneUserSubscriptions(s.candidates), nil
 }
 
+func (s *assetSubscriptionResolverStub) ListActiveSubscriptions(
+	_ context.Context,
+	_ int64,
+) ([]UserSubscription, error) {
+	return cloneUserSubscriptions(s.candidates), nil
+}
+
 func (s *assetSubscriptionResolverStub) ValidateAndCheckLimits(sub *UserSubscription) (bool, error) {
 	s.checked = append(s.checked, sub.ID)
 	return false, s.validateErrs[sub.ID]
@@ -106,11 +113,30 @@ func TestResolveBillingAssetUsesGlobalBalanceRateWithoutPlanMultiplier(t *testin
 	require.Equal(t, 1.75, asset.RateMultiplier)
 }
 
+func TestResolveBillingAssetUsesAllCurrentAndFutureSubscriptions(t *testing.T) {
+	planID := int64(42)
+	resolver := &assetSubscriptionResolverStub{
+		candidates: []UserSubscription{{ID: 9, UserID: 7, SubscriptionPlanID: &planID}},
+	}
+	apiKey := &APIKey{
+		UserID:                7,
+		AllowAllSubscriptions: true,
+		AllowBalance:          false,
+		User:                  &User{ID: 7, Balance: 100},
+	}
+
+	asset, err := (&APIKeyService{}).ResolveBillingAssetForRequest(context.Background(), apiKey, resolver, false)
+
+	require.NoError(t, err)
+	require.Equal(t, BillingSourceSubscription, asset.Source)
+	require.Equal(t, int64(42), *asset.PlanID)
+}
+
 func TestProvideAPIKeyServiceUsesConfiguredGlobalBalanceRate(t *testing.T) {
 	configService := &PaymentConfigService{settingRepo: &paymentConfigSettingRepoStub{values: map[string]string{
 		SettingKeyGlobalBalanceRateMultiplier: "1.25",
 	}}}
-	svc := ProvideAPIKeyService(nil, nil, nil, nil, &config.Config{}, nil, nil, configService)
+	svc := ProvideAPIKeyService(nil, nil, nil, nil, &config.Config{}, nil, nil, configService, nil)
 	apiKey := &APIKey{
 		UserID:       7,
 		AllowBalance: true,

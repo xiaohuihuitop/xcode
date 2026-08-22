@@ -50,6 +50,7 @@ func TestNewAPIKeyFromCreateRequestDefaultsToBalanceAllowed(t *testing.T) {
 	key := newAPIKeyFromCreateRequest(CreateAPIKeyRequest{Name: "default-balance"})
 
 	require.True(t, key.AllowBalance)
+	require.True(t, key.AllowAllSubscriptions)
 }
 
 func TestNewAPIKeyFromCreateRequestHonorsExplicitBalanceDisable(t *testing.T) {
@@ -85,6 +86,28 @@ func TestAPIKeyServiceCreateCarriesExplicitAssetPermissions(t *testing.T) {
 	require.NotNil(t, repo.created)
 	require.Equal(t, []int64{10, 30}, repo.created.AllowedPlatformIDs)
 	require.Equal(t, []int64{20, 80}, repo.created.AllowedSubscriptionPlanIDs)
+}
+
+func TestAPIKeyServiceCreateDefaultsToAllActivePlatformsWhenOmitted(t *testing.T) {
+	repo := &assetPermissionsAPIKeyRepoStub{apiKeyRepoStub: &apiKeyRepoStub{}}
+	svc := &APIKeyService{
+		apiKeyRepo: repo,
+		userRepo:   &userRepoStub{user: &User{ID: 7}},
+		platformLister: defaultAPIKeyPlatformListerStub{platforms: []Platform{
+			{ID: 2, Status: PlatformStatusActive},
+			{ID: 1, Status: StatusDisabled},
+			{ID: 3, Status: PlatformStatusActive},
+		}},
+	}
+
+	key, err := svc.Create(context.Background(), 7, CreateAPIKeyRequest{
+		Name:      "all-platforms",
+		CustomKey: stringPtr("sk-all-platforms-credential"),
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, []int64{2, 3}, key.AllowedPlatformIDs)
+	require.Equal(t, []int64{2, 3}, repo.created.AllowedPlatformIDs)
 }
 
 func TestAPIKeyServiceUpdateReplacesExplicitAssetPermissions(t *testing.T) {
@@ -133,6 +156,7 @@ func TestAPIKeyAuthSnapshotRoundTripPreservesAssetPermissions(t *testing.T) {
 		Status:                     StatusActive,
 		AllowedPlatformIDs:         []int64{10, 30},
 		AllowedSubscriptionPlanIDs: []int64{20, 80},
+		AllowAllSubscriptions:      true,
 		AllowBalance:               false,
 		User:                       &User{ID: 7, Status: StatusActive},
 	}
@@ -144,5 +168,28 @@ func TestAPIKeyAuthSnapshotRoundTripPreservesAssetPermissions(t *testing.T) {
 
 	require.Equal(t, []int64{10, 30}, restored.AllowedPlatformIDs)
 	require.Equal(t, []int64{20, 80}, restored.AllowedSubscriptionPlanIDs)
+	require.True(t, restored.AllowAllSubscriptions)
 	require.False(t, restored.AllowBalance)
+}
+
+func TestAPIKeyServiceUpdatePreservesOmittedSubscriptionSwitch(t *testing.T) {
+	repo := &assetPermissionsAPIKeyRepoStub{apiKeyRepoStub: &apiKeyRepoStub{apiKey: &APIKey{
+		ID:                    101,
+		UserID:                7,
+		Key:                   "sk-existing-key-credential",
+		Status:                StatusActive,
+		AllowedPlatformIDs:    []int64{1},
+		AllowAllSubscriptions: true,
+		AllowBalance:          true,
+	}}}
+	svc := &APIKeyService{
+		apiKeyRepo: repo,
+		userRepo:   &userRepoStub{user: &User{ID: 7}},
+	}
+
+	updated, err := svc.Update(context.Background(), 101, 7, UpdateAPIKeyRequest{})
+
+	require.NoError(t, err)
+	require.True(t, updated.AllowAllSubscriptions)
+	require.True(t, updated.AllowBalance)
 }

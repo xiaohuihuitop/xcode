@@ -90,6 +90,11 @@ func AllowBalance(v bool) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldAllowBalance, v))
 }
 
+// AllowAllSubscriptions applies equality check predicate on the "allow_all_subscriptions" field. It's identical to AllowAllSubscriptionsEQ.
+func AllowAllSubscriptions(v bool) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldAllowAllSubscriptions, v))
+}
+
 // Status applies equality check predicate on the "status" field. It's identical to StatusEQ.
 func Status(v string) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldStatus, v))
@@ -448,6 +453,16 @@ func AllowBalanceEQ(v bool) predicate.APIKey {
 // AllowBalanceNEQ applies the NEQ predicate on the "allow_balance" field.
 func AllowBalanceNEQ(v bool) predicate.APIKey {
 	return predicate.APIKey(sql.FieldNEQ(FieldAllowBalance, v))
+}
+
+// AllowAllSubscriptionsEQ applies the EQ predicate on the "allow_all_subscriptions" field.
+func AllowAllSubscriptionsEQ(v bool) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldAllowAllSubscriptions, v))
+}
+
+// AllowAllSubscriptionsNEQ applies the NEQ predicate on the "allow_all_subscriptions" field.
+func AllowAllSubscriptionsNEQ(v bool) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNEQ(FieldAllowAllSubscriptions, v))
 }
 
 // StatusEQ applies the EQ predicate on the "status" field.

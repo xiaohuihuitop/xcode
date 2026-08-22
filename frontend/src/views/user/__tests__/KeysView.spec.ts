@@ -453,14 +453,10 @@ describe('user KeysView column settings', () => {
     )
   })
 
-  it('creates a key with independent platforms, subscription plans, and balance', async () => {
+  it('creates a key with all current platforms, subscriptions, and balance by default', async () => {
     getAvailablePlatforms.mockResolvedValue([
       { id: 10, code: 'openai-primary', name: 'OpenAI Primary', account_platform: 'openai' },
       { id: 20, code: 'grok-primary', name: 'Grok Primary', account_platform: 'grok' },
-    ])
-    getActiveSubscriptions.mockResolvedValue([
-      { id: 301, subscription_plan_id: 30, plan_name_snapshot: 'Plan A' },
-      { id: 302, subscription_plan_id: 40, plan_name_snapshot: 'Plan B' },
     ])
     const wrapper = await mountView()
 
@@ -469,20 +465,18 @@ describe('user KeysView column settings', () => {
     const dialog = wrapper.get('[data-test="dialog"]')
     await dialog.get('input[type="text"]').setValue('multi-key')
     const platformCheckboxes = dialog.findAll('[data-test^="key-platform-"]')
-    const planCheckboxes = dialog.findAll('[data-test^="key-plan-"]')
     expect(platformCheckboxes).toHaveLength(2)
-    expect(planCheckboxes).toHaveLength(2)
-    await platformCheckboxes[0].setValue(true)
-    await platformCheckboxes[1].setValue(true)
-    await planCheckboxes[0].setValue(true)
-    await planCheckboxes[1].setValue(true)
+    expect((platformCheckboxes[0].element as HTMLInputElement).checked).toBe(true)
+    expect((platformCheckboxes[1].element as HTMLInputElement).checked).toBe(true)
+    expect((dialog.get('[data-test="key-all-subscriptions"]').element as HTMLInputElement).checked).toBe(true)
+    expect((dialog.get('[data-test="key-balance"]').element as HTMLInputElement).checked).toBe(true)
     await dialog.get('form').trigger('submit')
     await flushPromises()
 
     expect(createKey).toHaveBeenCalledWith(expect.objectContaining({
       name: 'multi-key',
       platform_ids: [10, 20],
-      subscription_plan_ids: [30, 40],
+      allow_all_subscriptions: true,
       allow_balance: true,
     }))
   })
@@ -494,6 +488,7 @@ describe('user KeysView column settings', () => {
     await nextTick()
     const dialog = wrapper.get('[data-test="dialog"]')
     await dialog.get('input[type="text"]').setValue('unbound-key')
+    await dialog.get('[data-test="key-platform-101"]').setValue(false)
     await dialog.get('form').trigger('submit')
     await flushPromises()
 
@@ -505,7 +500,7 @@ describe('user KeysView column settings', () => {
     const key = {
       ...createApiKey(),
       platform_ids: [99],
-      subscription_plan_ids: [99],
+      allow_all_subscriptions: false,
       allow_balance: false,
     } as ApiKey
     listKeys.mockResolvedValueOnce({ items: [key], total: 1, page: 1, page_size: 20, pages: 1 })
@@ -515,17 +510,15 @@ describe('user KeysView column settings', () => {
     await nextTick()
     const dialog = wrapper.get('[data-test="dialog"]')
     const platformCheckbox = dialog.get('[data-test="key-platform-99"]')
-    const planCheckbox = dialog.get('[data-test="key-plan-99"]')
     expect((platformCheckbox.element as HTMLInputElement).checked).toBe(true)
-    expect((planCheckbox.element as HTMLInputElement).checked).toBe(true)
+    expect((dialog.get('[data-test="key-all-subscriptions"]').element as HTMLInputElement).checked).toBe(false)
     await dialog.get('[data-test="key-balance"]').setValue(true)
-    await planCheckbox.setValue(false)
     await dialog.get('form').trigger('submit')
     await flushPromises()
 
     expect(updateKey).toHaveBeenCalledWith(1, expect.objectContaining({
       platform_ids: [99],
-      subscription_plan_ids: [],
+      allow_all_subscriptions: false,
       allow_balance: true,
     }))
   })
@@ -534,7 +527,7 @@ describe('user KeysView column settings', () => {
     const key = {
       ...createApiKey(),
       platform_ids: [101],
-      subscription_plan_ids: [201],
+      allow_all_subscriptions: true,
       allow_balance: true,
     } as ApiKey
     listKeys.mockResolvedValueOnce({ items: [key], total: 1, page: 1, page_size: 20, pages: 1 })
@@ -552,13 +545,12 @@ describe('user KeysView column settings', () => {
     await nextTick()
     const dialog = wrapper.get('[data-test="dialog"]')
     await dialog.get('[data-test="key-platform-102"]').setValue(true)
-    await dialog.get('[data-test="key-plan-202"]').setValue(true)
     await dialog.get('form').trigger('submit')
     await flushPromises()
 
     expect(updateKey).toHaveBeenCalledWith(1, expect.objectContaining({
       platform_ids: [101, 102],
-      subscription_plan_ids: [201, 202],
+      allow_all_subscriptions: true,
       allow_balance: true,
     }))
   })
@@ -566,6 +558,8 @@ describe('user KeysView column settings', () => {
 
 describe('user KeysView asset permission editor', () => {
   it('uses the V2 platform, subscription, and balance permission form', () => {
-    expect(keysViewSource).toContain("import KeyAssetPermissionsForm, { type SubscriptionPlanPermissionOption } from '@/components/keys/KeyAssetPermissionsForm.vue'")
+    expect(keysViewSource).toContain("import KeyAssetPermissionsForm from '@/components/keys/KeyAssetPermissionsForm.vue'")
+    expect(keysViewSource).toContain('allow_all_subscriptions')
+    expect(keysViewSource).not.toContain('key-plan-')
   })
 })
