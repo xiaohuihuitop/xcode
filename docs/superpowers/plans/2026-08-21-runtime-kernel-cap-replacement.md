@@ -1,5 +1,7 @@
 # Runtime Kernel CAP Replacement Implementation Plan
 
+> 状态：暂缓，非当前实施项（2026-08-22）。当前生产路线继续使用 Sub2API 作为唯一 Runtime；本文保留为历史评估材料，不应继续按此计划修改生产组合、配置或数据库。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task with verification checkpoints.
 
 **Goal:** 将 XCode 的 AI 账号域和运行时执行收口到统一 Runtime Kernel，并在同一 Go 进程内用 CLIProxyAPI（CAP）整体替换当前 Sub2API Runtime。
@@ -346,4 +348,3 @@ Run: `git add backend/pkg/runtimebridge/v1 backend/internal/runtimebridge docs/C
 - CAP Driver must pass terminal-event and usage conformance tests before composition-root replacement.
 - Full product regression must pass before a Hong Kong deployment.
 - Production must contain one Runtime binding; rollback is deployment-level only.
-
