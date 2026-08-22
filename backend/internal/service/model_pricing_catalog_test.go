@@ -52,6 +52,39 @@ func TestModelPricingCatalogLongestWildcardWins(t *testing.T) {
 	require.InDelta(t, 2e-6, *got.InputPrice, 1e-12)
 }
 
+func TestModelPricingCatalogPlatformPricingPrefersPlatformCodeAndPublicModel(t *testing.T) {
+	catalog := NewModelPricingCatalog(&modelPricingOverrideRepoStub{rules: []ModelPricingOverride{
+		{Adapter: PlatformOpenAI, ModelPattern: "gpt-*", InputPrice: floatPtr(1e-6), Status: ModelPricingStatusActive},
+		{Adapter: "codex", ModelPattern: "gpt-5.6-sol", InputPrice: floatPtr(3e-6), Status: ModelPricingStatusActive},
+	}})
+
+	got, err := catalog.ResolveForPricingInput(context.Background(), PricingInput{
+		Adapter:      PlatformOpenAI,
+		PlatformCode: "codex",
+		PublicModel:  "gpt-5.6-sol",
+		Model:        "gpt-5.6-upstream",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	require.InDelta(t, 3e-6, *got.InputPrice, 1e-12)
+}
+
+func TestModelPricingCatalogKeepsLegacyAdapterRulesWhenPlatformOverrideMissing(t *testing.T) {
+	catalog := NewModelPricingCatalog(&modelPricingOverrideRepoStub{rules: []ModelPricingOverride{
+		{Adapter: PlatformOpenAI, ModelPattern: "gpt-5.6-upstream", InputPrice: floatPtr(2e-6), Status: ModelPricingStatusActive},
+	}})
+
+	got, err := catalog.ResolveForPricingInput(context.Background(), PricingInput{
+		Adapter:      PlatformOpenAI,
+		PlatformCode: "codex",
+		PublicModel:  "gpt-5.6-sol",
+		Model:        "gpt-5.6-upstream",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	require.InDelta(t, 2e-6, *got.InputPrice, 1e-12)
+}
+
 func TestPricingOverrideToResolvedPreservesExplicitZeroAndIntervals(t *testing.T) {
 	zero := 0.0
 	intervalPrice := 3e-6

@@ -83,4 +83,6 @@ func TestPlatformCatalogPlazaUsesPlatformPricingWithoutLegacyAssets(t *testing.T
 	require.NotNil(t, items[0].Models[0].Pricing)
 	require.Equal(t, "openai", pricing.seen[0].Adapter)
 	require.Equal(t, "glm-5.2", pricing.seen[0].Model)
+	require.Equal(t, "glm", pricing.seen[0].PlatformCode)
+	require.Equal(t, "glm-5.2", pricing.seen[0].PublicModel)
 }

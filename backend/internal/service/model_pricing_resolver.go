@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"log/slog"
+	"strings"
 )
 
 // PricingSource 定价来源标识
@@ -58,26 +59,28 @@ func NewModelPricingResolverWithCatalog(billingService *BillingService, catalog 
 
 // PricingInput 定价解析输入
 type PricingInput struct {
-	Model   string
-	Adapter string // resolved account adapter; independent pricing path
+	Model        string
+	Adapter      string // resolved account adapter; independent pricing path
+	PlatformCode string // administrator-owned platform code, when a platform route exists
+	PublicModel  string // model name requested by the client before upstream mapping
 }
 
 // Resolve 解析模型定价。
 // 1. 获取基础定价（LiteLLM → Fallback）
 // 2. 未命中覆盖时使用 LiteLLM 或静态 fallback
 func (r *ModelPricingResolver) Resolve(ctx context.Context, input PricingInput) *ResolvedPricing {
-	if r.pricingCatalog != nil && input.Adapter != "" {
-		override, err := r.pricingCatalog.Resolve(ctx, input.Adapter, input.Model)
+	if r.pricingCatalog != nil {
+		override, err := r.pricingCatalog.ResolveForPricingInput(ctx, input)
 		if err == nil && override != nil {
-			basePricing, _ := r.resolveBasePricing(input.Model)
+			basePricing, _ := r.resolveBasePricing(pricingModelForInput(input))
 			return pricingOverrideToResolved(override, basePricing)
 		}
 		if err != nil {
-			slog.Debug("failed to resolve model pricing override", "adapter", input.Adapter, "model", input.Model, "error", err)
+			slog.Debug("failed to resolve model pricing override", "adapter", input.Adapter, "platform_code", input.PlatformCode, "public_model", input.PublicModel, "model", input.Model, "error", err)
 		}
 	}
 	// 1. 获取基础定价
-	basePricing, source := r.resolveBasePricing(input.Model)
+	basePricing, source := r.resolveBasePricing(pricingModelForInput(input))
 
 	resolved := &ResolvedPricing{
 		Mode:                   BillingModeToken,
@@ -87,6 +90,13 @@ func (r *ModelPricingResolver) Resolve(ctx context.Context, input PricingInput) 
 	}
 
 	return resolved
+}
+
+func pricingModelForInput(input PricingInput) string {
+	if model := strings.TrimSpace(input.Model); model != "" {
+		return model
+	}
+	return strings.TrimSpace(input.PublicModel)
 }
 
 // resolveBasePricing 从 LiteLLM 或 Fallback 获取基础定价

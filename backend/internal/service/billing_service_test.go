@@ -4,6 +4,7 @@ package service
 
 import (
 	"bytes"
+	"context"
 	"log"
 	"math"
 	"strings"
@@ -31,6 +32,27 @@ func captureStdLog(t *testing.T) *bytes.Buffer {
 
 func newTestBillingService() *BillingService {
 	return NewBillingService(&config.Config{}, nil)
+}
+
+func TestCalculateCostUnifiedUsesPlatformPricingIdentity(t *testing.T) {
+	catalog := NewModelPricingCatalog(&modelPricingOverrideRepoStub{rules: []ModelPricingOverride{
+		{Adapter: "codex", ModelPattern: "gpt-5.6-sol", InputPrice: floatPtr(4e-6), OutputPrice: floatPtr(8e-6), Status: ModelPricingStatusActive},
+	}})
+	resolver := NewModelPricingResolverWithCatalog(newTestBillingService(), catalog)
+
+	cost, err := newTestBillingService().CalculateCostUnified(CostInput{
+		Ctx:            context.Background(),
+		Model:          "gpt-5.6-upstream",
+		Adapter:        PlatformOpenAI,
+		PlatformCode:   "codex",
+		PublicModel:    "gpt-5.6-sol",
+		Tokens:         UsageTokens{InputTokens: 1000, OutputTokens: 500},
+		RateMultiplier: 1,
+		Resolver:       resolver,
+	})
+	require.NoError(t, err)
+	require.InDelta(t, 0.004, cost.InputCost, 1e-12)
+	require.InDelta(t, 0.004, cost.OutputCost, 1e-12)
 }
 
 func TestCalculateCost_BasicComputation(t *testing.T) {

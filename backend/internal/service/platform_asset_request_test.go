@@ -132,3 +132,22 @@ func TestPlatformAssetBillingFactsOverrideDefaultValues(t *testing.T) {
 	require.Equal(t, platformID, *usageLog.PlatformID)
 	require.Equal(t, BillingSourceSubscription, *usageLog.BillingSourceType)
 }
+
+func TestPricingInputForRequestPreservesPlatformAndPublicModel(t *testing.T) {
+	ctx := WithGatewayPlatformAssetContext(context.Background(), &GatewayPlatformAssetContext{
+		Platform: &ResolvedPlatformModel{
+			PlatformID:      1,
+			PlatformCode:    "codex",
+			AccountPlatform: PlatformOpenAI,
+			RequestedModel:  "gpt-5.6-sol",
+			UpstreamModel:   "gpt-5.6-upstream",
+		},
+		SchedulingScope: PlatformSchedulingScope{PlatformID: 1, PlatformCode: "codex", AccountPlatform: PlatformOpenAI},
+	})
+
+	input := pricingInputForRequest(ctx, nil, "gpt-5.6-upstream")
+	require.Equal(t, PlatformOpenAI, input.Adapter)
+	require.Equal(t, "codex", input.PlatformCode)
+	require.Equal(t, "gpt-5.6-sol", input.PublicModel)
+	require.Equal(t, "gpt-5.6-upstream", input.Model)
+}

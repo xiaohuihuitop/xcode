@@ -103,7 +103,12 @@ func (s *PlatformCatalogService) list(ctx context.Context, withPricing bool) ([]
 				if pricingModel == "" {
 					pricingModel = model.Pattern
 				}
-				model.Pricing = s.pricing.Resolve(ctx, PricingInput{Model: pricingModel, Adapter: platform.AccountPlatform})
+				model.Pricing = s.pricing.Resolve(ctx, PricingInput{
+					Model:        pricingModel,
+					Adapter:      platform.AccountPlatform,
+					PlatformCode: platform.Code,
+					PublicModel:  model.Pattern,
+				})
 			}
 			item.Models = append(item.Models, model)
 		}

@@ -90,6 +90,10 @@ func pricingInputForRequest(ctx context.Context, apiKey *APIKey, model string) P
 		Model:   model,
 		Adapter: effectivePricingAdapter(ctx, apiKey),
 	}
+	if route, ok := GatewayPlatformAssetContextFromContext(ctx); ok && route.Platform != nil {
+		input.PlatformCode = strings.TrimSpace(route.Platform.PlatformCode)
+		input.PublicModel = strings.TrimSpace(route.Platform.RequestedModel)
+	}
 	return input
 }
 

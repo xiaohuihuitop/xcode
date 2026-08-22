@@ -65,13 +65,13 @@ const descriptionHtml = computed(() => {
   return value ? DOMPurify.sanitize(marked.parse(value) as string) : ''
 })
 
-const platforms = computed(() => (props.response?.platforms ?? []).map((item) => item.account_platform).filter((value, index, all) => all.indexOf(value) === index).sort())
+const platforms = computed(() => (props.response?.platforms ?? []).map((item) => item.code).filter((value, index, all) => all.indexOf(value) === index).sort())
 
 const filteredPlatforms = computed<ModelPlazaPlatform[]>(() => {
   const selected = selectedPlatform.value
   const query = searchQuery.value.trim().toLowerCase()
   return (props.response?.platforms ?? [])
-    .filter((item) => selected === 'all' || item.account_platform === selected)
+    .filter((item) => selected === 'all' || item.code === selected)
     .map((item) => query
       ? { ...item, models: item.models.filter((model) => `${model.pattern} ${model.upstream_model ?? ''}`.toLowerCase().includes(query)) }
       : item)

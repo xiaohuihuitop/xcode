@@ -147,6 +147,10 @@ func (c *ModelPricingCatalog) Resolve(ctx context.Context, adapter, model string
 	if err != nil {
 		return nil, fmt.Errorf("list model pricing overrides: %w", err)
 	}
+	return resolveModelPricingRules(rules, model), nil
+}
+
+func resolveModelPricingRules(rules []ModelPricingOverride, model string) *ModelPricingOverride {
 	modelLower := strings.ToLower(model)
 	matches := make([]ModelPricingOverride, 0, len(rules))
 	for _, rule := range rules {
@@ -158,7 +162,7 @@ func (c *ModelPricingCatalog) Resolve(ctx context.Context, adapter, model string
 		}
 	}
 	if len(matches) == 0 {
-		return nil, nil
+		return nil
 	}
 	sort.SliceStable(matches, func(i, j int) bool {
 		iExact := strings.EqualFold(strings.TrimSpace(matches[i].ModelPattern), model)
@@ -174,7 +178,52 @@ func (c *ModelPricingCatalog) Resolve(ctx context.Context, adapter, model string
 		return strings.ToLower(matches[i].ModelPattern) < strings.ToLower(matches[j].ModelPattern)
 	})
 	selected := matches[0]
-	return &selected, nil
+	return &selected
+}
+
+// ResolveForPricingInput resolves platform-specific rules before legacy
+// adapter rules. Platform codes distinguish pools such as codex and glm even
+// when both pools use the same account adapter.
+func (c *ModelPricingCatalog) ResolveForPricingInput(ctx context.Context, input PricingInput) (*ModelPricingOverride, error) {
+	identities := make([]struct{ adapter, model string }, 0, 4)
+	seen := make(map[string]struct{}, 4)
+	add := func(adapter, model string) {
+		adapter = strings.ToLower(strings.TrimSpace(adapter))
+		model = strings.TrimSpace(model)
+		if adapter == "" || model == "" {
+			return
+		}
+		key := adapter + "\x00" + strings.ToLower(model)
+		if _, exists := seen[key]; exists {
+			return
+		}
+		seen[key] = struct{}{}
+		identities = append(identities, struct{ adapter, model string }{adapter: adapter, model: model})
+	}
+	add(input.PlatformCode, input.PublicModel)
+	add(input.PlatformCode, input.Model)
+	add(input.Adapter, input.PublicModel)
+	add(input.Adapter, input.Model)
+	if c == nil || c.repo == nil {
+		return nil, nil
+	}
+	rulesByAdapter := make(map[string][]ModelPricingOverride, len(identities))
+	for _, identity := range identities {
+		rules, loaded := rulesByAdapter[identity.adapter]
+		if !loaded {
+			var err error
+			rules, err = c.repo.List(ctx, identity.adapter)
+			if err != nil {
+				return nil, fmt.Errorf("list model pricing overrides: %w", err)
+			}
+			rulesByAdapter[identity.adapter] = rules
+		}
+		override := resolveModelPricingRules(rules, identity.model)
+		if override != nil {
+			return override, nil
+		}
+	}
+	return nil, nil
 }
 
 func modelPatternMatches(pattern, model string) bool {
