@@ -125,7 +125,9 @@ git diff --name-only -- backend/migrations backend/ent/migrate backend/ent/schem
 
 Verify GPT Chat Completions, Responses, account failover, usage platform/account/subscription attribution, and `total_cost=actual_cost` in a disposable environment before any Hong Kong deployment.
 
-- [ ] **Step 3: Commit the verified runtime port**
+- [x] **Step 3: Commit the verified runtime port**
+
+已在 `827a76b` 完成 Runtime port 提交，并通过合并提交 `5079603` 合并到 `main`。
 
 Use a Chinese Conventional Commit scoped to the actual behavior, for example:
 
