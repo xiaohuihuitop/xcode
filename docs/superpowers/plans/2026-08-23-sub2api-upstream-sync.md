@@ -17,7 +17,7 @@
 - Record: `docs/superpowers/specs/2026-08-23-sub2api-upstream-sync-design.md`
 - Record: `docs/superpowers/plans/2026-08-23-sub2api-upstream-sync.md`
 
-- [ ] **Step 1: Add the official remote in the isolated worktree**
+- [x] **Step 1: Add the official remote in the isolated worktree**
 
 Run:
 
@@ -28,7 +28,7 @@ git fetch --prune --tags upstream
 
 Expected: `upstream/main` resolves to the official repository without changing XCode `main`.
 
-- [ ] **Step 2: Capture the baseline and working tree state**
+- [x] **Step 2: Capture the baseline and working tree state**
 
 Run:
 
@@ -41,7 +41,7 @@ git show HEAD:backend/cmd/server/VERSION
 
 Expected: the review branch is clean, XCode remains at its own release commit, and the Runtime version difference is explicit.
 
-- [ ] **Step 3: Commit the approved design and plan**
+- [x] **Step 3: Commit the approved design and plan**
 
 ```powershell
 git add docs/superpowers/specs/2026-08-23-sub2api-upstream-sync-design.md docs/superpowers/plans/2026-08-23-sub2api-upstream-sync.md
@@ -55,18 +55,18 @@ git commit -m "docs(runtime): 记录 Sub2API 官方同步方案"
 - Read: official commits `d45135d8`, `fd6cd474`, `ffc01f9c`, `6244090c`, `b1e60ba4`, `e45490a3`.
 - Create: `docs/superpowers/plans/2026-08-23-sub2api-upstream-candidate-inventory.md`.
 
-- [ ] **Step 1: List official commits after the latest release**
+- [x] **Step 1: List official commits after the latest release**
 
 ```powershell
 git log --oneline --decorate v0.1.179..upstream/main
 git diff --stat v0.1.179...upstream/main
 ```
 
-- [ ] **Step 2: Classify candidate commits by the XCode runtime path**
+- [x] **Step 2: Classify candidate commits by the XCode runtime path**
 
 For each candidate, record the commit, changed files, whether the current production path calls those files through `sub2APIOpenAIPort`, and whether the patch must move into `internal/runtime/sub2api`.
 
-- [ ] **Step 3: Record exclusions and database impact**
+- [x] **Step 3: Record exclusions and database impact**
 
 Explicitly exclude Grok, Gemini, Antigravity, DeepSeek, unrelated UI and product changes. Record whether the selected range changes `backend/migrations/`, `backend/ent/migrate/schema.go`, `backend/ent/schema/`, or dependency/toolchain files.
 
@@ -80,15 +80,15 @@ Explicitly exclude Grok, Gemini, Antigravity, DeepSeek, unrelated UI and product
 - Test: `backend/internal/service/openai_gateway_responses_chat_fallback_test.go`.
 - Test: the relevant RuntimeBridge contract tests under `backend/pkg/runtimebridge/v1/`.
 
-- [ ] **Step 1: Write a failing regression test for the selected upstream behavior**
+- [x] **Step 1: Write a failing regression test for the selected upstream behavior**
 
 The test must exercise the pure `v1.Request`/`HTTPExchange` path and assert the exact response, retry or terminal usage behavior affected by the upstream patch.
 
-- [ ] **Step 2: Apply only the smallest compatible implementation**
+- [x] **Step 2: Apply only the smallest compatible implementation**
 
 Keep the public RuntimeBridge contract unchanged. Translate upstream behavior at the Sub2API Driver or port boundary and preserve XCode platform/account/billing facts.
 
-- [ ] **Step 3: Run the focused Go tests**
+- [x] **Step 3: Run the focused Go tests**
 
 ```powershell
 go test -tags=unit ./internal/runtime/sub2api ./internal/handler ./internal/service
@@ -111,7 +111,7 @@ pnpm --dir frontend run build
 - Read: `docs/ARCHITECTURE.md`, `docs/DEVELOPMENT_GUIDE.md`, `docs/HANDOFF.md`.
 - Update: `docs/memory/当前状态.md` only after the selected patch is verified.
 
-- [ ] **Step 1: Inspect the final diff and migration scope**
+- [x] **Step 1: Inspect the final diff and migration scope**
 
 ```powershell
 git diff --check
@@ -120,6 +120,8 @@ git diff --name-only -- backend/migrations backend/ent/migrate backend/ent/schem
 ```
 
 - [ ] **Step 2: Run the release acceptance checklist**
+
+> 暂不执行：本轮只完成本地候选补丁审查；真实 GPT 请求、账号故障切换、用量归属和扣费验收需在用户确认发布后进行。
 
 Verify GPT Chat Completions, Responses, account failover, usage platform/account/subscription attribution, and `total_cost=actual_cost` in a disposable environment before any Hong Kong deployment.
 
