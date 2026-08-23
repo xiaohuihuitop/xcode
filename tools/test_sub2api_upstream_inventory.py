@@ -8,6 +8,7 @@ import zipfile
 from pathlib import Path
 
 from tools.sub2api_upstream_inventory import (
+    classify_commit,
     classify_path,
     generate_inventory,
     compare_trees,
@@ -27,6 +28,72 @@ class InventoryTests(unittest.TestCase):
         self.assertEqual(classify_path("backend/internal/service/subscription.go"), "productcore")
         self.assertEqual(classify_path("backend/migrations/228_channel_pricing_multipliers.sql"), "database")
         self.assertEqual(classify_path("frontend/src/views/admin/GroupsView.vue"), "frontend_product")
+        self.assertEqual(classify_path("backend/ent/account.go"), "database")
+        self.assertEqual(classify_path("backend/internal/pkg/antigravity/client.go"), "runtime_provider")
+        self.assertEqual(classify_path("backend/internal/pkg/websearch/provider.go"), "runtime_provider")
+        self.assertEqual(classify_path("backend/internal/applicationgateway/gateway.go"), "runtime_protocol")
+        self.assertEqual(classify_path("backend/internal/gatewayruntime/exchange.go"), "runtime_protocol")
+        self.assertEqual(classify_path("backend/internal/runtimebridge/local.go"), "runtime_protocol")
+        self.assertEqual(classify_path("backend/pkg/runtimebridge/v1/bridge.go"), "runtime_protocol")
+        self.assertEqual(classify_path("backend/internal/service/account_header_override.go"), "runtime_provider")
+        self.assertEqual(classify_path("backend/internal/service/account.go"), "runtime_provider")
+        self.assertEqual(classify_path("backend/internal/service/gateway_forward_as_responses.go"), "runtime_protocol")
+        self.assertEqual(classify_path("backend/internal/service/batch_image_provider_gemini.go"), "runtime_provider")
+        self.assertEqual(classify_path("backend/internal/service/batch_image_processor.go"), "runtime_protocol")
+        self.assertEqual(classify_path("backend/internal/service/batch_image.go"), "runtime_protocol")
+        self.assertEqual(classify_path("backend/internal/service/scheduler_cache.go"), "runtime_provider")
+        self.assertEqual(classify_path("backend/internal/service/billing_service.go"), "productcore")
+        self.assertEqual(classify_path("backend/internal/service/platform.go"), "productcore")
+        self.assertEqual(classify_path("backend/internal/service/user.go"), "productcore")
+        self.assertEqual(classify_path("backend/internal/service/proxy.go"), "runtime_provider")
+        self.assertEqual(classify_path("backend/internal/service/sub2api_account_runtime.go"), "runtime_provider")
+        self.assertEqual(classify_path("backend/internal/service/sub2api_pricing_adapter.go"), "productcore")
+        self.assertEqual(classify_path("backend/internal/service/sub2api_product_usage_finalizer.go"), "productcore")
+        self.assertEqual(classify_path("backend/internal/service/ops_service.go"), "productcore")
+        self.assertEqual(classify_path("backend/internal/service/wire.go"), "infrastructure")
+        self.assertEqual(classify_path("backend/internal/handler/sub2api_runtime_adapter.go"), "runtime_provider")
+        self.assertEqual(classify_path("backend/internal/handler/runtime_ingress.go"), "runtime_protocol")
+        self.assertEqual(classify_path("backend/internal/handler/admin/account_handler.go"), "runtime_provider")
+        self.assertEqual(classify_path("backend/internal/handler/user_handler.go"), "productcore")
+        self.assertEqual(classify_path("backend/internal/handler/wire.go"), "infrastructure")
+        self.assertEqual(classify_path("backend/internal/repository/openai_oauth_service.go"), "runtime_provider")
+        self.assertEqual(classify_path("backend/internal/repository/account_repo.go"), "runtime_provider")
+        self.assertEqual(classify_path("backend/internal/repository/batch_image_repo.go"), "runtime_protocol")
+        self.assertEqual(classify_path("backend/internal/repository/user_repo.go"), "productcore")
+        self.assertEqual(classify_path("backend/internal/repository/usage_log_repo.go"), "productcore")
+        self.assertEqual(classify_path("backend/internal/repository/db_pool.go"), "infrastructure")
+        self.assertEqual(classify_path("backend/internal/server/routes/gateway.go"), "runtime_protocol")
+        self.assertEqual(classify_path("backend/internal/server/routes/user.go"), "productcore")
+        self.assertEqual(classify_path("backend/internal/server/middleware/recovery.go"), "infrastructure")
+        self.assertEqual(classify_path("backend/internal/securityaudit/coordinator.go"), "productcore")
+        self.assertEqual(classify_path("backend/internal/domain/openai_messages_dispatch.go"), "runtime_protocol")
+        self.assertEqual(classify_path("backend/internal/domain/model_pricing.go"), "productcore")
+        self.assertEqual(classify_path("backend/internal/model/error_passthrough_rule.go"), "runtime_protocol")
+        self.assertEqual(classify_path("backend/internal/model/tls_fingerprint_profile.go"), "runtime_provider")
+        self.assertEqual(classify_path("backend/internal/platform/liveattestation/attestation.go"), "runtime_provider")
+        self.assertEqual(classify_path("backend/internal/productcore/authorizer.go"), "productcore")
+        self.assertEqual(classify_path("backend/internal/pkg/httpclient/pool.go"), "infrastructure")
+        self.assertEqual(classify_path("backend/resources/model-pricing/default.json"), "productcore")
+        self.assertEqual(classify_path("assets/partners/logos/example.svg"), "documentation")
+        self.assertEqual(classify_path("openspec/config.yaml"), "documentation")
+        self.assertEqual(classify_path("skills/sub2api-admin/SKILL.md"), "documentation")
+        self.assertEqual(classify_path("backend/go.mod"), "infrastructure")
+        self.assertEqual(classify_path("backend/cmd/server/main.go"), "infrastructure")
+        self.assertEqual(classify_path("tools/check_pnpm_audit_exceptions.py"), "infrastructure")
+
+    def test_classify_commit_separates_merges_runtime_and_maintenance(self):
+        self.assertEqual(classify_commit("Merge pull request #5876 from wucm667/fix/issue-5872"), "merge")
+        self.assertEqual(classify_commit("fix(images): decode data URLs during task offload"), "runtime_protocol")
+        self.assertEqual(classify_commit("chore: update sponsors"), "documentation")
+        self.assertEqual(classify_commit("feat: ops 错误详情弹窗支持自定义时间区间"), "productcore")
+        self.assertEqual(classify_commit("fix(ui): adapt native form controls to dark mode via color-scheme"), "frontend_product")
+        self.assertEqual(classify_commit("fix: stop scheduler work after request cancellation"), "runtime_provider")
+        self.assertEqual(
+            classify_commit("fix(gateway): 流内降载错误恢复 pre-output failover 并对客户端改写为可重试错误码"),
+            "runtime_protocol",
+        )
+        self.assertEqual(classify_commit("完善大文件备份分卷上传与恢复"), "infrastructure")
+        self.assertEqual(classify_commit("测试：同步长上下文计费断言"), "test")
 
     def test_migration_number_handles_numeric_prefix_and_non_migration(self):
         self.assertEqual(migration_number("backend/migrations/228_channel.sql"), 228)

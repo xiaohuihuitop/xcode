@@ -26,6 +26,13 @@ RUNTIME_PROTOCOL_PREFIXES = (
     "backend/internal/pkg/apicompat/",
     "backend/internal/pkg/openai/",
     "backend/internal/pkg/xai/",
+    "backend/internal/applicationgateway/",
+    "backend/internal/gatewayruntime/",
+    "backend/internal/runtimebridge/",
+    "backend/pkg/runtimebridge/",
+    "backend/internal/handler/runtime_",
+    "backend/internal/service/gateway_",
+    "backend/internal/server/routes/gateway.go",
 )
 RUNTIME_PROVIDER_PREFIXES = (
     "backend/internal/runtime/",
@@ -36,6 +43,19 @@ RUNTIME_PROVIDER_PREFIXES = (
     "backend/internal/service/grok_",
     "backend/internal/service/gemini_",
     "backend/internal/service/antigravity_",
+    "backend/internal/handler/sub2api_",
+    "backend/internal/pkg/antigravity/",
+    "backend/internal/pkg/anthropicfp/",
+    "backend/internal/pkg/claude/",
+    "backend/internal/pkg/gemini/",
+    "backend/internal/pkg/geminicli/",
+    "backend/internal/pkg/googleapi/",
+    "backend/internal/pkg/oauth/",
+    "backend/internal/pkg/openai_compat/",
+    "backend/internal/pkg/tlsfingerprint/",
+    "backend/internal/pkg/websearch/",
+    "backend/internal/repository/openai_",
+    "backend/internal/service/account_",
 )
 PRODUCT_MARKERS = (
     "/subscription",
@@ -51,6 +71,7 @@ COMMIT_PROTOCOL_MARKERS = (
     "chat completion",
     "chatcompletion",
     "input token",
+    "image",
     "message",
     "protocol",
     "reasoning",
@@ -130,11 +151,368 @@ FILE_FIELDS = (
     "current_sha256",
     "migration_number",
 )
+REVIEWED_COMMIT_SUBJECTS = {
+    "runtime_protocol": {
+        "修复工具输出图片桥接",
+        "fix(anthropic): recognize classifier requests with extra system entries",
+        "fix(gateway): 流内降载错误恢复 pre-output failover 并对客户端改写为可重试错误码",
+        "fix(claude): strip cache control from deferred tools",
+        "fix(claude): support top-level deferred tools",
+        "feat: 新增独立 /x_search，走原生 x_search 并沿用搜索计费",
+        "fix(gateway): align passthrough model discovery",
+    },
+    "runtime_provider": {
+        "feat(admin): 为账号批量删除增加并发限制",
+        "feat(admin): 支持按筛选结果全选账号",
+        "fix: stop scheduler work after request cancellation",
+        "fix(ratelimit): 守卫按端点来源门控，并与冷却键对齐模型口径",
+        "fix(admin): empty web-search config on missing setting and reset dialog scroll",
+        "fix(settings): cache unset scheduling thresholds",
+        "fix(review): 处理 PR #5666 四个阻断项（B1-B4）",
+        "fix(fingerprint): align credential-face identity with the real client and de-drift models version",
+        "fix(composite): keep CN rollout on fully supported paths",
+        "feat(proxy): allow configurable probe targets",
+        "fix(config): register proxy probe URLs default",
+        "fix(proxy): validate configurable probe targets",
+        "fix(proxy): format validated probe targets",
+    },
+    "productcore": {
+        "feat: ops 错误详情弹窗支持自定义时间区间",
+        "fix(dashboard): include cache tokens in token card breakdown",
+        "fix(ops): show neutral SLA card when window has no requests",
+        "feat(security-audit): add narrow blocking audit scope",
+        "fix(email): unify SMTP connection path between send and test-connection",
+        "feat(moderation): route content moderation through configurable proxy server",
+        "fix(admin-ui): wire require_force into the refund dialog",
+        "fix(auth): prevent refresh token rotation races",
+        "修复模型广场图片模型价格展示与实收口径不一致",
+        "新增腾讯天御验证码认证门禁",
+        "人机验证增加阿里云验证码 2.0",
+        "fix(ops): preserve custom range in error lists",
+        "fix: 完善腾讯验证码区域适配与 CSP 白名单",
+        "fix: 修复腾讯验证码票据过期与区域切换",
+        "fix(ops): 系统日志落库失败后退避重试，避免拖垮数据库连接池",
+        "fix(risk-control): block prompts when risk control backend fails",
+        "修复邮箱域名注册额度策略",
+        "Revert \"fix(risk-control): 风控后端异常时阻断提示词请求\"",
+        "fix(audit): scope cyber policy events",
+        "feat: 分组支持逐模型定价，并可关闭长上下文阶梯",
+        "fix: Realtime 仅在观察到音频后计费，并修正标志位求值顺序",
+        "feat: 优化分组用量统计",
+        "fix(ops): avoid single-insert fallback after batch failure",
+        "fix: skip expiry reminders without SMTP config",
+        "功能：支持渠道模型分时倍率定价",
+        "chore: remove leftover Sora references after platform removal",
+        "perf(usage): aggregate stats in one scan",
+        "渠道定价：持久化服务层级与区间倍率",
+        "计费：应用渠道倍率与上下文区间价格",
+        "计费：识别并记录 Anthropic Fast 请求",
+        "fix(ops): exclude model configuration errors from SLA",
+    },
+    "frontend_product": {
+        "fix(ui): adapt native form controls to dark mode via color-scheme",
+        "优化模型广场UI:筛选栏换行对齐、模型排序与表格留白",
+        "feat(home): add compact home page preset to avoid abuse classification",
+        "fix(usage): restore request ID column visibility",
+        "fix: 优化运营监控内存容量显示",
+        "fix: 账号徽章与用量格按实时档位展示，避免账单滞后误判",
+        "fix: 账号页自动刷新偏好改为模块初始化时恢复",
+        "fix(admin): show category labels in ops error distribution legend",
+        "feat(monitor-ui): 配额模式表单、用量快照视图与 8 平台支持",
+        "feat(ui): Select 组件支持可选远程搜索（remote/loading props + search 事件）",
+        "前端：配置渠道倍率并精简长上下文开关",
+        "前端：修正账号长上下文开关门控",
+        "fix(admin): 补全平台筛选选项",
+    },
+    "infrastructure": {
+        "完善大文件备份分卷上传与恢复",
+        "fix(lint): use require.NotNil for staticcheck SA5011",
+        "fix(lint): resolve remaining nil dereference warnings",
+        "fix(backup): 定时备份加 leader 锁，避免多实例重复备份",
+        "fix(lint): 补齐 setting_public.go 与配额 fetcher 测试的 gofmt 对齐",
+        "fix(repo): tolerate ErrTxStarted for tx-bound clients and harden test stubs",
+    },
+    "test": {
+        "chore: remove unrelated test refactors",
+        "修复：隔离分组用量仓储测试时区",
+        "测试：同步长上下文计费断言",
+    },
+}
+SERVICE_PATH_RULES = (
+    (
+        "runtime_provider",
+        (
+            "account.go",
+            "anthropic_",
+            "batch_image_provider",
+            "bedrock_",
+            "claude_",
+            "cn_provider_",
+            "codex_",
+            "composite_",
+            "credential",
+            "digest_session_",
+            "geminicli_",
+            "oauth_",
+            "ollama_",
+            "proxy_",
+            "proxy.go",
+            "quota_",
+            "ratelimit_",
+            "refresh_",
+            "scheduled_test_",
+            "scheduler_",
+            "session_",
+            "shadow_",
+            "sub2api_account_",
+            "temp_unsched",
+            "tls_",
+            "token_",
+            "upstream_",
+            "vertex_",
+        ),
+    ),
+    (
+        "runtime_protocol",
+        (
+            "batch_image.go",
+            "batch_image_",
+            "concurrency_",
+            "deferred_",
+            "error_passthrough_",
+            "header_",
+            "http_upstream_",
+            "image_generation_",
+            "image_output_",
+            "image_storage",
+            "image_task",
+            "model_mapping_",
+            "model_not_found_",
+            "model_rate_limit",
+            "request_metadata",
+            "response_header_",
+            "rpm_cache",
+            "sse_",
+            "thinking_",
+        ),
+    ),
+    (
+        "productcore",
+        (
+            "admin_",
+            "affiliate_",
+            "aliyun_",
+            "announcement",
+            "audit_",
+            "auth_",
+            "backup_",
+            "balance_",
+            "billing_",
+            "content_moderation",
+            "crs_",
+            "custom_",
+            "dashboard_",
+            "data_management_",
+            "email_",
+            "global_balance_",
+            "idempotency",
+            "identity_",
+            "image_billing_",
+            "invalid_auth_",
+            "media_price_",
+            "metadata_userid",
+            "model_platform_",
+            "model_pricing_",
+            "notification_",
+            "notify_",
+            "ops_",
+            "parse_integral_",
+            "passkey",
+            "platform_",
+            "platform.go",
+            "product_",
+            "profit_",
+            "promo_",
+            "registration_",
+            "setting",
+            "sub2api_pricing_",
+            "sub2api_product_",
+            "system_operation_",
+            "tencent_",
+            "totp_",
+            "turnstile_",
+            "usage_",
+            "user_",
+            "user.go",
+            "video_billing",
+            "websearch_config",
+        ),
+    ),
+    (
+        "infrastructure",
+        (
+            "domain_constants",
+            "internal500_",
+            "leader_lock",
+            "prompts/",
+            "slice_helpers",
+            "sql_errors",
+            "timing_wheel_",
+            "update_",
+            "wire.go",
+        ),
+    ),
+)
+HANDLER_PATH_RULES = (
+    (
+        "runtime_provider",
+        (
+            "admin/account_",
+            "admin/antigravity_",
+            "admin/cn_provider_",
+            "admin/gemini_",
+            "admin/grok_",
+            "admin/openai_",
+            "admin/proxy_",
+            "admin/scheduled_test_",
+            "admin/tls_",
+            "composite_platform",
+            "quotaview/",
+        ),
+    ),
+    (
+        "runtime_protocol",
+        (
+            "batch_image_",
+            "concurrency_",
+            "endpoint.go",
+            "failover_",
+            "gateway_handler",
+            "gateway_helper",
+            "gateway_web_search",
+            "image_",
+            "no_account_",
+            "request_body_",
+            "stream_",
+        ),
+    ),
+    (
+        "productcore",
+        (
+            "admin/",
+            "announcement_",
+            "auth_",
+            "available_",
+            "content_moderation_",
+            "dto/",
+            "gateway_key_billing",
+            "idempotency_",
+            "model_plaza_",
+            "model_target_",
+            "ops_",
+            "passkey_",
+            "security_audit_",
+            "setting_",
+            "totp_",
+            "usage_",
+            "user_",
+        ),
+    ),
+    ("infrastructure", ("handler.go", "logging.go", "page_handler.go", "wire.go")),
+)
+REPOSITORY_PATH_RULES = (
+    (
+        "runtime_provider",
+        (
+            "account_",
+            "claude_",
+            "concurrency_",
+            "gemini_",
+            "geminicli_",
+            "grok_",
+            "http_upstream",
+            "openai_",
+            "proxy_",
+            "refresh_token_",
+            "req_client_",
+            "rpm_",
+            "scheduled_test_",
+            "scheduler_",
+            "session_limit_",
+            "temp_unsched_",
+            "timeout_",
+            "tls_",
+        ),
+    ),
+    (
+        "runtime_protocol",
+        (
+            "batch_image_",
+            "error_passthrough_",
+            "gateway_cache",
+            "image_storage_",
+            "image_task_",
+        ),
+    ),
+    (
+        "productcore",
+        (
+            "affiliate_",
+            "aliyun_",
+            "announcement_",
+            "audit_",
+            "auth_cache_",
+            "billing_",
+            "composite_model_",
+            "content_moderation_",
+            "custom_group_",
+            "dashboard_",
+            "email_",
+            "idempotency_",
+            "identity_",
+            "internal500_",
+            "leader_lock_",
+            "model_pricing_",
+            "ops_",
+            "passkey_",
+            "platform_",
+            "promo_",
+            "security_secret_",
+            "setting_",
+            "simple_mode_",
+            "tencent_",
+            "totp_",
+            "turnstile_",
+            "usage_",
+            "user_",
+        ),
+    ),
+    (
+        "infrastructure",
+        (
+            "aes_",
+            "backup_",
+            "db_pool",
+            "ent.go",
+            "error_translate",
+            "github_release_",
+            "migrations_",
+            "pagination",
+            "postgres_",
+            "redis.go",
+            "s3_",
+            "server_timing_",
+            "sql_",
+            "update_cache",
+            "wire.go",
+        ),
+    ),
+)
 
 
 def classify_path(path: str) -> str:
     normalized = path.replace("\\", "/")
-    if normalized.startswith("backend/migrations/") or normalized.startswith("backend/ent/schema/"):
+    if normalized.startswith("backend/migrations/") or normalized.startswith("backend/ent/"):
         return "database"
     if normalized.startswith("frontend/"):
         return "frontend_product"
@@ -142,19 +520,89 @@ def classify_path(path: str) -> str:
         return "runtime_protocol"
     if normalized.startswith(RUNTIME_PROVIDER_PREFIXES):
         return "runtime_provider"
+    for prefix, rules in (
+        ("backend/internal/service/", SERVICE_PATH_RULES),
+        ("backend/internal/handler/", HANDLER_PATH_RULES),
+        ("backend/internal/repository/", REPOSITORY_PATH_RULES),
+    ):
+        if normalized.startswith(prefix):
+            relative = normalized.removeprefix(prefix)
+            for category, markers in rules:
+                if relative.startswith(markers):
+                    return category
+            break
+    if normalized.startswith("backend/internal/domain/"):
+        if normalized.endswith(("openai_messages_dispatch.go", "reasoning_effort.go")):
+            return "runtime_protocol"
+        return "productcore"
+    if normalized.startswith("backend/internal/model/error_passthrough_"):
+        return "runtime_protocol"
+    if normalized.startswith("backend/internal/model/tls_fingerprint_"):
+        return "runtime_provider"
+    if normalized.startswith("backend/internal/platform/liveattestation/"):
+        return "runtime_provider"
+    if normalized.startswith(("backend/internal/productcore/", "backend/internal/securityaudit/", "backend/internal/web/")):
+        return "productcore"
+    if normalized.startswith(("backend/internal/repository/user_", "backend/internal/server/routes/user.go")):
+        return "productcore"
+    if normalized.startswith("backend/internal/server/"):
+        return "infrastructure"
+    if normalized.startswith(
+        (
+            "backend/internal/config/",
+            "backend/internal/middleware/",
+            "backend/internal/pkg/",
+            "backend/internal/setup/",
+            "backend/internal/util/",
+        )
+    ):
+        return "infrastructure"
+    if normalized.startswith("backend/internal/testutil/"):
+        return "test"
+    if normalized.startswith("backend/resources/model-pricing/"):
+        return "productcore"
     if normalized.startswith("backend/internal/") and any(marker in normalized for marker in PRODUCT_MARKERS):
         return "productcore"
-    if normalized.startswith(("deploy/", ".github/", "Dockerfile", "Makefile")):
+    if normalized.startswith(("assets/", "openspec/", "skills/")):
+        return "documentation"
+    if normalized.startswith(
+        (
+            "deploy/",
+            ".github/",
+            "Dockerfile",
+            "Makefile",
+            "backend/cmd/",
+            "backend/go.mod",
+            "backend/go.sum",
+            "backend/Makefile",
+            "backend/Dockerfile",
+            "backend/.dockerignore",
+            "backend/.golangci.yml",
+            "backend/scripts/",
+            "tools/",
+            ".dockerignore",
+            ".gitattributes",
+            ".gitignore",
+            ".goreleaser",
+        )
+    ):
         return "infrastructure"
     if normalized.endswith("_test.go") or "/testdata/" in normalized:
         return "test"
-    if normalized.startswith(("docs/", "README")):
+    if normalized.startswith(("docs/", "README", "CLA.md", "DEV_GUIDE.md", "LICENSE")):
         return "documentation"
     return "needs_review"
 
 
 def classify_commit(subject: str) -> str:
+    for category, subjects in REVIEWED_COMMIT_SUBJECTS.items():
+        if subject in subjects:
+            return category
     normalized = " ".join(subject.lower().split())
+    if normalized.startswith("merge "):
+        return "merge"
+    if normalized == "chore: update sponsors":
+        return "documentation"
     if any(marker in normalized for marker in COMMIT_PROVIDER_MARKERS):
         return "runtime_provider"
     if any(marker in normalized for marker in COMMIT_PROTOCOL_MARKERS):
