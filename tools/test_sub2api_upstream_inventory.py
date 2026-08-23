@@ -10,6 +10,7 @@ from pathlib import Path
 from tools.sub2api_upstream_inventory import (
     classify_commit,
     classify_path,
+    feature_rows_from_markdown,
     generate_inventory,
     compare_trees,
     migration_number,
@@ -132,6 +133,21 @@ class InventoryTests(unittest.TestCase):
             {"sha": "b", "category": "runtime_provider"},
         ]
         features = [{"id": "F001", "commits": "a", "disposition": "direct_sync", "phase": "2"}]
+        with self.assertRaisesRegex(ValueError, "uncovered commits: b"):
+            validate_matrix(commits, features)
+
+    def test_feature_matrix_parser_feeds_uncovered_commit_validation(self):
+        markdown = """
+| ID | 官方功能 | 官方提交 | 归宿 | 阶段 |
+| --- | --- | --- | --- | --- |
+| F001 | protocol | a | direct_sync | 2 |
+"""
+        features = feature_rows_from_markdown(markdown)
+        self.assertEqual(features[0]["id"], "F001")
+        commits = [
+            {"sha": "a", "category": "runtime_protocol"},
+            {"sha": "b", "category": "runtime_provider"},
+        ]
         with self.assertRaisesRegex(ValueError, "uncovered commits: b"):
             validate_matrix(commits, features)
 

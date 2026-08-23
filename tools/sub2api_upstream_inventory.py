@@ -894,6 +894,34 @@ def read_csv(path: Path) -> list[dict]:
         return list(csv.DictReader(handle))
 
 
+def feature_rows_from_markdown(markdown: str) -> list[dict]:
+    lines = markdown.splitlines()
+    required = {"ID", "官方提交", "归宿", "阶段"}
+    for index, line in enumerate(lines[:-1]):
+        if not line.strip().startswith("|"):
+            continue
+        headers = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if not required.issubset(headers):
+            continue
+        separator = [cell.strip() for cell in lines[index + 1].strip().strip("|").split("|")]
+        if len(separator) != len(headers) or not all(re.fullmatch(r":?-{3,}:?", cell) for cell in separator):
+            raise ValueError("feature matrix header is missing its separator row")
+        aliases = {"ID": "id", "官方提交": "commits", "归宿": "disposition", "阶段": "phase"}
+        rows = []
+        for row_line in lines[index + 2 :]:
+            if not row_line.strip().startswith("|"):
+                break
+            cells = [cell.strip() for cell in row_line.strip().strip("|").split("|")]
+            if len(cells) != len(headers):
+                raise ValueError(f"feature matrix row has {len(cells)} cells, expected {len(headers)}")
+            source = dict(zip(headers, cells))
+            rows.append({target: source[header].strip("`") for header, target in aliases.items()})
+        if not rows:
+            raise ValueError("feature matrix contains no rows")
+        return rows
+    raise ValueError("feature matrix table is missing")
+
+
 def validate_inventory(inventory_dir: Path) -> None:
     inventory_dir = Path(inventory_dir)
     metadata = json.loads((inventory_dir / "metadata.json").read_text(encoding="utf-8"))
@@ -911,6 +939,10 @@ def validate_inventory(inventory_dir: Path) -> None:
         raise ValueError(f"needs_review files: {len(unresolved_files)}")
     if not (inventory_dir / "runtime-feature-matrix.md").is_file():
         raise ValueError("runtime feature matrix is missing")
+    features = feature_rows_from_markdown(
+        (inventory_dir / "runtime-feature-matrix.md").read_text(encoding="utf-8")
+    )
+    validate_matrix(commits, features)
     if not (inventory_dir / "database-impact.md").is_file():
         raise ValueError("database impact mapping is missing")
 
@@ -957,7 +989,7 @@ def validate_matrix(commits: list[dict], features: list[dict]) -> None:
     invalid = [
         row.get("id", "<missing>")
         for row in features
-        if row.get("disposition") not in DISPOSITIONS or not row.get("phase")
+        if row.get("disposition") not in DISPOSITIONS or row.get("phase") not in {"2", "3", "4", "5", "6"}
     ]
     if invalid:
         raise ValueError("invalid feature rows: " + ", ".join(invalid))
