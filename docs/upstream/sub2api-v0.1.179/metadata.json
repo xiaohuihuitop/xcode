@@ -1,0 +1,11 @@
+{
+  "archive_sha256": "80b2720941a10d4160090e2f99f3c8e2dd67cc2c6606aa4efc506b58ebff0ff4",
+  "base_tag": "v0.1.169",
+  "commit_count": 594,
+  "generated_at": "2026-08-23T13:18:59Z",
+  "official_version_file": "0.1.178",
+  "release_published_at": "2026-08-20T07:06:32Z",
+  "repo": "Wei-Shaw/sub2api",
+  "target_commit": "75f88be5f75c27771836b586f7de1503afa0e3bc",
+  "target_tag": "v0.1.179"
+}

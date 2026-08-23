@@ -1,0 +1,595 @@
+sha,date,subject,category,files_known
+5e72deb7d4229716465ca6bf5dc7b8da26e83c76,2026-05-01T06:16:49Z,feat: ops 错误详情弹窗支持自定义时间区间,needs_review,false
+3bff4b64b1c6a5460ed9c53889db777cbf0053f7,2026-07-10T15:43:16Z,fix(ui): localize user role label in app header,productcore,false
+7d796f1119a36f0cb48541de54e07f443def1a21,2026-07-10T16:08:26Z,fix(ui): adapt native form controls to dark mode via color-scheme,needs_review,false
+a6d868f27b64e6b2e2dd96a69560f82b7243846a,2026-07-11T09:18:25Z,fix(dashboard): include cache tokens in token card breakdown,needs_review,false
+35e8ba2a3ea1e8b351f958f49df66eef80b407d1,2026-07-11T10:28:21Z,fix(announcements): use proper empty-state copy instead of error message,runtime_protocol,false
+0d5e3ca9b03bd555329110ba9dffa7275f5866ec,2026-07-11T11:48:08Z,fix(ops): show neutral SLA card when window has no requests,needs_review,false
+272735b0a7bcc4a56c1c4ebe45792da444abb010,2026-07-28T01:19:13Z,fix(openai): preserve Codex namespace tools on OAuth Responses forwarding,runtime_provider,false
+e3e033bb359f1dba628eae38a57d2cf5c9072b9b,2026-07-28T18:46:12Z,fix(payment): preserve UTF-8 in EasyPay errors,productcore,false
+b74cb7891ccfac92ac9cbb9f340aa69244aa2153,2026-07-29T06:31:18Z,fix(grok): bump pinned Grok CLI version to 0.2.114,runtime_provider,false
+7045f89de49b99e81843667760e84d4862b16b52,2026-07-29T10:47:07Z,fix(openai): retry pool auth failures before failover,runtime_provider,false
+7b6111f2f704022833fc4931c0fe99a296702181,2026-07-29T18:37:14Z,fix(subscription): align quota windows with subscription term,runtime_provider,false
+3d99acb0ad64758cdd3c8f4f2cbfcd37dbf99501,2026-07-29T15:38:39Z,优化模型广场UI:筛选栏换行对齐、模型排序与表格留白,needs_review,false
+739c0ff9c553acfee6d740e13752c2e2bb3c551a,2026-07-30T08:28:19Z,feat(home): add compact home page preset to avoid abuse classification,needs_review,false
+a35ff9613ea3588e08a614252095816c0a44da2a,2026-07-30T10:03:54Z,feat(admin): 为账号批量删除增加并发限制,needs_review,false
+2a871ec8527118cc4c3bacbfeecb4df02eaf9ca0,2026-07-30T10:07:27Z,feat(admin): 支持按筛选结果全选账号,needs_review,false
+7d3bf86e550e149c28a230fe039bc1691b1b6b05,2026-07-30T18:31:35Z,fix(openai): retry streamed capacity errors in pool mode,runtime_provider,false
+d74e669a23cb6819f3aeacf73e7b471bfe405948,2026-07-31T01:47:53Z,feat(security-audit): add narrow blocking audit scope,needs_review,false
+4d13925c9e17184fba511154769591a583055c37,2026-07-30T08:34:33Z,fix(grok): skip entitlement 403 cooldown for pool mode accounts,runtime_provider,false
+5c9629ddb7d6113a1ca04c4a51f3813dbacaa56b,2026-07-30T08:43:39Z,fix(grok): unify pool mode bypass for all default cooldown paths,runtime_provider,false
+baaae8e121269a299966dc636a2dbc07ef3915fc,2026-07-31T04:31:45Z,fix(grok): filter billing ping response events,runtime_provider,false
+3deb2f17d8aa5b94830838c3a3bf4d41d142d129,2026-07-31T06:21:36Z,fix(payment): 保存系统设置时不再清空可见支付方式配置,productcore,false
+8ed9f754cf3ddedb1bfcb80b3068ef15b1332062,2026-07-31T06:54:01Z,fix(payment): prevent method selector overflow,productcore,false
+d6467f6eb029c0547f7b0d7b51768179de631103,2026-07-31T07:04:56Z,fix(images): decode data URLs during task offload,needs_review,false
+7ceabb3fd5f3d5e3cb774e421d3b2191c6ae99c8,2026-07-31T09:19:08Z,chore: sync VERSION to 0.1.169 [skip ci],infrastructure,false
+77d4df95449e480a90c32672d2e8f079c2c45835,2026-07-31T10:34:11Z,test(grok): check filter body close error,runtime_provider,false
+beeb2f989bb06bcb54c1782b90861d3cb7064d77,2026-07-31T10:34:13Z,test(settings): include compact home in API contracts,test,false
+dfdbc27709a866fdfc2667b720f72ccde3f9f9f7,2026-07-31T10:55:15Z,fix(openai): default missing passthrough instructions,runtime_provider,false
+30967d5d9a6ca6eb483b8b70bd6fcad869dc5d97,2026-07-31T10:57:43Z,fix(grok): ping 帧统一改写为 SSE 注释并限制过滤缓冲,runtime_provider,false
+94df1fffc2e0b1fb897623b2e451822b6df54c77,2026-07-31T11:20:16Z,Merge pull request #5124 from wucm667/fix/issue-5105-filter-grok-billing-ping,runtime_provider,false
+2bf9c6d56be6130fe863e03c9defd7eaa3ab83b7,2026-07-31T11:36:47Z,修复工具输出图片桥接,needs_review,false
+c772d186666154aed2ae67ada9df2332f3955fb9,2026-07-31T12:27:25Z,Merge pull request #5130 from moonfunjohn/codex/fix-epay-method-selector-overflow,runtime_provider,false
+796313e993a0a17863c2ac54cbad85b65c69871b,2026-07-31T12:27:35Z,Merge pull request #5131 from wucm667/fix/issue-5125-image-data-url-offload,needs_review,false
+0eac363e67887747c3903c09d1de1f0bd366962a,2026-07-31T12:27:46Z,Merge pull request #5120 from Vibeone/fix/grok-pool-mode-cooldown-bypass,runtime_provider,false
+132d446ca92f6f86c9d918ba67cb49af66d19c6e,2026-07-31T12:37:58Z,Merge pull request #5133 from dawnx/fix/payment-visible-method-wipe,productcore,false
+da6194c1c37078a87d8e9adec0f2ddff46f22f57,2026-07-31T12:38:15Z,Merge pull request #5112 from chenty2333/fix/openai-stream-capacity-pool-retry,runtime_provider,false
+66998918b6307823246d6c321d62aa67c095ccb8,2026-07-31T12:39:57Z,Merge pull request #5143 from wucm667/fix/issue-5138-codex-instructions,runtime_provider,false
+d29acc29a580f3f25e16351c6d5a19e3674ba83c,2026-07-31T12:40:18Z,Merge pull request #5066 from wucm667/fix/issue-5051-subscription-quota-window,runtime_provider,false
+f54e9827a08d6becb5c8e8c8a4d444e5421bd46c,2026-07-31T13:16:06Z,fix(pricing): update Codex Auto-review rates,runtime_provider,false
+698547418fc8b8fc5f597fd34516e7026e706d82,2026-07-31T13:20:32Z,fix(pricing): keep Auto-review rates evidence-based,productcore,false
+fe217258653bf924e159c6b36ddaceb0af28b011,2026-07-30T07:15:51Z,fix(openai): recover stale encrypted compaction,runtime_provider,false
+07f980b99f9d04a4328906f8f3c4dd7b1bee5e06,2026-07-31T13:48:10Z,Merge pull request #5084 from apple-ouyang/codex/fix-openai-compaction-encrypted-retry,runtime_provider,false
+04c96a20155c2bc74141f219b04af420bb062158,2026-07-31T13:49:44Z,Merge pull request #4981 from INKCR0W/fix/openai-preserve-codex-namespaces,runtime_provider,false
+2980ff385076593d0db9aaa30c590db153e27366,2026-07-31T13:51:33Z,Merge pull request #5094 from wucm667/feat/issue-5065-compact-homepage,needs_review,false
+570ea74d122c9fc31ab83b164d9461611b73e084,2026-07-31T14:32:00Z,Merge pull request #5117 from gaoren002/feat/prompt-audit-blocking-latest-input,needs_review,false
+4c80d160dd8d4bd56ff76cf64200925485187f94,2026-07-31T15:12:02Z,fix(email): unify SMTP connection path between send and test-connection,needs_review,false
+948b63c9cae20508b7846acea2803dc40acb66c9,2026-07-31T15:12:22Z,feat(moderation): route content moderation through configurable proxy server,needs_review,false
+682c4fe0e61b851508fa976ac693e0f68a0639eb,2026-07-31T15:24:44Z,Merge pull request #5147 from Wei-Shaw/feat/moderation-proxy-and-smtp-starttls,needs_review,false
+2e338af822bc3bfafaf1e1834c2eea0c9ab87631,2026-08-01T00:54:11Z,Merge pull request #5085 from feeeei/main,needs_review,false
+15b3c0c5aa768fc84901db2a233f80120c53f2a5,2026-08-01T00:54:26Z,Merge pull request #5145 from zvensmoluya/codex/update-auto-review-pricing,runtime_provider,false
+d9fba8fe7874ec5e8818a8c68bc528bb50c33a46,2026-08-01T00:54:38Z,Merge pull request #5101 from Tongzai123/feat/admin-select-all-filtered-results,needs_review,false
+eb1c5c7ee866d58c8836c0d00ead33bd1a65b5a8,2026-08-01T00:54:54Z,Merge pull request #5146 from tudoujunha/codex/fix-responses-tool-output-media,runtime_provider,false
+85a27fae39f9ba0a2b35c791e998cf873c901eb1,2026-07-30T07:22:16Z,fix(openai): retry SSE rate limits as HTTP 429,runtime_provider,false
+dd9a177a62a8431e4d54cca061247fdcb29232eb,2026-08-01T02:01:52Z,chore: update sponsors,needs_review,false
+2ef124629526439d71fb7410951ed21795d030d9,2026-08-01T02:32:43Z,fix(anthropic): recognize classifier requests with extra system entries,needs_review,false
+8f5caef78e37caf268cf1a8f5ed15ab8d19a65e6,2026-08-01T02:50:27Z,Merge pull request #5153 from Wei-Shaw/fix/issue-5152-classifier-multi-system-entries,needs_review,false
+d4cada3b6bd1098b11593102de0d1aab535aa016,2026-08-01T02:50:57Z,Merge pull request #5089 from feeeei/fix/openai_sse_rate_limit,runtime_provider,false
+bd52e5d770decc26677a6da7eed45dcae45a7d85,2026-08-01T03:29:58Z,fix(gateway): record observed usage when anthropic stream is interrupted,runtime_protocol,false
+d6d53052f808b9b13001eb927e361f8458b453f0,2026-08-01T03:32:31Z,chore: update sponsors,needs_review,false
+b22f73e725236790f97d89bf0c3b908a48e591d5,2026-08-01T05:51:06Z,Merge pull request #5154 from Wei-Shaw/fix/issue-5148-stream-partial-usage-billing,runtime_protocol,false
+f3a3d86845e3b46411d9f259a1fd57509124e505,2026-07-26T07:24:50Z,feat(billing-probe): extend upstream billing probe to all API-key platforms,runtime_protocol,false
+0204ce285e24ce22582c068962fb836f2571cb30,2026-08-01T06:45:02Z,fix(oauth): use claude.com/cai authorize endpoint,runtime_provider,false
+ff7ab2308dba2878ef62c398fae160d94e16f234,2026-08-01T07:03:59Z,test(oauth): lock AuthorizeURL to claude.com/cai endpoint,runtime_provider,false
+ddf4c6fd813c7bab3d776c64bf0b6c604b350f34,2026-08-01T10:45:33Z,fix(openai): fail over Messages temporary account errors,runtime_provider,false
+21aacde0b3d340e21253b73a04f6e724b40a77de,2026-08-01T12:32:10Z,fix(openai-ws): keep downstream writes off the relay cancellation context,runtime_provider,false
+b74024c7868ee88a0bf921306cbc22a2f922872a,2026-08-01T12:47:42Z,Merge pull request #5167 from Wei-Shaw/fix/openai-ws-passthrough-close-frame-race,runtime_provider,false
+d60f4e442baeadb66d8dc693f306f9de2ed8ca6d,2026-08-01T13:15:38Z,feat(composite): enforce reasoning effort policy,runtime_protocol,false
+56f3d3c9b0ab23a68d648f97f2b011707b9f016c,2026-08-01T13:53:55Z,fix(billing-probe): 收口探测资格放宽后的抑制清单与调度信任面,productcore,false
+b0f5007f0433077e1f71bb39c96df0610e967f99,2026-07-26T11:49:30Z,feat(billing-probe): optionally sync account rate from upstream declared rate,runtime_provider,false
+0b6b4ea95675fffabc42e9f471045cb9c7df3867,2026-08-01T14:01:56Z,fix(billing-probe): govern the automatic account rate write-back,runtime_provider,false
+20ad5ec506d1e0e68d36a714b423784ccb3afebc,2026-07-26T18:18:13Z,feat(scheduler): per-group profit control for token account admission,runtime_provider,false
+fad2f215e88b974cd9073f2278b852bcbe2fdd8f,2026-08-01T08:10:28Z,"fix(profit-control): decouple gate from image intent, propagate gate via selection, restore eager sticky fallback",needs_review,false
+dec47e8fae60a1a5677f13309c755a1e6d4ac27f,2026-08-01T14:25:35Z,"fix(profit-control): stop leaking profit policy, close veto livelock, restore passthrough turn pricing",productcore,false
+30d2589ef0f0dc839b934b0b21a270d18b7af52b,2026-08-02T03:47:59Z,fix(openai-ws): preserve terminal event on lease loss,runtime_provider,false
+d99ee7291197f3a87c0073e8f0d20b439719b641,2026-08-02T10:18:37Z,Merge pull request #4896 from Brisbanehuang/feat/upstream-billing-probe-multi-platform,runtime_protocol,false
+11c1e944b91dd596186f5bf9aa80edc0655ffedd,2026-08-02T10:18:50Z,Merge pull request #4911 from Brisbanehuang/feat/upstream-billing-rate-writeback,runtime_protocol,false
+c043c24774228ba891ddf90d783aa6dc7d0855b5,2026-08-02T10:19:13Z,Merge pull request #4925 from Brisbanehuang/feat/group-profit-control,productcore,false
+2a42833c4cfce80e2ba4d007ccd47f3568604658,2026-08-02T10:31:15Z,fix(admin-ui): wire require_force into the refund dialog,needs_review,false
+7e2e9ba05026b7126318aa0754c1afa0ac00bc58,2026-08-02T10:46:21Z,chore: sync VERSION to 0.1.170 [skip ci],infrastructure,false
+0b26acac0798a43935bd6a71be260cac3b9acfe2,2026-08-02T12:27:44Z,fix(payment): make Stripe refunds idempotent,productcore,false
+0b9f40e23044b7d987e448669f5a7c829bed9b8a,2026-08-02T12:50:13Z,fix(billing): retain usage logs on billing failure,productcore,false
+a0802f00b63917555b0225093c281e8bbb4a9af1,2026-07-29T08:23:45Z,feat: cache OpenAI reset credit details,runtime_provider,false
+f970bd48c98775eca3c4d538b1bfe8c001ae0c14,2026-08-02T07:46:50Z,fix: stop scheduler work after request cancellation,needs_review,false
+e1b76e2245cf099485c86a1d3ebca5303daa690a,2026-08-02T15:00:12Z,fix(codex): normalize load-shed originators to avoid upstream capacity shedding,runtime_provider,false
+3c20f9a6667db0050e2802d816d6aab24354cab7,2026-08-02T15:11:17Z,[verified] fix(payment): require force for insufficient refund balance,productcore,false
+38081ef72e1a1b92dc235e1427100c4efbd49f56,2026-08-02T15:13:15Z,fix(auth): prevent refresh token rotation races,needs_review,false
+954d44c19c24cb27df7f593349c5bf8a3dd99aa2,2026-08-03T01:59:34Z,Merge pull request #5198 from Wei-Shaw/fix/codex-originator-load-shed,runtime_provider,false
+a1f1a0cc6b4bf222c034d742eabd931775d2a0f7,2026-08-03T02:27:30Z,Merge pull request #5194 from wucm667/fix/issue-5189-persist-unsettled-usage,needs_review,false
+61ebdbdd43b788149443f1b4c7872321aec55da2,2026-08-03T02:46:36Z,Merge pull request #5200 from mrlitong/fix/auth-refresh-race,needs_review,false
+a03de418c8c4cf863526b83eed4457e8c0dc54c8,2026-08-03T03:27:37Z,Merge pull request #5192 from luckydududu/up/admin-refund-require-force,needs_review,false
+724565e4aa0b06b60f044bf3e0b8414a2e6c7f6d,2026-08-03T03:27:52Z,Merge pull request #5199 from wucm667/fix/issue-5191-refund-balance-force,needs_review,false
+0173830df625bcf898664ceeb8ccb1104e625c96,2026-08-03T03:28:05Z,Merge pull request #5193 from wucm667/fix/issue-5187-stripe-refund-idempotency,needs_review,false
+684ab20a0be2e744e50fe66bfe6970b2361f686e,2026-08-03T03:28:16Z,Merge pull request #5164 from wucm667/fix/issue-5099-messages-temp-failover,runtime_protocol,false
+27e8f69a9e04d5919c7f4b6a4175c34af24e7eb2,2026-08-03T03:28:38Z,Merge pull request #5171 from heathermhuang/codex/composite-reasoning-policy,runtime_provider,false
+54a2bcfd1580d0813d5ae9c8276cf7824e300a65,2026-08-03T06:40:55Z,fix(openai): harden reset-credit refresh and account recovery,runtime_provider,false
+825ca7b1fc9335f904bc077f051de815fb61e47f,2026-08-03T08:01:10Z,Merge pull request #5183 from rick147/codex/feat-openai-reset-credit-cache,runtime_provider,false
+db725a775a624e96af43f0e3403179372dfb2d5d,2026-08-03T08:59:05Z,[verified] fix(subscription): serialize concurrent renewals,productcore,false
+2be047d1cdd4d35d2b24fda934063bb0970e0d96,2026-08-03T09:22:18Z,[verified] test(subscription): update unit repository stubs,productcore,false
+1b04e03cc4c7c23c216ae0f4830b593700b06eda,2026-08-03T09:38:04Z,fix(prompt-audit): parse responses output text,runtime_protocol,false
+66ad405dd6ad3d6f5f286b14a85835843553c2cf,2026-08-03T11:59:58Z,fix(upstream): set explicit TCP dial timeout on upstream transports,runtime_protocol,false
+e2652eb853c74c0054cec5a2fa4672ccd8652d01,2026-08-03T12:00:32Z,"fix(billing): quantize usage billing amounts to the NUMERIC(20,8) scale",productcore,false
+2eb24814fe347536891b399fd7c110b99d9c9b2b,2026-08-03T12:14:58Z,fix(codex): 强制统一出站身份并让客户端版本号跟随官方发布,runtime_provider,false
+1e08c4c56f9b4cf67ff4cec36ed42654b264a97f,2026-08-03T12:26:50Z,test(server): 补齐 settings 契约用例的 Codex 版本号字段,runtime_provider,false
+c418fd522f429e80c5606d90393d7da601ca30d5,2026-08-03T12:35:56Z,[verified] fix(security-audit): deduplicate websocket turn audits,runtime_protocol,false
+4c4ff363802c8236c361273ff17595b9614b8e74,2026-08-03T12:55:37Z,perf(codex): 版本同步间隔改为 6 小时并加启动防抖,runtime_provider,false
+c899c8cf37f28bf14c1e900488cc28e544f0c058,2026-08-03T13:50:49Z,fix(codex): 管理员配置的 UA 只贡献指纹，版本段一律用生效版本重建,runtime_provider,false
+80af44cad7a880ca4341777d069766e6c777649d,2026-08-03T16:43:05Z,[verified] fix(dashboard): show usernames in spending ranking,productcore,false
+2d3e8452058c037714a07d08109718408cad9a7a,2026-08-04T02:51:04Z,perf(codex): 版本同步主路径改用 /releases/latest 并保留列表回退,runtime_provider,false
+785b61d424e2180cb2ce97921045ce3cdf6e2c21,2026-08-04T03:23:15Z,修复模型广场图片模型价格展示与实收口径不一致,needs_review,false
+9fd7e762316367d45188040b054bbd62157239c9,2026-08-04T06:50:44Z,Merge pull request #5233 from Wei-Shaw/fix/codex-identity-enforcement,runtime_provider,false
+e592c5f9e055cb796e32eb1f74fe97cc46fd67f3,2026-08-04T07:09:29Z,新增腾讯天御验证码认证门禁,needs_review,false
+1f4cfc44c1d0c24ce363947b3ba80e8db580650b,2026-08-04T08:15:04Z,Merge pull request #5226 from spongehah/codex/fix-prompt-audit-output-text,runtime_provider,false
+9b4575e43428fe75ff798e304fa2fb432f5e2822,2026-08-04T08:15:21Z,Merge pull request #5243 from wucm667/feat/issue-5240-dashboard-username,productcore,false
+846dd310a320b19b8f96d922e56298ece09a32d1,2026-08-04T08:15:50Z,Merge pull request #5158 from neboyang/feat/claude-oauth-authorize-url,runtime_provider,false
+770e35b474cbbffea4bce335ea1839adc24ae56d,2026-08-04T08:16:20Z,Merge pull request #5040 from coo1white/upstream-pr/grok-cli-0.2.114,runtime_provider,false
+35cab3c814a0903c81136411683262a5dd8ee481,2026-08-04T08:27:53Z,Merge pull request #5258 from feeeei/fix/model_plaza,needs_review,false
+ae81dfd93375c7b8432d3f7183f865b56d7404b5,2026-08-04T08:28:22Z,Merge pull request #5177 from r266-tech/fix-nonpassthrough-write-context,needs_review,false
+a4d263f62f1866726b271ecb09012fb70f3bbf37,2026-08-04T08:28:52Z,Merge pull request #5224 from wucm667/fix/issue-5190-lock-subscription-renewal,productcore,false
+8b3fe664dc68d056a65942b7b309089d65dfb8f7,2026-08-04T08:39:55Z,Merge pull request #5261 from lyen1688/feat/tencent-captcha-gate,needs_review,false
+7d38e67120c371f522164ba850669923a01cd53c,2026-08-04T09:59:16Z,fix(openai): keep transient failure streak from resetting on sparse traffic,runtime_provider,false
+d3b5703b55ddf5a7e38cee0baff4767865c0cb68,2026-08-04T11:14:28Z,fix(model-plaza): show composite group models,productcore,false
+635a27189fb7ebdfb0e8a905969a971caa4c3ee5,2026-08-04T12:29:53Z,fix(auth-ui): gate pending OAuth account creation on a captcha proof,runtime_provider,false
+d431c57f2ecf96807b4d2aee6e407aa7cdf6c412,2026-08-04T12:43:01Z,Merge pull request #5268 from Wei-Shaw/fix/pending-oauth-captcha-submit-gate,runtime_provider,false
+26e0a89323d59e79170beb04dd6eeacb1f079f02,2026-08-03T05:38:44Z,人机验证增加阿里云验证码 2.0,needs_review,false
+f0e7a9c7a23a7d02fb159b62fa809621eb0475a6,2026-08-04T13:16:43Z,Merge pull request #5223 from feeeei/main,needs_review,false
+aac53afe0ef1ae850e2f18b5d2814ac67c835e7e,2026-08-04T13:41:47Z,chore: sync VERSION to 0.1.171 [skip ci],infrastructure,false
+c5e046b7d7b5fec8ebb7f6bfe18733a660c7e8b1,2026-08-04T13:54:50Z,chore: update sponsors,needs_review,false
+00b8596176809906993169c283671811ad04f58d,2026-08-04T13:55:34Z,chore: update sponsors,needs_review,false
+5c52fa93d5fbfa4fd15b5fe145c38754ef9496cf,2026-08-05T01:49:25Z,fix grok missing usage billing bypass,runtime_provider,false
+2f109e74caee1a33248744b05a700a65f03bec5c,2026-08-05T08:28:16Z,fix: emit response.failed when compact keepalive commits headers but no SSE payload,runtime_protocol,false
+ba92d704225256aa6975967bee6480f8abc4c8bb,2026-08-05T09:59:20Z,fix grok usage guard for compatible accounts,runtime_provider,false
+8aa425d22f943d0aa289794c98f0d233aadf3ec9,2026-08-05T10:25:58Z,fix(apicompat): accept chat reasoning alias,runtime_protocol,false
+fc5a1b78d20977a1afe235a36328932732f41eed,2026-08-05T13:26:37Z,fix(ws): allow Codex prewarm continuation,runtime_provider,false
+ce149831331ea6ae41f1472c3c7322fb8fd70229,2026-08-05T14:35:01Z,fix(antigravity): support Gemini 3.6 Flash models,runtime_provider,false
+82ccc187cde44dccb33db45cf404c27ddb99a8d9,2026-08-05T18:26:42Z,fix(ops): preserve custom range in error lists,needs_review,false
+df249ee5d5cf99ee624ba73b05fad5c253378544,2026-08-05T18:54:16Z,fix(scheduler): diagnose legacy OpenAI exclusions,runtime_provider,false
+5b7a64334fcbaa5aca5c52cf15bdc462069e1ab1,2026-08-05T20:30:10Z,fix(grok): support task IDs for video owner binding,runtime_provider,false
+47c03c75d82494cb224b4be2c8387030d3ac449d,2026-08-06T06:00:04Z,Merge pull request #5232 from fengshao1227/fix/billing-quantize-monetary-scale,productcore,false
+c9e60d1f2649c8c1e1334f6aaff39b511cc5979c,2026-08-06T06:10:41Z,Merge pull request #5031 from keaipiao/fix/easypay-error-utf8,needs_review,false
+e08aee49ed1abb3e51a0918614119f9a4a9f2e45,2026-08-06T06:11:49Z,Merge pull request #5266 from shentry/fix/transient-streak-rate-dependence,needs_review,false
+c123caddd40bbb655caea4e68af4470a9e196fed,2026-08-06T06:22:46Z,chore: update sponsors,needs_review,false
+fe2c265c91f58c68426495acb875ff9bd1b0440c,2026-08-06T07:01:28Z,fix(identity): validate user-agent before persisting account fingerprint,runtime_provider,false
+a1936d42db3826319c60a93996ea4d512779d5a7,2026-08-06T11:30:44Z,chore: update sponsors,needs_review,false
+a19c9f8d8a1059d5ce6d78a276fa4e9bca982914,2026-08-06T11:31:17Z,chore: update sponsors,needs_review,false
+e93f6b9953d55c9e862a8d57821260c840465173,2026-08-06T12:31:56Z,fix: avoid cooling OAuth accounts for HTML count token errors,runtime_provider,false
+8e102b3a0f0f720ba8c9cbc44e9464cb90ebedcf,2026-08-06T12:34:37Z,fix: 完善腾讯验证码区域适配与 CSP 白名单,needs_review,false
+287a9f386b88d7a3f054723cdb8c1792fb82fff2,2026-08-06T13:27:06Z,fix: 修复腾讯验证码票据过期与区域切换,needs_review,false
+ab326c96eb6dac0637a980251b73c04b94826944,2026-08-06T16:25:37Z,fix(openai-ws): exclude terminal events from TTFT,runtime_provider,false
+02e50cc22d038dabf3c6af92dbb92d1e0321f8d5,2026-08-06T19:09:57Z,fix(security): block OAuth account takeover via pending exchange,runtime_provider,false
+e4b0e1b66bc296523939bc186100c6b6853e5f48,2026-08-07T00:37:50Z,Merge pull request #5338 from Wei-Shaw/fix/tencent-captcha-region-csp,needs_review,false
+dbb42881c0c6dd0596de2f9367a9c7f45e3b50eb,2026-08-07T01:56:03Z,fix(openai): default OAuth identity to codex-tui,runtime_provider,false
+b6e53c9320e770b14c9b3ea60406d7e817409520,2026-08-07T02:06:28Z,fix(frontend): align Codex UA setting copy,runtime_provider,false
+93367b6db43315abe4f9fd9b09cbfc971b1f5ad0,2026-08-07T02:17:00Z,Merge pull request #5351 from Wei-Shaw/fix/codex-tui-default-identity,runtime_provider,false
+a58048ac32b96e56113d8b149111a32347256471,2026-08-07T03:01:22Z,feat(channel-monitor-v2): 添加被动监控聚合表与模式相关迁移,productcore,false
+ead73264c7093d16f215343001724024a2fad714,2026-08-07T03:01:22Z,feat(channel-monitor-v2): 实现被动聚合、分层保留与只读 API,productcore,false
+a5beecb92ace6f584e6ef9c9c2d800a5710a4e8d,2026-08-07T03:01:22Z,feat(channel-monitor-v2): 接入模式开关、路由门控与依赖注入,productcore,false
+d8c5024cee278137349f213f3d08fc7455d85f2f,2026-08-07T03:01:22Z,feat(channel-monitor-v2): 实现用户端 Ops 风格被动监控界面,productcore,false
+d2d91ff9a85adff73694e2ef08c246053d1c375c,2026-08-07T03:01:22Z,feat(channel-monitor-v2): 补齐管理端配置、隐藏吞吐开关与测试,productcore,false
+242f2b78c2f6b1f795a4da172f3f0842f8995c7d,2026-08-07T03:10:55Z,feat(channel-monitor-v2): 统一展示成功率、首 Token、每秒 Token 与缓存率,productcore,false
+4245cb41f4d6a78c99ed363c9bad0ee488d1bc5d,2026-08-07T03:21:13Z,fix(channel-monitor-v2): 修复 CI golangci-lint 与 admin settings 契约测试,productcore,false
+8ea68bd689664ede8e6f658dfb49296e9784c884,2026-08-07T03:36:34Z,fix grok chat usage guard parity,runtime_provider,false
+d2d259cb7c282f77871fe4894ad529df788673b1,2026-08-07T03:53:25Z,feat(channel-monitor-v2): 首次启用静默回填 90m–30d 并修正覆盖判定,productcore,false
+59b5ac5458d7b70f4e249bdb0a868337cea94647,2026-08-07T03:53:25Z,feat(channel-monitor-v2): 渠道监控展示首次聚合进度,productcore,false
+4a9459d607d58e95c8b998c9857749e22f45d3d3,2026-08-07T04:02:27Z,fix(channel-monitor-v2): 修复 CI gofmt 与 public settings 注入契约,productcore,false
+74249b8fed51e79d7c07719a21a0b26b4da94b05,2026-08-07T04:31:14Z,feat(grok): 模型目录与可配置映射，默认禁止跨厂商暗默改写,runtime_provider,false
+370bdcf695a05db8008459cf534ffec9a77fefbd,2026-08-07T04:34:42Z,feat(grok): 补齐密码登录与 SSO 校验，统一 OAuth 凭证形态,runtime_provider,false
+eb6c9663e702e6cdc00384b6bd0fa55021e3fb6a,2026-08-07T04:44:08Z,feat(grok): 视频按模型族配置每秒单价，并补齐管理端映射设置,runtime_provider,false
+ba58e74b33d372dd5a5ac25aedd98156db6cc642,2026-08-07T04:55:14Z,feat(grok): free 档本地用量软门禁与支付失败临时下线,runtime_provider,false
+451abc3aa5c81e3c65b3c10a8200ab853b6ed6c6,2026-08-07T05:08:22Z,feat(grok): 加固媒体计费门控并补齐分组按模型价输入,runtime_provider,false
+0a28c99aae270b68fdc1d26c7b59477d7457768a,2026-08-07T05:08:22Z,feat(grok): 管理端补齐 SSO/密码授权前端入口,runtime_provider,false
+be925d9a427f34c7ec22892e51e869e90fe6e536,2026-08-07T05:08:23Z,docs(grok): 更新完整整合进度（阶段 4–6）,runtime_provider,false
+9b7ea3aabf2874d80f99f29e2ef094881a532868,2026-08-07T05:18:59Z,feat(grok): 创建账号流程接入邮箱密码登录,runtime_provider,false
+48fc076ce1140a88102de32ab0879df5f5b6e96f,2026-08-07T05:18:59Z,docs(grok): 记录创建账号密码登录 UI 接入,runtime_provider,false
+91f5b00679b300733e8a956590d0468881560972,2026-08-07T05:23:03Z,feat(grok): ReAuth 弹窗支持 SSO、密码与 RT 重新授权,runtime_provider,false
+8989d25ed5096107f9669f3d3b7136ed1ea9f81c,2026-08-07T05:23:03Z,docs(grok): 记录 ReAuth 密码/SSO 入口,runtime_provider,false
+43391de925648a78c59bb1999c6a15fdfa3bdb6d,2026-08-07T05:41:34Z,fix(grok): 打通按模型视频价格计费链路,runtime_provider,false
+e9aaa325fa88d042c722537045d03628c991c04e,2026-08-07T05:43:02Z,fix(grok): 让跨客户端消息映射服从配置开关,runtime_provider,false
+9bc99e8b6eb62767172c22a6b832f1208b5c8fec,2026-08-07T05:44:56Z,fix(grok): 防止加权粘连回退绕过免费额度门禁,runtime_provider,false
+e12e0dc1a63df6191ec717bd07ecdb73b0cbe339,2026-08-07T05:47:09Z,feat(grok): 对齐 free-usage/empty 失败分类与 sticky/ReAuth 体验,runtime_provider,false
+dfca6246eb9d445fc57bddb95a7e5c77ecaeabab,2026-08-07T05:55:58Z,refactor(grok): 将视频模型价纳入 Ent 持久化,runtime_provider,false
+ec9e7336060bfef2df6f4dd80625560ec1f4cdbd,2026-08-07T05:56:38Z,feat(grok): stream idle 换号、team+model 冷却与 RT 刷新打散,runtime_provider,false
+cda6de44da609901d6bed483853ed40284052a7f,2026-08-07T05:59:32Z,fix(grok): 运行时映射设置即时失效账号缓存,runtime_provider,false
+2413441b5fa8ad29189cec4b751b1884035dc04f,2026-08-07T06:06:21Z,feat(grok): P2 模型额度软封、spending reauth、粘连分轨与观测模型,runtime_provider,false
+d0930c4bdb2925bc83503cb358b5f0fc1beefe27,2026-08-07T06:13:07Z,fix(grok): 完善密码与SSO授权能力控制,runtime_provider,false
+ff4bb3bd2c907feb0db95bd60bf7e76a90f4cebb,2026-08-07T06:18:06Z,fix(grok): 修复授权文案的i18n占位符,runtime_provider,false
+eb2e73df3df09a2edc77c1fce2d0018e6160b8d7,2026-08-07T06:22:15Z,feat(grok): 补齐管理端模型映射设置,runtime_provider,false
+2c8836e40b2495d0ce5db5affa048e5e5b184967,2026-08-07T06:42:00Z,fix(grok): 完善按模型视频价格矩阵,runtime_provider,false
+0316994c52343adee51024fc4b5f8b9ef45112f1,2026-08-07T06:50:02Z,fix(grok): 修正授权与模型映射边界,runtime_provider,false
+7c62382d044d1f9f0abefa494d52d6b947cf302f,2026-08-07T06:53:18Z,feat(grok): 吸收调度阈值、配额解析、批量用量与 CLI 身份,runtime_provider,false
+2e20ea4c872a9697714941e03e77e3bafcf35c4b,2026-08-07T06:55:41Z,fix(grok): 保持模型级免费额度隔离,runtime_provider,false
+a397724f6953d300179c59bdb242c4a7aefc4142,2026-08-07T07:03:04Z,refactor(grok): 移除未接入的免费恢复状态,runtime_provider,false
+99ad01f6de1ede51e8a43ff76a3a85c07cae5fc9,2026-08-07T07:08:39Z,feat(grok): 网关 Voice TTS/STT/Realtime 与分组音频定价,runtime_provider,false
+79df1647d4c2b7c30b801d5d329a4482b99cd1ea,2026-08-07T07:52:55Z,feat(grok): 账单绝对金额、调度阈值 UI、搜索/Voice 计费与 /v1/web_search,runtime_provider,false
+2a256150f78cabff0f5c6e18adc26d9c9f25a0df,2026-08-07T07:56:49Z,docs: 补充 channel-monitor v2 摘要并忽略根目录 .vite 缓存,productcore,false
+a061a758f438ef83d56a545bda035816611099b7,2026-08-07T08:10:31Z,fix(grok): 修复调度阈值初始化与刷新测试回归,runtime_provider,false
+865002fd2c00346e18cfa56fda5214eac6874ff6,2026-08-07T08:14:25Z,Merge pull request #5317 from wucm667/fix/issue-5314-grok-video-task-id,runtime_provider,false
+22ef761c2760c30cb4a2bb8d8ccf587d5b09c923,2026-08-07T08:14:37Z,Merge pull request #5309 from wucm667/fix/issue-5308-antigravity-gemini36,runtime_provider,false
+dce0f6b4e32be64c93f519fc7f71c388f4763d40,2026-08-07T08:14:48Z,Merge pull request #5337 from wucm667/fix/issue-5331-oauth-count-tokens-fallback,runtime_provider,false
+c8af48d769d6516b5628280be0336dbf0d1891c2,2026-08-07T08:15:00Z,Merge pull request #5315 from wucm667/fix/issue-5312-ops-custom-error-range,needs_review,false
+5ec11885d1beb9be35ac7da6c77e46f51c718515,2026-08-07T08:15:11Z,Merge pull request #5307 from lenzhang/fix/ws-prewarm-continuation,needs_review,false
+8f55e0a7cd4dc404666b2e47738775b51e7896f2,2026-08-07T08:17:52Z,Merge pull request #5267 from wucm667/fix/issue-5264-model-plaza-composite,needs_review,false
+9b54b46b0639fd6a3ec42ffc355432e383be3020,2026-08-07T08:22:37Z,fix(admin): enable image generation permission for Composite groups,productcore,false
+32e4de79420f747ddef741e15474ff5e6515000a,2026-08-07T08:24:53Z,Merge pull request #5231 from fengshao1227/fix/upstream-dial-timeout,runtime_protocol,false
+25d2b03e909c99eb3af7cbdc05166c8dafacfc2f,2026-08-07T08:29:48Z,fix(grok): 加固 OAuth 会话共享与一次性消费,runtime_provider,false
+b59a3df5b5f7ffb2c50a27b982e88dc5078c50fd,2026-08-07T08:29:57Z,fix(grok): 视频在 status 返回 video.url 后再按上游参数计费,runtime_provider,false
+5199a610af7c5984212e7fc735e98e9fdb33a22b,2026-08-07T08:30:55Z,test(grok): 恢复媒体资格失败关闭契约,runtime_provider,false
+e549931cf44a1c73302dc5193662171163ae99c3,2026-08-07T08:31:12Z,fix(grok): 避免刷新时无效清理重认证标记,runtime_provider,false
+a3aae134ee62cb5335a32b2b16e8eea7f129947d,2026-08-07T08:34:47Z,fix(grok): 加固 SSO 凭证与 Cookie 隔离,runtime_provider,false
+962da308cc74f776eca09790685ca063019a50cd,2026-08-07T08:36:12Z,fix(grok): 限制导入探测队列并去重任务,runtime_provider,false
+21d0905c78339beab73d183733699fa0524e78df,2026-08-07T08:36:15Z,fix(grok): 按官方 status=done + video.url 计费并对齐字段,runtime_provider,false
+769f1c2def1bf24bb889fe3cc1ce6b530f3418a6,2026-08-07T08:38:26Z,fix(grok): 防止 OAuth 客户端缺失导致崩溃,runtime_provider,false
+61b975b5dd8fd25d8ddc613fef692e4369595a5e,2026-08-07T08:45:25Z,test(grok): 对齐跨客户端映射与路由审计契约,runtime_provider,false
+7b93f4a68943f4a840c64889bdc7bf86a8a30dad,2026-08-07T08:47:25Z,docs(grok): 更新完整整合审查与排除清单,runtime_provider,false
+856a96a217c8c99e1849181243bb6f13c99ce8ef,2026-08-07T08:55:36Z,test(grok): 对齐配额模型同步与 CLI 身份断言,runtime_provider,false
+5bb206ee99783f251a50e16997d8df3fff1b3bf6,2026-08-07T08:56:53Z,test(grok): 补齐音频与搜索计价接口契约,runtime_provider,false
+be5e4226d4c6ab4098588ca1a4c75d6596058fcc,2026-08-07T09:01:20Z,test(grok): 补齐模型映射与调度设置契约,runtime_provider,false
+918b1218780a04733691210bff28f5230cf2346a,2026-08-07T09:02:33Z,docs(grok): 补充 personal-dev 能力覆盖矩阵,runtime_provider,false
+93a04567d440b4fbd720d4832502dc8472424742,2026-08-07T09:03:48Z,style(grok): 清理搜索处理器末尾空行,runtime_provider,false
+7a814682825941627ae446af7713f2523e44a711,2026-08-07T09:15:43Z,fix(grok): 按 review 优先级修复计费漏扣、auth 投影与 free 门禁,runtime_provider,false
+ccf7ba3ba768fadfd57a41d6ee37f23289777288,2026-08-07T09:21:01Z,fix(grok): P2 分层清理、主对话 SearchCount 与调度 7d/30d,runtime_provider,false
+245d0696024654cf3e12276e18ab7774a739615a,2026-08-07T09:40:21Z,fix(grok): 二轮评审残留 — Search 叠加计费与 fail-closed 安全,runtime_provider,false
+99b357083e1b5a860f9987523434092e5ef2fcfa,2026-08-07T09:42:51Z,fix(subscription): restore midnight daily quota reset,runtime_provider,false
+d7c9e7167bdcb5cb3564957827c7bf39f251df2a,2026-08-07T09:58:23Z,fix(grok): 三轮评审 — 流式 Search 去重与调度/计费加固,runtime_provider,false
+3ae94df72baf89b3cf9fce54775eb6c422dfda43,2026-08-07T10:15:08Z,fix(grok): 四轮评审 — SearchCount 接线与 sticky free-gate,runtime_provider,false
+3a415e6d04272440c2f886c6c20ab0651b03f30e,2026-08-07T10:23:28Z,fix(grok): 五轮评审 — messages SearchCount 与 OpenAI free-gate,runtime_provider,false
+8f5657b91c4339f25a9462591cc29c54443e61b6,2026-08-07T10:34:55Z,fix(grok): 收窄 free 推断 — 仅月度探测，勿把周度 OK 当 free,runtime_provider,false
+e687ca3e9d9c943bb7b1edb0f0622b783c671963,2026-08-07T10:45:05Z,fix(ops): 系统日志落库失败后退避重试，避免拖垮数据库连接池,needs_review,false
+72a56f862c3fec1340da727222d07ce18be96b4b,2026-08-07T10:52:53Z,fix(grok): free 500k + 对齐 personal-dev tier/时间窗,runtime_provider,false
+bd9b12bbcb987b7ca0389cbb5fc9302650098651,2026-08-07T11:49:08Z,Merge pull request #5380 from Wei-Shaw/fix/subscription-daily-midnight-reset,productcore,false
+b8c0c00091ee62b69be71f7643e1ecd4c4ba6e67,2026-08-07T12:20:20Z,Merge pull request #5384 from fengshao1227/fix/ops-system-log-sink-flush-backoff,needs_review,false
+e01c917a970bb563158afc81d03ac8ecfca9e344,2026-08-07T12:29:17Z,fix(risk-control): block prompts when risk control backend fails,needs_review,false
+f3c94d2099e92efaf0e20742fa338b6dbfb483e8,2026-08-07T10:31:56Z,fix(openai): 修正 Responses 工具 Schema 中显式为 null 的 parameters.type,runtime_provider,false
+379db1914158ec4329b2755c32c7c250998025b7,2026-08-07T12:37:44Z,perf(openai): 工具 Schema 净化改为单次拼接，去掉逐路径全量重写,runtime_provider,false
+a071b27b417ab2f20630ffb438b9480c271d5cc4,2026-08-07T11:44:43Z,fix(grok): 405 纳入 failover 与临时踢号，修复 Grok 会话粘性锁死,runtime_provider,false
+146b8b668494df0a95fb421cbbfb851a79f3b840,2026-08-07T12:41:23Z,revert(grok): 撤回 405 账号级踢号，只保留 failover 分类,runtime_provider,false
+b5d9fd21b0e3542ce2a4c5e19959edffa525ad59,2026-08-07T11:37:28Z,fix(ratelimit): 图片模型被 Codex 文本端点拒绝时不再写模型冷却,runtime_provider,false
+02fbcbe3ad1d3860d43d84438e2f256bf471f286,2026-08-07T12:49:39Z,fix(ratelimit): 守卫按端点来源门控，并与冷却键对齐模型口径,needs_review,false
+e79429b03f5b9ba0ff6cec055df67918a7c72ce5,2026-08-07T13:05:46Z,Merge pull request #5392 from fengshao1227/fix/grok-405-failover-and-cooldown,runtime_provider,false
+045b620d0d73b7a2125fb99132b9a453596406d3,2026-08-07T13:05:58Z,Merge pull request #5391 from fengshao1227/fix/codex-plan-gated-image-model-no-cooldown,runtime_provider,false
+e88fc52ce666aa239b80de21630f339464c505b5,2026-08-07T13:06:10Z,Merge pull request #5383 from fengshao1227/fix/responses-tool-parameters-null-type,runtime_protocol,false
+db0bff82c7f954607f4b66421a79200e150ac836,2026-08-04T13:44:29Z,feat(usage): audit upstream response models,runtime_protocol,false
+915cc7e7bdd86cd390c41d7cb13be42c64285047,2026-08-07T03:12:01Z,fix(openai): stop injecting legacy beta on OAuth responses,runtime_provider,false
+815035fcc9adb0536fd89896da1f8a04da95fd8d,2026-08-07T03:48:44Z,fix(openai): send OAuth routing hints,runtime_provider,false
+de349187d91f5d458199d332aa90966d732bd55d,2026-08-07T05:11:08Z,fix(openai): harden priority routing hints,runtime_provider,false
+c33c3208e307c53c82daebc0ba303c3f09b51308,2026-08-07T14:42:33Z,fix(gateway): 流内降载错误恢复 pre-output failover 并对客户端改写为可重试错误码,needs_review,false
+14a27f1960c46244977fec18ad25acb438261c0a,2026-08-07T14:55:42Z,test(gateway): 校准 error 帧边界 flush 期望至 pre-output failover 新契约,test,false
+de904c433e3a2b5bce18f2937ef5ce99a70e6874,2026-08-07T15:00:46Z,Merge pull request #5396 from Brisbanehuang/codex/upstream-response-model-audit,runtime_provider,false
+64090de6645f738e1a6dbdcf84cc08495304dd0a,2026-08-07T15:09:03Z,fix(apicompat): Responses→Anthropic 转换不再发出上游会拒收的 content block,runtime_protocol,false
+8f7b0a314de816daabb5b761db3025cb10c3eca9,2026-08-07T15:11:20Z,Merge pull request #5398 from Wei-Shaw/fix/openai-capacity-shed-stream-recovery,runtime_provider,false
+89915748736c84dbeb2a4ef201a4e2f444f13cab,2026-08-07T15:20:22Z,Merge pull request #5345 from puppywang/fix/oauth-pending-account-takeover,runtime_provider,false
+155c494964c3ea6ecc31f52679525c1034bf0f16,2026-08-07T15:21:59Z,Merge pull request #5399 from fengshao1227/fix/responses-anthropic-invalid-content-blocks,runtime_protocol,false
+68d8f122e47fe50e9edda3beba95c7bd98b19e56,2026-08-07T15:39:12Z,chore: sync VERSION to 0.1.172 [skip ci],infrastructure,false
+74fcdf3d42b28a48446a6c5b1fda4e9a4ef23c49,2026-08-07T16:29:22Z,fix(openai): preserve exponential capacity backoff,runtime_provider,false
+9763765ebf86e851db958418550ba7fc1edb1ec8,2026-08-07T17:05:29Z,fix(openai): fail over OAuth image stream errors,runtime_provider,false
+d0767eab9ddc6a1d885e4f1341ca150f7b2d96d3,2026-08-07T17:07:08Z,feat(grok): admin account test modes with real media preview,runtime_provider,false
+6d632eec45aa794558bca4c7384c39a2cf0e8576,2026-08-07T17:07:19Z,fix(grok): tighten OAuth SSO flow and hide password login,runtime_provider,false
+68faeac8377b44f0929c17f1e787c6b8ac1d9e35,2026-08-07T17:07:19Z,fix(grok): restore base URL resolution and operator settings wiring,runtime_provider,false
+2526a042266e871c7dff1cd5eaa6357afaf2cacf,2026-08-07T17:07:27Z,fix(admin): empty web-search config on missing setting and reset dialog scroll,needs_review,false
+165b072908004bbffd2b465137f46dc0bd767617,2026-08-07T17:07:27Z,"fix(grok): gateway media/voice routing, models, and status UI polish",runtime_provider,false
+0d98176c595a0b0b7e152107dc96ab8769759fac,2026-08-07T17:59:44Z,fix(channel-monitor-v2): correct aggregation privacy and backfill,productcore,false
+85b65284ec297f8a64eb9aaf799dc94c9d4b7034,2026-08-08T00:48:38Z,fix(grok): set async video duration_ms from create accept to done discovery,runtime_provider,false
+35faaa6d2100ae7ed94982d29c1e23882c709563,2026-08-08T00:48:38Z,feat(grok): register custom-voices CRUD and audio download gateway routes,runtime_provider,false
+8399a304177e50f0f803817c6704808074e4e4df,2026-08-08T00:48:38Z,fix(grok): treat free-usage and billing exhaustion as recoverable,runtime_provider,false
+e1d6600eb289f9312e4070ee0ed4e92988a53234,2026-08-08T00:48:38Z,fix(admin): simplify Grok usage UI for free 24h and paid windows,runtime_provider,false
+6345b048d11faa7054c697cdcb1a9a8388d1a117,2026-08-08T00:48:38Z,style(admin): color paid Grok and OpenAI plan badges,runtime_provider,false
+85fb776151507c1e8bd8b7cc36e03abd703b8b7f,2026-08-08T00:48:38Z,test(frontend): mock getLiveCapability and align rollback timeout,frontend_product,false
+77e39fe608e051dfea6f2f1c7f4d02473264cc7b,2026-08-08T00:48:38Z,docs(grok): note custom-voices coverage and free 24h soft-gate scope,runtime_provider,false
+9f3ee38d4e3f7b73ccfd9a4e828fe5a5c4098e47,2026-08-08T00:55:59Z,fix(channel-monitor-v2): preserve migration checksums and privacy defaults,productcore,false
+64d1ebe4a51d7b644e11b0e453fcfa8e20d68d82,2026-08-08T00:59:18Z,fix(channel-monitor-v2): close dedup and migration privacy gaps,productcore,false
+8005335742951e9828aa76f2aaa46c1375ae9203,2026-08-08T01:00:15Z,fix(channel-monitor-v2): align admin error details dedup,productcore,false
+12db0f906a7faae9e818a481485e58e344487658,2026-08-08T01:45:12Z,fix(grok): drop account-test ZDR path and align media CLI headers,runtime_provider,false
+e01ce90d475b797e08dbc25b7dd40aa59017eed0,2026-08-08T01:45:12Z,"fix(grok): harden voice request ids, video pending, and search pricing alerts",runtime_provider,false
+bdeb13021a5444f48e36dc05a5967e14c90915a6,2026-08-08T01:45:12Z,fix(admin): i18n account-test media uploads and shared file pickers,runtime_provider,false
+b7863650ec9f74582c4c9d8da1901b0e9d3ee796,2026-08-08T01:45:12Z,fix(usage): prefer explicit video billing mode over image_count,productcore,false
+2e857b20b8d8f88fc880ca8a6fcf98356d7afd1f,2026-08-08T02:00:56Z,chore(grok): 从 PR 中移除进度文档与 lockfile 噪音,runtime_provider,false
+f3bac4619e52f41165a641e488540912571df438,2026-08-08T02:26:16Z,feat(keys): expand Grok client samples and tune free soft-gate default,runtime_provider,false
+b717ed9d0d1fc28eddc0a1327856de36f24efcb9,2026-08-08T02:33:45Z,feat(keys): complete Grok Build sample with endpoints/auth/session/features,runtime_provider,false
+b7112d596fcaedff7d6a862bab5b5b61d81eeffc,2026-08-08T02:40:40Z,fix(keys): grok-4.5 上下文窗口按 500k 对齐并修正账号测试 i18n mock,runtime_provider,false
+8ad0a5ff527fc00d701252f2de618306819a1819,2026-08-08T02:48:42Z,fix(deps): bump nanoid 3.3.16 -> 3.3.17 to clear GHSA-2v37-7h3g-55p8 audit gate,infrastructure,false
+cc67b1aca1d3b590609abef2fcd3a6ca31c5c651,2026-08-08T02:58:53Z,Merge pull request #5406 from bestony/fix/openai-oauth-routing-hints,runtime_provider,false
+07b46e93e42952c5e6a80c5d87826fff36d78cad,2026-08-08T03:02:22Z,fix(grok): 修正 voice 路由推导、视频价归一化与门禁缓存驻留,runtime_provider,false
+1f58e25ab318e6a78f7dbb0bd2aa597329987ede,2026-08-08T03:12:56Z,Merge upstream/main into feat/grok-complete-integration,runtime_provider,false
+3c22aeeb3d6082d4f9676e40bc449a9550421262,2026-08-08T04:49:39Z,fix(channel-monitor-v2): default hide_throughput true for privacy parity,productcore,false
+a4faa015a758bef68884f7d39180ff592f8de881,2026-08-08T04:50:53Z,fix(deps): bump nanoid 3.3.16 -> 3.3.17 for GHSA-2v37-7h3g-55p8,infrastructure,false
+cec922d33531135d62015f72e934e1f200753bf3,2026-08-08T04:56:40Z,fix(grok): clear golangci-lint findings on complete-integration branch,runtime_provider,false
+825f9c78d592b6efa2fa6a9f494490096818e931,2026-08-08T05:56:22Z,fix(channel-monitor-v2): default mode v1 and gentle adaptive backfill,productcore,false
+9f31df3fa836d7dff967e030e57b3c062818e9de,2026-08-08T06:34:53Z,fix(openai): strip invalid reasoning item IDs in API key passthrough,runtime_provider,false
+280c1c86232fc2eac1e36fc1593cf00e0f245521,2026-08-08T06:35:10Z,fix(openai): fail over empty response.completed streams instead of recording 0/0 success,runtime_provider,false
+7eb1310701c02e9591a4aa91f9ffc6580d050229,2026-08-08T06:39:22Z,fix(grok): close free-by-default billing and related review blockers,runtime_provider,false
+04d9eeaf07c52ef226f9dbce5d3feecd1ec4049f,2026-08-08T06:46:35Z,fix(channel-monitor-v2): clear CI lint and align trend axis with range zoom,productcore,false
+e91b4941680bf948166c4f1dbd96356c8a623bbb,2026-08-08T07:00:33Z,fix(test): stabilize OpenAI streaming preamble keepalive assertion,runtime_provider,false
+cbf2be05a303dd9e8ade0ea204abde2e8fd27f10,2026-08-08T07:24:34Z,fix(openai): 非流式生图脱钩上游 context，客户端断开不再导致图已出却不扣费,runtime_provider,false
+cbc2a3dd46ded3dce0c25e8be6fd58d2aa209e6e,2026-08-07T01:57:13Z,修复池模式 Gemini 账号被 429 打上账号级限流,runtime_provider,false
+4999231d61aa4cfed8e8940adfba681edbd347bf,2026-08-08T12:36:08Z,修复邮箱域名注册额度策略,needs_review,false
+b6eb6c1efab720fc1c791b07ca3384539c843154,2026-08-08T13:36:18Z,fix(gemini): 原生生图按上游实际回吐的图片张数计费,runtime_provider,false
+a54a4b674b90a5e08b7abe90a83f135d9eea126b,2026-08-08T14:52:31Z,fix(grok): clear golangci errcheck and gofmt on free-quota path,runtime_provider,false
+5315896b304ce6d0f7eb596ba3d28cddcf57e8b5,2026-08-08T15:38:50Z,fix(grok): align free soft-gate tests with async fail-open cache,runtime_provider,false
+6e34fb09c9a3236fc3c48b8ff11e877f9c211e77,2026-08-09T02:04:49Z,perf(usage): optimize upstream response model observation,runtime_protocol,false
+fb0475656cbc674c0304cfe18c2bbd413f3d9f83,2026-08-09T03:31:09Z,Merge pull request #5408 from IanShaw027/feat/grok-complete-integration,runtime_provider,false
+d92edc01be2d668ea50a5ea65e78086b557210f7,2026-08-09T03:55:04Z,Merge origin/main into feat/channel-monitor-v2-ops-ui,productcore,false
+909cbb9b12b594c396ccbe519ace95f8b4c69771,2026-08-09T04:25:37Z,Merge pull request #5356 from IanShaw027/feat/channel-monitor-v2-ops-ui,productcore,false
+7a113fb7a30eb8fba4014229fdd1dce7bc518d86,2026-08-09T06:55:02Z,Merge pull request #5352 from feeeei/main,needs_review,false
+a1073843ac5693b0b84f464769f688fd7b319f69,2026-08-09T06:55:15Z,Merge pull request #5437 from Brisbanehuang/codex/upstream-response-model-audit-followup,runtime_provider,false
+c5bda8b8e4639c170a170c886ab6abf02ba78e9a,2026-08-09T06:55:28Z,Merge pull request #5416 from fengshao1227/fix/images-apikey-detach-upstream-context,runtime_protocol,false
+7821c4005e8b3ad156e5a952b803fd07bb43e199,2026-08-09T07:02:08Z,Merge pull request #5424 from fengshao1227/fix/gemini-native-image-billing,runtime_provider,false
+f2da30bcd94615d697719cb764d1c971a7e92a8b,2026-08-09T07:16:26Z,Merge pull request #5423 from lyen1688/feat/email-domain-registration-quota,runtime_provider,false
+563a72ca734774a7744f39876dbff4d3019c9be4,2026-08-09T07:53:40Z,feat: add default-off switch for email domain registration quota,runtime_provider,false
+29009f0b2ea14edf3b11ae2564fb617ff91a03b4,2026-08-09T08:09:17Z,Merge pull request #5446 from Wei-Shaw/feat/email-domain-quota-switch,runtime_provider,false
+48eb3766d2da817b171b45bb3036d42575e42b8f,2026-08-09T08:26:22Z,chore: sync VERSION to 0.1.173 [skip ci],infrastructure,false
+118c1e8e72bd20043c31dc601904a9991aece12c,2026-08-09T10:10:46Z,docs: sync Go 1.26.5 / golangci-lint v2.9 versions with CI,documentation,false
+bbc8b6e906d69d85a39b89a3fd14545771e1f430,2026-08-09T12:47:07Z,完善大文件备份分卷上传与恢复,needs_review,false
+f5c108c836a849dd6b982e46238c42c6db611899,2026-08-09T14:42:51Z,fix(api-key): validate quota and expiry inputs,runtime_provider,false
+99b31067f73b036fdf363837f2cae9b27eb23601,2026-08-09T20:29:08Z,fix(openai): preserve Codex usage percentages in scheduling threshold,runtime_provider,false
+fddc806db29a518f3b53d2c3ae9cc28cae100c4b,2026-08-10T00:36:08Z,Merge pull request #5458 from lyen1688/feat/backup-large-file-parts,needs_review,false
+b5e83156d9633d4618a989c320ab0334a92a1d98,2026-08-10T00:51:46Z,Merge pull request #5394 from wucm667/fix/issue-5388-risk-control-fail-closed,needs_review,false
+358e4a89a1803e2e8d6fe8da9e24402e0f7a7518,2026-08-10T01:29:14Z,fix(openai-oauth): 个人订阅到期时间不再被 POID workspace 的 entitlement 覆盖,runtime_provider,false
+af6928a26870744da873a59f678b2afb0db6d5c9,2026-08-10T01:59:42Z,"Revert ""fix(risk-control): 风控后端异常时阻断提示词请求""",needs_review,false
+4667f9012f4e163dc1d0b18481674830c7123046,2026-08-10T02:00:02Z,Merge pull request #5477 from Wei-Shaw/revert-5394-fix/issue-5388-risk-control-fail-closed,needs_review,false
+2d0976ac2c8690d31218b311e5856ba6ed1f06f4,2026-08-10T02:23:05Z,Merge pull request #5475 from fengshao1227/fix/oauth-personal-subscription-expiry,runtime_provider,false
+895e8247afc6151cca5c70cb186c7b45d30f307a,2026-08-10T02:51:43Z,Merge pull request #5472 from wucm667/fix/issue-5468-openai-threshold-percent,runtime_provider,false
+5deeb7ef15999bb6f1c010d2ab60d49ad19ba329,2026-08-10T02:51:54Z,Merge pull request #5376 from wucm667/fix/issue-5369-composite-image-permission,needs_review,false
+30d0405388f0eaf02e45548d04bf2a00e86e290c,2026-08-10T02:52:04Z,Merge pull request #5464 from wucm667/fix/issue-5455-api-key-input-validation,needs_review,false
+f19e3816d0d5725f63260cb45b37302dec0e97e6,2026-08-10T02:52:14Z,Merge pull request #5316 from wucm667/fix/issue-5313-legacy-scheduler-diagnostics,needs_review,false
+f3c7a1a8c410d03f67d6fc5fae96508ef4dff9da,2026-08-10T02:52:49Z,Merge pull request #5295 from wucm667/fix/issue-5289-streaming-upstream-error,runtime_protocol,false
+10a4c6e3ad319587e817109c071259269855ec30,2026-08-10T02:53:17Z,Merge pull request #5234 from wucm667/fix/issue-5230-deduplicate-latest-turn-audit,needs_review,false
+5350b3d98e48fe9c205e200fab3507ba2feb1593,2026-08-10T02:54:39Z,fix(usage): restore request ID column visibility,needs_review,false
+591d47fb9b706d3d96d1e36e0ea57a2fb8521fb1,2026-08-10T03:25:46Z,fix(openai): 原生 Responses 路径不再把上游确定性 400 归一成可重试 502,runtime_provider,false
+3d3aee2e7257d1e2bbe0fcd8e1a37cacb0592e0f,2026-08-10T06:27:04Z,fix(openai): skip stale and reset Codex snapshots in scheduling threshold evaluator,runtime_provider,false
+9096492b559909d6f8dec54de3e3d64a870809e1,2026-08-10T06:04:13Z,feat(billing): support safe upstream response model billing,runtime_protocol,false
+b689e5b401431797b9f0373191547ef44a9f800a,2026-08-10T07:12:06Z,fix(billing): harden response-model billing and repair its test fixtures,runtime_protocol,false
+33351c7bc740f2ecf490971f3bdd1940eec4923f,2026-08-10T08:42:51Z,fix(billing): gofmt channel.go and drop the redundant response-model hint,runtime_protocol,false
+e5b325e481626933acd7e46371c5b15473d08b8c,2026-08-10T11:11:47Z,fix(billing): harden response-model billing admission,runtime_protocol,false
+0b3fe95afd20aba77ee7649b37febb8255fb57a5,2026-08-10T11:47:22Z,Merge pull request #5439 from pigzwy/feat/response-model-billing,runtime_protocol,false
+3e1674a06033279a2af9f7c3c2bdeadab88d779b,2026-08-10T20:31:36Z,fix(settings): cache unset scheduling thresholds,needs_review,false
+61acf2912588e98986d6b184cbd36ecd9313fb76,2026-08-11T01:27:22Z,Merge pull request #5501 from wucm667/fix/issue-5500-unset-scheduling-thresholds,needs_review,false
+ba4bd0c0b41dc4618ceb9c8a0f6cf27db73ad6c9,2026-08-11T01:27:34Z,Merge pull request #5481 from fengshao1227/fix/responses-deterministic-400-passthrough,runtime_protocol,false
+e2d9034d3d298ab4e288686c9fd0e62fcf196e2b,2026-08-11T01:28:27Z,Merge pull request #5327 from fengshao1227/fix/fingerprint-user-agent-validation,productcore,false
+0f73203e35d3e530f4245a32ec3e0f00472cfc38,2026-08-11T01:28:43Z,Merge pull request #5277 from Pluviobyte/agent/fix-grok-missing-usage-billing,runtime_provider,false
+9261dd77343d296d109e788224989b743e746f98,2026-08-11T01:55:19Z,[verified] fix: apply service-tier pricing to account cost,runtime_provider,false
+12abb547008b1882cd101c8c3c996f1cce9e521e,2026-08-11T02:18:20Z,fix(openai): 上游 HTML 403 不再被当成账号级错误处罚账号,runtime_provider,false
+fd9ce53281af6010cba6d8841aa435cc2de6c842,2026-08-11T02:46:50Z,fix(openai): 探测响应未跑完时不再落标为「上游不支持 Responses」,runtime_provider,false
+0d7b6ae64c0e890dbd3d0f436f4f89c571f7415c,2026-08-11T03:27:49Z,fix(frontend): show security audit menu in simple mode,frontend_product,false
+2d9920ba7dfe516ceec4c2c6d51c2e055619160e,2026-08-11T03:56:46Z,fix(security-audit): restore websocket audit logs,runtime_protocol,false
+c8d9af6ce1e12527d7aa969be3d42d2450f536a2,2026-08-11T04:34:51Z,fix(gemini): normalize exclusive minimum tool schemas,runtime_provider,false
+6564d376e53ced64f4e309010c1ec6ecdb94e68b,2026-08-11T05:05:56Z,fix(audit): scope cyber policy events,needs_review,false
+e499a54a9d239af465119e0025ca6d5db78bfda7,2026-08-11T05:52:35Z,Merge pull request #5449 from hongheshan-svg/docs/fix-stale-go-golangci-versions,infrastructure,false
+ca9e2b48ee99e57236b9d92896b504115779ae6f,2026-08-11T05:53:05Z,Merge pull request #5413 from Yuxin-Qiao/fix/openai-responses-reasoning-item-id,runtime_provider,false
+20a2d12ddeeb27c50ece99388e6d078382b61072,2026-08-11T05:53:43Z,Merge pull request #5415 from Yuxin-Qiao/fix/openai-responses-empty-completed-failover,runtime_provider,false
+b918874f8159a60cd49fb9434a9f0bc93297627e,2026-08-11T05:58:06Z,Merge pull request #5403 from cyhhao/fix/codex-capacity-exponential-backoff,runtime_provider,false
+6876477371ac17f14c5806f2a59dc86711a9008d,2026-08-11T05:59:49Z,Merge pull request #5304 from wucm667/fix/issue-5302-chat-reasoning-alias,runtime_protocol,false
+bc0a6a70394c13cf070045468cde7862df3f4455,2026-08-11T06:00:07Z,Merge pull request #5480 from scp-planet/fix/admin-usage-request-id-column,needs_review,false
+574dfad2dc6dbaef887ca4badc5421dbe36dd8d8,2026-08-11T06:00:33Z,Merge pull request #5488 from wucm667/fix/issue-5482-stale-codex-threshold,runtime_provider,false
+caa1abb13a2ea0ef5125f3e9108fc4f4a05c8d65,2026-08-11T06:04:42Z,Merge pull request #5404 from wucm667/fix/issue-5400-oauth-image-stream-error,runtime_provider,false
+a3bbf35cbd253e1fac18451f7198d94f8661c592,2026-08-11T06:09:07Z,Merge branch 'main' into fix/issue-5029-openai-passthrough-pool-auth-retry,runtime_provider,false
+1e618dbc299fc0a82e9a690bcf2d5843be817113,2026-08-11T06:21:45Z,Merge pull request #5054 from wucm667/fix/issue-5029-openai-passthrough-pool-auth-retry,runtime_provider,false
+e24cb99b79379c7294b552422861cc89028753ff,2026-08-11T08:01:34Z,fix(openai-ws): retain no-delta TTFT fallback,runtime_provider,false
+662444774fddd4f504ee87145aaef6337bb432fc,2026-08-11T08:19:18Z,test(gemini): check cleaned schema assertions,runtime_provider,false
+900194fab2a5485fe1aa19d350e448adce347b7c,2026-08-11T08:31:09Z,fix(openai): 修正 Responses 可见输出 TTFT,runtime_provider,false
+9c36b75a7d2feaf20db7de25b3ab33f108e04279,2026-07-28T08:56:17Z,fix(claude): strip cache control from deferred tools,needs_review,false
+0b35370a7ab9fd419574922411bf94531e4350ee,2026-07-29T08:41:36Z,fix(claude): support top-level deferred tools,needs_review,false
+2321c0e771a7638127f9931cd964ad5d84ab5277,2026-07-29T08:53:44Z,chore: retry CI checks,infrastructure,false
+1afb8264e53c4952cdd1a860a3605351e5ac330a,2026-07-29T15:25:08Z,fix(lint): use require.NotNil for staticcheck SA5011,needs_review,false
+5ea03c178df54d0e8d7346c72935df6633fb634e,2026-07-29T16:06:44Z,fix(lint): resolve remaining nil dereference warnings,needs_review,false
+145b0ac35e06b168cddfab754b074afb20d234d5,2026-07-29T16:28:14Z,fix(lint): make remaining pointer assertions explicit,runtime_protocol,false
+e087f1b73699d31a1077b03e10dae0e8c3992a9c,2026-07-29T16:49:48Z,fix(lint): use fatal pointer assertions in usage tests,runtime_protocol,false
+c3fc4331c1b150998a9b2dd9dfc3fe5d4d4d64bf,2026-07-29T17:12:42Z,fix(lint): make compatibility test assertions fatal,runtime_protocol,false
+c91fbeb0c008b2323e98ca5b73cedf074c8543dd,2026-08-11T08:01:06Z,chore: remove unrelated test refactors,needs_review,false
+943f09d357f53afaf1caf5cf11fa32c1fa60fdc9,2026-08-11T09:34:58Z,fix: 优化运营监控内存容量显示,needs_review,false
+04dc540b2371e487569d3a21967d40cec094b638,2026-08-11T10:15:31Z,fix(openai): parse nested data usage envelopes,runtime_provider,false
+a163742fc978422bd2d0ec6ba160e01ce54f472f,2026-08-11T14:01:47Z,fix(openai): preserve usage path precedence,runtime_provider,false
+670b03f7e70b2e8e8ad78b581846e8dbfb29801d,2026-08-11T16:10:34Z,fix(i18n): move account scheduling threshold keys out of status block,runtime_provider,false
+da283854f6aa41e2446339faaa740279209df8cd,2026-08-11T18:25:00Z,chore: retry CI after registry timeout,infrastructure,false
+d76c1af7592ac6d2af5eeeb780e3dd5fa363ba8b,2026-08-12T01:54:47Z,Merge pull request #5535 from feitianbubu/fix/account-scheduling-threshold-i18n-nesting,runtime_provider,false
+177bf30867446d2fe2b3789424d8fc1d70706eb5,2026-08-12T01:57:45Z,Merge pull request #5527 from creamtea47/codex/ops-memory-capacity-display,runtime_provider,false
+40aae11888ee038f34535b7564e408fb9c333868,2026-08-12T01:57:52Z,Merge pull request #5513 from wucm667/fix/issue-5506-gemini-exclusive-minimum,runtime_provider,false
+5192abb6b55f36122dea13bf08feb26cf54c4408,2026-08-12T01:58:08Z,Merge pull request #5503 from fengshao1227/fix/openai-html-403-not-account-penalty,runtime_provider,false
+1225437099395cdab87463784f14b612fbaaca3a,2026-08-12T01:58:16Z,Merge pull request #5502 from pyt111/codex/fix-account-stats-service-tier,runtime_provider,false
+a29fce4a6170f26f527fb4d175d6a3465ff9e6f0,2026-08-12T01:58:24Z,Merge pull request #5511 from wucm667/fix/pr-5234-ws-audit-logging,needs_review,false
+0ed1a9f22abfd58d360e679293411a882cba385c,2026-08-12T01:58:32Z,Merge pull request #5514 from wucm667/fix/issue-5510-cyber-policy-audit-scope,needs_review,false
+19c6007a229bad0cdd54d726df01a9b4be31f786,2026-08-12T01:59:43Z,Merge pull request #5342 from wucm667/fix/issue-5340-ws-v2-terminal-ttft,needs_review,false
+80acae16fa58d0742e1144925afabe9558e31f3b,2026-08-12T01:59:52Z,Merge pull request #5525 from Fool0ntheHill/codex/fix-openai-visible-ttft,runtime_provider,false
+46cbb7187b2cfc78fa9e13a0706475b4d7ea804b,2026-08-12T02:01:09Z,Merge pull request #5531 from SamizuHM/fix/openai-compat-nested-data-usage,runtime_provider,false
+4ec9ceec4adac9b7679848347164804451bca48a,2026-08-12T02:01:20Z,Merge pull request #5508 from pcmid/fix/show-security-audit-menu-in-simple-mode,needs_review,false
+bd404c16f2ff28c7b21c560f816be0b3af4b21c9,2026-08-12T02:17:09Z,fix(channel): align pricing conflict detection with the pricing cache key,productcore,false
+814ecfba7c11a3e3819f2256b0a8405a0d8b6205,2026-08-12T03:22:06Z,fix(group): invalidate the channel cache when a group's platform changes,productcore,false
+c0ab3a00ea733cc0559a5a949c28fb5d9d7c5d16,2026-08-12T09:57:50Z,feat: Codex OAuth 设备指纹收敛，减少上游可见的设备数和会话数,runtime_provider,false
+04f8cdb194b755b407a9581947d051fd1d980105,2026-08-12T10:12:29Z,fix: 修复 golangci-lint errcheck 和 gofmt 格式问题,infrastructure,false
+93c32fa1a2450351561abc46156d2e28cb5f74ca,2026-08-12T10:52:01Z,Merge pull request #5553 from Wei-Shaw/feat/codex-fingerprint-convergence,runtime_provider,false
+ef4f99f292dc7d0c9ebcd0080e90b169417a9774,2026-08-12T11:07:43Z,chore: sync VERSION to 0.1.175 [skip ci],infrastructure,false
+5935e674a84341c3536e27e6a968384f67d9062b,2026-08-12T11:17:04Z,chore: update sponsors,needs_review,false
+bba6a55e0f5402c96c0e3dbc0ab8dac4e8474a2d,2026-08-12T13:29:59Z,fix(backup): 定时备份加 leader 锁，避免多实例重复备份,needs_review,false
+bb9e74285e98c9a54b8255a7496468dc559c326d,2026-08-12T17:23:37Z,feat: 从 JWT tier 识别 Grok 订阅档位，刷新后覆盖失效订阅,runtime_provider,false
+a04ce49016ec2446370d6e0e430d2cd89e7a6654,2026-08-12T17:23:45Z,feat: 新增 grok-4.6 目录、官方定价与请求路径支持,runtime_provider,false
+69648476d4a5a28421ef748ec16931777e245b7c,2026-08-12T17:23:54Z,fix: 账号徽章与用量格按实时档位展示，避免账单滞后误判,needs_review,false
+76a13a5a8d56dca2befb8a3d70daf356c540f336,2026-08-12T18:43:03Z,fix(gateway): handle Anthropic SSE overload errors,runtime_protocol,false
+f3d9491071d0dc8093c1c10de37b9ad78007b52f,2026-08-12T23:49:08Z,feat: 分组支持逐模型定价，并可关闭长上下文阶梯,needs_review,false
+363cc4994bc44f79e1762b07c3013e97b5be02bf,2026-08-12T23:49:14Z,fix: SuperGrokPro 用 4.5 窗口区分 Heavy，容量抖动只封单模型,runtime_provider,false
+0de6d7e9ba3f3a497e36c8ed653dca278f5f601c,2026-08-12T23:49:19Z,feat: 新增独立 /x_search，走原生 x_search 并沿用搜索计费,needs_review,false
+c4d883b8da728d19ca065db2398e1a27db5f9d5f,2026-08-13T00:37:57Z,feat: Chat 与 Responses 往返保留 x_search，并补 sources 抽取,runtime_protocol,false
+678eb22a405526c85ab226c35f3ed1e113369d0f,2026-08-13T00:38:10Z,fix: Realtime 仅在观察到音频后计费，并修正标志位求值顺序,needs_review,false
+8c4c3c09ceaf540ecfdebf4511c9aadd903f56e0,2026-08-13T00:38:10Z,fix: 未登记的 Grok 文本模型回退 grok-4.5 价卡,runtime_provider,false
+b830bc14d655524357360df1e4301b9cf81fb1fc,2026-08-13T00:38:10Z,fix: 长上下文默认保持开启，并与 OpenAI 账号开关取交集,runtime_provider,false
+0ae151a23816539f6530e3cce9e411e22063d8b0,2026-08-13T00:38:10Z,fix: 徽章改读 grok_usage_snapshot，增量刷新比较 Grok 快照,runtime_provider,false
+b61e4bcc458860c438c6cf119208924c4ad9d076,2026-08-13T00:54:41Z,fix: 对齐 JWT 常量 gofmt，并补全 available groups 契约字段,productcore,false
+0fa577a19c07f33808f02ff04ceee16a481b8949,2026-08-13T01:08:35Z,Merge pull request #5571 from IanShaw027/feat/grok-jwt-tier-and-4.6,runtime_provider,false
+4853662f992dfd92bbedbb160aecb2e7a6c76f78,2026-08-13T01:12:41Z,Merge pull request #5540 from luckydududu/fix/channel-pricing-model-name-normalization,productcore,false
+fd82dfd52d31babdceb2d20e0ef1126e508d0f8d,2026-08-13T01:22:34Z,fix: Grok 长上下文只跟分组开关，不受 OpenAI 账号开关否决,runtime_provider,false
+e29b93a1fbc6753590b0bbda010c3ab1ab3361c6,2026-08-13T01:22:38Z,fix: 未知 Grok 文本兜底排除 image/video/audio 等媒体族,runtime_provider,false
+e215c98c2c959e2b93700d59af08ebec189b27fe,2026-08-13T01:22:41Z,fix: 账号页自动刷新偏好改为模块初始化时恢复,needs_review,false
+e77b4b260e75c3656e251c202210f0442f641b7b,2026-08-13T01:23:50Z,Merge pull request #5504 from fengshao1227/fix/responses-probe-inconclusive-keeps-unknown,runtime_protocol,false
+5912ae960c523027c048e108bd91365174cfcf44,2026-08-13T01:24:00Z,Merge pull request #5543 from luckydududu/fix/invalidate-channel-cache-on-group-platform-change,productcore,false
+e803e3851c0a7e222cfadeafad7b8636ab959d11,2026-08-13T01:24:11Z,Merge pull request #5559 from seng1e/fix/scheduled-backup-leader-lock,needs_review,false
+0e82efe48951cb7da1f8554639afdeab05bf16b8,2026-08-13T01:46:47Z,chore: sync VERSION to 0.1.176 [skip ci],infrastructure,false
+fbfdcef8184ae4b2e224d5cfc47cf1d0e3742710,2026-08-13T02:32:07Z,Merge pull request #5573 from IanShaw027/fix/grok-long-context-and-media-fallback,runtime_provider,false
+a288bab73ace3ec789dd3af26ca8e98f3277c766,2026-08-13T04:40:06Z,fix(gateway): align passthrough model discovery,needs_review,false
+674570ca17be336f2015d229495c8ceeda9d6c04,2026-08-13T16:25:55Z,fix: preserve group pricing in auth snapshots,productcore,false
+9662cff2e7c62fcfb99111415f5ac11a15748e14,2026-08-14T08:23:52Z,fix(openai): preserve remote compaction v2 responses endpoint,runtime_provider,false
+a8b9ea22b701704507fa597c03c1835173248f36,2026-08-14T10:18:53Z,fix(openai): separate native and legacy compaction routing,runtime_provider,false
+cb7b03795daa7e569fe2f5618207af742ab3da60,2026-08-14T14:34:43Z,feat: 优化分组用量统计,needs_review,false
+89d826be2979b975400b4424897c5ab665a4fb90,2026-08-14T15:25:31Z,修复：解决分组用量 PR 的 CI 失败,infrastructure,false
+45dcce0e49b979c4eeea9002b844dc5e923bb681,2026-08-14T15:48:03Z,修复：隔离分组用量仓储测试时区,needs_review,false
+c204d33b09ebfefe96c1d4dcb16a88590992257e,2026-08-15T01:00:16Z,Merge pull request #5649 from lyen1688/feat/group-usage-daily-rollups,productcore,false
+44ef88f659a02ca9b725ce11b110e03cd43d814d,2026-08-15T03:02:59Z,fix(openai): restore API-key custom tools,runtime_provider,false
+1d3b9665c8824d3b7f5a03a3f50419e812261e91,2026-08-15T05:46:31Z,Merge pull request #5641 from InCerryGit/fix/issue-5624-remote-compaction-v2,needs_review,false
+8219dcfc87ac270fe11414a98e326b06f5b4309f,2026-08-15T08:34:47Z,fix(openai): relay x-codex-turn-state and guard cross-account echo,runtime_provider,false
+8ae6d8f67e72b099ed581b1455840ca62bb25561,2026-08-15T08:35:08Z,fix(openai): send session-level beta features and probe native compaction v2,runtime_provider,false
+fce41e318f147cca42d04944754ed4e693714ddf,2026-08-15T08:35:26Z,fix(openai): make Codex fingerprint convergence opt-in and cover passthrough,runtime_provider,false
+4d9fedee204012ee51089259ce28e25add21e541,2026-08-15T08:44:30Z,fix(test): check type assertions in turn-state provenance tests,runtime_protocol,false
+d677d67dda8a961dff7671ce5c9bf24bff26b505,2026-08-15T08:43:20Z,feat: OpenAI Team 联动熔断,runtime_provider,false
+073e92d17178a1ccdb0a27017f572f10c9c7ab62,2026-08-15T09:10:18Z,Merge pull request #5668 from Wei-Shaw/fix/codex-turn-state-and-fingerprint-optin,runtime_provider,false
+901a0439f1575a45c29150e04d2ccc3ed87f4948,2026-08-15T07:14:19Z,feat: 国产供应商一等支持（Kimi/Zhipu/DeepSeek 多协议 + 配额/余额监控）,runtime_provider,false
+c3063e01a4bf8c389bcd9dbef1ef6bd92477e107,2026-08-15T13:30:56Z,fix(openai): recover message-only capacity failures,runtime_provider,false
+baeac1f3de21d37b129405f092ef86c24b3f203d,2026-08-15T13:40:21Z,chore: sync VERSION to 0.1.177 [skip ci],infrastructure,false
+539064798965888f14605eb76c2733cd58851c7f,2026-08-15T14:54:21Z,fix(openai): complete request-scoped capacity recovery,runtime_provider,false
+a600dd1c0aefa85df0a7aaea904c25c8a252ee5f,2026-08-15T14:54:27Z,Merge remote-tracking branch 'origin/main' into agent/openai-capacity-failover,runtime_provider,false
+11e1e228829ad770c7e0e42723ddc37b17b5770d,2026-08-16T06:17:43Z,fix(docker): bump Go builder image to 1.26.6 to match go.mod,infrastructure,false
+e8ff2017c061dd559b4f9ac0b7a5ada72573118a,2026-08-16T10:04:52Z,fix(admin): show category labels in ops error distribution legend,needs_review,false
+cb7841d85ce7a74a1b0ff8fa279ce8a0e11767cb,2026-08-14T06:09:02Z,fix(i18n): add missing expired key to account status block used by proxy list,runtime_provider,false
+22fc0cdbf58c76d49f2b5941aa3fd97d8bd0244d,2026-08-16T15:49:21Z,fix(frontend): clarify OpenAI Fast/Flex policy rules,runtime_provider,false
+51016bb03a4e6ae916aa4ee1d12296a92950270a,2026-08-17T01:30:48Z,Merge pull request #5690 from luckydududu/fix/dockerfile-golang-image-follows-gomod,infrastructure,false
+396a9d1130c9a8ab977e6a959a4fdd2d9f95dd27,2026-08-17T01:40:53Z,Merge pull request #5703 from InCerryGit/fix/clarify-openai-fast-policy-ui,runtime_provider,false
+5f19433103f5d5fb78ca31fced71e86bbf235868,2026-08-17T02:52:57Z,fix(ops): avoid single-insert fallback after batch failure,needs_review,false
+79c2eb50201568b47f6ebff4d9c4665347d4eba4,2026-08-17T02:59:43Z,fix: skip expiry reminders without SMTP config,needs_review,false
+1977810cf24fa36d939cce694e7808347e516259,2026-08-17T03:04:50Z,fix(frontend): isolate account helper data loading,runtime_provider,false
+4b667ccd45747162ac58545cdbb6f6d88737bf04,2026-08-17T04:07:06Z,fix(review): 处理 PR #5666 四个阻断项（B1-B4）,needs_review,false
+e7285453829930e2889432dcd18d7a0c2ba18481,2026-08-17T04:26:22Z,style: gofmt 迁移测试注释（CI golangci-lint gofmt）,infrastructure,false
+9aac3b73f7f6d03ca40a151647f48a49757b41d8,2026-08-17T04:33:53Z,add Ollama usage query action,runtime_provider,false
+cb5e03a72027e26d18abbfa0be4dce0f77864693,2026-08-17T04:36:58Z,fix(antigravity): preserve mixed Gemini tool config,runtime_provider,false
+8a0a76aeb52e6c96adfd3627d4a442951b8fc585,2026-08-17T04:40:44Z,Merge pull request #1 from xiaobo121388/codex/add-ollama-usage-query,runtime_provider,false
+76b70b1685e45e6c722a71887b7ff0e1dd5681ad,2026-08-17T05:34:41Z,fix(openai): validate bulk account settings,runtime_provider,false
+b8642ef674ba80ce827cbb71df6edd091db8c3d9,2026-08-17T05:49:46Z,fix(auth): make invitation code consumption atomic with user creation,productcore,false
+8d82bb069c89c72d96b4d986f00d3bf561b70b36,2026-08-17T05:56:16Z,fix(openai): expose bulk account settings,runtime_provider,false
+e330c243a8f142f8963d784916da0093ab7084ee,2026-08-17T06:55:20Z,Merge pull request #5666 from Randark-JMT/feat/cn-providers-kimi-zhipu-deepseek,runtime_provider,false
+3c3bb2fa1949c7e5d0dd4e9b4cb07cab61595cd3,2026-08-17T07:23:49Z,fix(gemini): support includeServerSideToolInvocations in GeminiToolConfig,runtime_provider,false
+612436a5a7cbb7ab9d4ce4174fcdff948fab31fb,2026-08-17T08:48:36Z,fix(openai-compat): Responses→Chat 桥接按 reasoning item id 缓存回注 reasoning_content,runtime_provider,false
+971544570d6da41c6486d0e92f225bf28dfe2d7a,2026-08-17T09:11:33Z,test(antigravity): check tool config assertions,runtime_provider,false
+7cdca9e4958045dab38a77769b2b82402c83a365,2026-08-17T09:28:51Z,feat(groups): 放行 kimi/zhipu/deepseek 平台分组创建入口,runtime_provider,false
+10c8b70203feac8fbd744d386af6600aa87c3837,2026-08-17T09:28:53Z,fix(cn-providers): 修复 CN 分组五项功能缺陷(调度闸门/计费/断开漏记/count_tokens/403),runtime_provider,false
+c38c5beef81227f19b27356053a6db7c7e4072f4,2026-08-17T09:44:33Z,fix(i18n): CN 余额单元格误引 grokBalance 键致渲染原始 key,runtime_provider,false
+401dd43b4b27883ae60d27c8270942a5fdbf2d07,2026-08-17T10:47:18Z,fix(apicompat): 链式工具调用回放本轮 reasoning_content,runtime_protocol,false
+9f24a55305c7650443d555922c083051997fe2db,2026-08-17T11:13:03Z,功能：支持渠道模型分时倍率定价,needs_review,false
+6793d5ac85f4ca469cc49a9cec29285c78e445b1,2026-08-17T11:38:03Z,fix(openai): make Codex convergence identity consistent,runtime_provider,false
+ab28a2d10b3e228719d072f8c59376f32c5e0b46,2026-08-17T12:29:54Z,Merge pull request #5730 from Wei-Shaw/fix/cn-provider-group-entry-and-correctness,runtime_provider,false
+c46d07ca07ee28413fd1dfa20406722e554a1c7b,2026-08-17T13:15:12Z,fix: normalize Grok response model audit aliases,runtime_provider,false
+6bf335965aee18bca344d155c904fd54aeb12a0d,2026-08-17T14:27:22Z,merge main 并修复与 #5730 的语义冲突,needs_review,false
+5253bb72b08586c619f5b369b2f1dc7547b0e97a,2026-08-17T14:38:41Z,Merge pull request #5737 from lyen1688/feat/channel-time-pricing,productcore,false
+7e45634df955ddf8a2ae014f2895bd6139544f41,2026-08-18T00:51:30Z,chore: remove leftover Sora references after platform removal,needs_review,false
+b2d1c3859ab77f7a71b342ca99b4660486bc2feb,2026-08-18T01:57:05Z,Merge pull request #5738 from okbexx/fix/codex-identity-snapshot,runtime_provider,false
+7d633f5fc3dcedea83c77ce77bc25dc497b88e0a,2026-08-18T02:03:26Z,Merge pull request #5742 from heathermhuang/codex/fix-grok-response-model-audit,runtime_provider,false
+f66a42c40e36b3052e0ec3c32a8f62a687de87cc,2026-08-18T02:05:39Z,Merge pull request #5697 from feitianbubu/fix/ops-error-distribution-legend-labels,needs_review,false
+8869775ed385fe985e05d4e9f414c9062b64af5a,2026-08-18T02:06:56Z,Merge pull request #5636 from feitianbubu/fix/proxy-status-expired-i18n-key,needs_review,false
+ab0fcd1a0e6fa8f9974ba21c6c3478bebdd07be4,2026-08-17T10:49:59Z,fix(gemini): Skipped 错误策略对齐 OpenAI，上游 4xx 不再硬改 500,runtime_provider,false
+615e6901ea41530c5439679b57bf291e31948e95,2026-08-18T03:50:01Z,feat(channel-monitor): add quota mode schema (migration 226 + ent),runtime_provider,false
+c44711ac98dd7f2cafacff18aa9b3bfa9e7bcbb1,2026-08-18T04:03:13Z,feat(channel-monitor): quota mode service layer (fetcher + dispatch + repo),runtime_provider,false
+6a6fd304f68e2a8f5dbe6a96e424c4baffc203c6,2026-08-18T04:06:18Z,feat(settings): channel_monitor_show_quota public setting (default off),runtime_provider,false
+41344c20ff54e4a828a09fa0ca77d0167a66b7f4,2026-08-18T04:14:15Z,feat(monitor): wire quota fetcher & expose check_mode in handlers,runtime_provider,false
+7ab6d3db66c4862013a6ee998c014327c843b3ca,2026-08-18T04:51:02Z,test(channel-monitor): quota mode unit/integration/migration coverage,runtime_provider,false
+c51fd7d0b351da9df3459da280778d30b182a24e,2026-08-18T04:51:06Z,test(channel-monitor): adapt checker body test to 3-arg normalizeMonitorPrimaryModel,productcore,false
+bb6c3b4f6a0543788dac7cafb8025846ae293709,2026-08-18T05:03:20Z,fix: unify Codex OAuth outbound identity onto the inference resolver,runtime_provider,false
+16e4f7ecc33ad895587a3581b8f8d1c6f3dbf44e,2026-08-18T05:02:29Z,修复 Codex 额度探针模型兼容性,runtime_provider,false
+a20e1c00cc1736378d7510c48ab52cac66489739,2026-08-18T05:09:58Z,feat(monitor-ui): 配额模式表单、用量快照视图与 8 平台支持,needs_review,false
+302a10b88608392617dbe8e228711a86a236ac0d,2026-08-18T05:10:10Z,test(monitor-ui): 配额视图渲染与开关门控用例,test,false
+a7a321232f1979064f1ebd9d3dd034ff3c37f8c6,2026-08-18T05:49:59Z,Merge pull request #5567 from wucm667/fix/issue-5563-anthropic-sse-overload,runtime_protocol,false
+cddb03c0f1a887fe7344bc2f13827dcc5c31be21,2026-08-18T05:50:13Z,Merge pull request #5609 from wucm667/fix/issue-5607-auth-pricing-snapshot,productcore,false
+853234474595223bc915ad21324f4c6165f9daae,2026-08-18T05:50:39Z,Merge pull request #5715 from wucm667/fix/issue-3917-current-main,needs_review,false
+1a3ecd2b9451193dcca387e848fcb236ebfd1e57,2026-08-18T05:50:57Z,Merge pull request #5004 from wucm667/fix/issue-4990-deferred-tool-cache-control,needs_review,false
+3d9a0a71bdd6fe66ee6735c8e5444adecd1c1cd0,2026-08-18T05:51:09Z,Merge pull request #4057 from feitianbubu/fix/ops-sla-zero-window,needs_review,false
+632b4f4faa5480c46a293b3d622a2cb41137dd48,2026-08-18T05:51:21Z,Merge pull request #4053 from feitianbubu/fix/announcements-empty-state-copy,needs_review,false
+5dfac8bffa5f832f39ac40f6599666f22a713150,2026-08-18T05:51:42Z,Merge pull request #4049 from feitianbubu/fix/dashboard-token-cache-breakdown,needs_review,false
+f6d6613ec6cbebc0fab156cb70b42a2a2eddb513,2026-08-18T05:51:57Z,Merge pull request #4006 from feitianbubu/fix/native-controls-dark-mode,needs_review,false
+5c129602855cf041e926d62aa1923bedd799c285,2026-08-18T05:52:15Z,Merge pull request #4005 from feitianbubu/fix/header-role-i18n,needs_review,false
+c76ff559974b73b729dfe77efdeba2d92a47697b,2026-08-18T05:52:34Z,Merge pull request #2148 from feitianbubu/pr/ops-error-detail-support-custom-time,needs_review,false
+c0325d24f949e3f4ccb17e40f751be27bad842e8,2026-08-18T05:53:49Z,Merge pull request #5759 from o2e/codex/fix-codex-usage-probe-model-clean,runtime_provider,false
+baaf59d417677df26491ffea20a5db8c4fe83302,2026-08-18T05:54:06Z,Merge pull request #5755 from feeeei/feat/gemini,runtime_provider,false
+6259940ef25adf0f37342e7444a23913d29e0f08,2026-08-18T05:54:32Z,Merge pull request #5669 from feeeei/main,needs_review,false
+ed2da8239653f23da154759f839033133675d9fb,2026-08-18T05:55:24Z,Merge pull request #5711 from wucm667/fix/issue-5709-antigravity-tool-config,runtime_provider,false
+1ea4150bf04524dfe815bb70a552439a9dd36043,2026-08-18T05:56:02Z,Merge pull request #5581 from wucm667/fix/issue-5574-passthrough-model-discovery,needs_review,false
+7376f4a48cc0bdcf78232e1ed77063f0e0152c5a,2026-08-18T05:57:41Z,fix(lint): gofmt 对齐 + 移除未使用的 isSupportedProvider,runtime_provider,false
+c792b44bb2fb2421e8489c4361e68a3e47f34df3,2026-08-18T06:05:27Z,Merge pull request #5712 from xiaobo121388/main,needs_review,false
+4d19836189bdccd730a57b0c0f4c03c252cf6355,2026-08-18T06:06:32Z,Merge pull request #5716 from wucm667/fix/issue-2695-current-main,needs_review,false
+938f1868ae0a53ea9203f1b406ccf3334e05ba75,2026-08-18T06:11:42Z,Merge pull request #5714 from wucm667/fix/issue-2733-current-main,needs_review,false
+a9514a68d20bddc971f31f956e682b50edfdc183,2026-08-18T06:26:19Z,perf(usage): aggregate stats in one scan,needs_review,false
+ebcae03afda0ddec1ff744973ea3d3cced12c3dd,2026-08-18T06:29:43Z,fix(lint): 补齐 setting_public.go 与配额 fetcher 测试的 gofmt 对齐,needs_review,false
+7e579cb28df5f2e7ed9ef84bc8bca6370acfa8f7,2026-08-18T06:42:30Z,fix(openai): adapt client tools in WS HTTP bridge,runtime_provider,false
+269fbcac0e5b78dd2167c8b15267ed3a9fe7efa5,2026-08-18T06:50:57Z,feat: Grok 用量条补齐本站 24h/7d/30d 聚合,runtime_provider,false
+1870b58c1d04eba8db0087df03c1ce40ac5c85d6,2026-08-18T06:53:55Z,Merge pull request #5721 from lyy0709/codex/bulk-openai-settings,runtime_provider,false
+fd42d3722d11ae4980bddd718e94105e42b5ce4f,2026-08-18T06:55:08Z,fix: hide Grok prepaid and used/limit when they are empty,runtime_provider,false
+9617775f9a5b4999e7ee59e15d96184253f8f2e4,2026-08-18T07:02:25Z,fix(repo): tolerate ErrTxStarted for tx-bound clients and harden test stubs,needs_review,false
+1ba92449c7372493b2c94d42e290c0959f4cf760,2026-08-18T07:05:54Z,fix(gemini): wire includeServerSideToolInvocations into the typed transform path,runtime_provider,false
+a341239596caa92d3a546c84126283787de5670e,2026-08-18T07:20:08Z,fix(fingerprint): align credential-face identity with the real client and de-drift models version,needs_review,false
+37732dcd346d1515ce829709cbd2b45607908eca,2026-08-18T07:35:01Z,Merge pull request #5725 from tamseno/fix/gemini-include-server-side-tool-invocations,runtime_provider,false
+f211a630c85e5031da13d405a45a89861e3a47e4,2026-08-18T07:35:16Z,Merge pull request #5720 from tamseno/fix/invitation-code-toctou-race,needs_review,false
+1ed3b6aef6180abadd63386b1ba8b5149bf83603,2026-08-18T07:35:34Z,Merge pull request #5760 from spongehah/feature/unify-codex-outbound-identity,runtime_provider,false
+685455985b5238b1fdc6a8c56ee62f277ec2ff70,2026-08-18T07:35:42Z,Merge pull request #5765 from IanShaw027/feat/grok-from-personal-main,runtime_provider,false
+58ea46e894b0650c29a705555069b9f998e69bab,2026-08-18T07:47:50Z,Merge pull request #5661 from wucm667/fix/issue-5659-openai-custom-tools,runtime_provider,false
+26cb59df05b6340ddc591af0178fa1425e17c56b,2026-08-18T07:47:59Z,Merge pull request #5764 from hansnow/fix/ws-http-bridge-custom-tools,needs_review,false
+c253bd2c72dcce1aee21a4bc671ad23eb1bf5a34,2026-08-18T07:48:02Z,fix(openai): restore client tools in terminal events,runtime_provider,false
+58ccea4eaa031758974fa70bb588d42bc5876019,2026-08-18T08:21:50Z,Merge pull request #5767 from hansnow/fix/ws-http-bridge-custom-tools,needs_review,false
+8f6f459835779efa2e3308b90addfa20e81a4a66,2026-08-18T09:12:01Z,fix(channels): support kimi/zhipu/deepseek platforms in channel pricing,runtime_provider,false
+22df600d090479ea42070eb79c42c520ea9e1eab,2026-08-18T09:14:20Z,fix(channel-monitor): 配额快照识别值通道失败并加 60s 负缓存与 singleflight,productcore,false
+03c3f3b6fcf51e2c7c1dcc7a6c2fdbd4931bf67d,2026-08-18T09:14:31Z,feat(ui): Select 组件支持可选远程搜索（remote/loading props + search 事件）,needs_review,false
+5cbd0c96a2eec8133cc504946767fcc7e83b9f1a,2026-08-18T09:14:44Z,fix(monitor-ui): 关联账号选择器改服务端搜索+回填，OpenAI 配额模式加消耗提示,runtime_provider,false
+dd04503e1ff0298d8e61b8adf61febec9210f6a2,2026-08-18T09:27:43Z,Merge pull request #5773 from Wei-Shaw/fix/channel-pricing-cn-platforms,productcore,false
+e0c48a19ed794a565e3858662520afe0a1f9f0ba,2026-08-18T09:36:27Z,Merge pull request #5761 from Randark-JMT/feat/channel-monitor-quota-mode,runtime_provider,false
+49504adc98d2b6d539491e865a340e644548979e,2026-08-18T10:03:19Z,chore: sync VERSION to 0.1.178 [skip ci],infrastructure,false
+3d21d61609f7f7db4d4f99182372a1f1baa4f648,2026-08-18T10:20:09Z,chore: retrigger CI（上游 flaky 测试 TestApplyCodexFingerprintClientMetadataRaw_MatchesMapVariant 毫秒边界误报，与本 PR 无关）,runtime_provider,false
+1128df2592d9a505df22c9df953374899b3eee70,2026-08-18T09:46:37Z,fix(monitor): align quota-fetcher credential/balance semantics with scheduler,runtime_provider,false
+c41ae19e529e0297df1d3212627410d731cb27ea,2026-08-18T09:54:33Z,fix(monitor): reject unusable quota data sources and invalid mode combos at write time,runtime_provider,false
+e2dfb3b8cb6e7c8e217f1551850d7b67e2f147f1,2026-08-18T10:04:23Z,refactor(monitor): pass loaded account through quota sources (single load per fetch),runtime_provider,false
+c9effc45603f1051d9dcad7fbfd1cc209c227c7a,2026-08-18T10:08:01Z,"fix(frontend): monitor form check-mode restore, account unbinding and mode badge",runtime_provider,false
+2c250bfd7354728bd61f82abce695ea3ba7d4301,2026-08-18T10:35:57Z,"fix(monitor-ui): localize the ""quota"" placeholder model across monitor views",runtime_provider,false
+ac6208de16348b2a6a974834da016930227bec3d,2026-08-18T12:46:28Z,fix(accounts): route CN provider chat tests correctly,runtime_provider,false
+85cb732cdb0cfc61d4232956d5952cc403d009b4,2026-08-18T18:47:23Z,docs: fix broken star history chart in README,documentation,false
+214210e1b249bb404cfe597103fb8e6247cbda1c,2026-08-19T01:37:45Z,Merge pull request #5782 from UnlastingR/fix/cn-provider-account-test-routing,runtime_provider,false
+359fd12b2e0a4ab37143b9ecb7714236a1fc375c,2026-08-19T01:41:25Z,Merge pull request #5749 from Randark-JMT/chore/remove-sora-leftovers,needs_review,false
+b228b93e9c40ae9d3452890425c7dcea8a3a336b,2026-08-19T02:39:10Z,fix(openai): 修复 Chat 非流式缓冲读取错误未触发故障转移,runtime_provider,false
+c6f4fbde49fa0d45ec2838327a657c03889f4287,2026-08-19T03:11:23Z,Merge pull request #5676 from Perfecto23/agent/openai-capacity-failover,runtime_provider,false
+e61595fb3536a568e7b69245dac231de78c35a16,2026-08-19T03:21:35Z,Merge pull request #5780 from Randark-JMT/fix/channel-monitor-p2,productcore,false
+82f7dd14f717bef480879f73cba288791b9b9663,2026-08-19T03:23:33Z,Merge pull request #5794 from Dessalines39394/fix/star-history-chart,needs_review,false
+bfac49fef9e9ba7543e312327c3625ab5210668f,2026-08-19T03:34:06Z,fix(codex): handle responses input token preflight,runtime_provider,false
+892787723f30b84f6b00b49a74e834be623ed4c8,2026-08-19T03:30:26Z,fix(grok): preserve xhigh effort for grok-4.6,runtime_provider,false
+58e147fba6f6343ae5c2078de96803635b2cab4f,2026-08-19T04:40:32Z,feat(composite): support Codex endpoints,runtime_provider,false
+b171bb0e4a84509ec5afaba8ec8c750d1857e246,2026-08-19T05:01:25Z,fix(composite): support CN providers,runtime_provider,false
+e943f817b118936eb776f20a3a4040a4123dcfff,2026-08-19T06:03:03Z,Merge pull request #5729 from lbyxiaolizi/fix/responses-chat-reasoning-content-passback,runtime_protocol,false
+4d3b300a255a6158d00f450e2d249c3403f8b5e7,2026-08-19T06:05:52Z,test(scheduler): update CN platform expectations,test,false
+2a5ae2b2dc4b8ffe016f44d66245bfe234a1a398,2026-08-19T06:19:26Z,Merge pull request #5816 from kingsleydon/fix/composite-codex-support,runtime_provider,false
+7d9c958482eaf4f81a820702a98b40db6cbddf54,2026-08-19T06:43:33Z,Merge pull request #5810 from Pluviobyte/codex/fix-responses-input-tokens,runtime_provider,false
+bd1ccd97366540496dfebbeb6d20f2ae1a7edd21,2026-08-19T06:47:34Z,Merge remote-tracking branch 'origin/main' into fix/issue-5796-composite-new-platforms,needs_review,false
+aa673062e2d1c17d0e599d6feb03a221184d95ea,2026-08-19T06:58:32Z,fix(composite): keep CN rollout on fully supported paths,needs_review,false
+b94e484e23698621f8fd3b339eb9df8679009d64,2026-08-19T07:19:33Z,fix(openai): preserve client tools across WS bridge turns,runtime_provider,false
+499a8ee4235eea151b9907b5cda408b43dc29c0d,2026-08-19T07:24:26Z,fix(composite): exempt resolved grok/CN targets from messages dispatch gate,runtime_provider,false
+e4896c41d2de453684b0524fa7efd778263934d6,2026-08-19T07:26:19Z,test(apicompat): satisfy client tool type assertions,runtime_protocol,false
+fefd0d5145232ff43c105f76d7f719c414ff3059,2026-08-19T07:31:18Z,test(apicompat): avoid unchecked tool history assertions,runtime_protocol,false
+6a945b3cadfec1cc593490caf7eaccb4b244feae,2026-08-19T07:36:38Z,Merge pull request #5817 from wucm667/fix/issue-5796-composite-new-platforms,needs_review,false
+e8b53c9195d1840231993c618f9dc5a58b104f69,2026-08-19T08:41:33Z,Merge pull request #5801 from MokoYee/fix/openai-chat-buffered-stream-failover,runtime_provider,false
+89d28037f21321d07f0501b0e4e53ebefc7a8ae0,2026-08-19T08:42:28Z,Merge pull request #5822 from hansnow/fix/ws-http-bridge-followup-client-tools,needs_review,false
+ae62854abcb1285e0abc4e69d7465e78518d7d4b,2026-08-19T08:42:52Z,Merge pull request #5815 from 771373073/fix/grok46-xhigh,runtime_provider,false
+f917d19d3e27e140ba53de816c842c56e039d06a,2026-08-19T08:47:11Z,test(frontend): align Grok API key placeholder assertion,runtime_provider,false
+b0464a986303d4e4e300d5fcb5b66b0d78a51b2b,2026-08-19T08:28:53Z,feat(proxy): allow configurable probe targets,needs_review,false
+994fbfeddba8c03c427ac9464f0ba9563db216d5,2026-08-19T08:33:17Z,fix(frontend): prevent CN quota labels overlapping bars,runtime_provider,false
+63839f193ac7e5c73f2974182e2b5b9d08495a78,2026-08-19T08:36:18Z,fix(frontend): align admin role selector styling,frontend_product,false
+99a8b84701ba70ada7bc62da0fe50cf459286432,2026-08-19T10:36:53Z,修复 Grok 内联图片与 view_image 冲突,runtime_provider,false
+82cbe6aff7d963e5096d26df73671236a707ad24,2026-08-19T10:51:21Z,fix(openai): resume later websocket turns after 429,runtime_provider,false
+1b30a2d747a401096238f8f9d6834b2cfc86f7ee,2026-08-19T11:03:39Z,feat(accounts): support header overrides for CN providers,runtime_provider,false
+b0cdea303afd81071f0b0ccc762cb5141480133a,2026-08-19T11:04:53Z,补全 Grok 多入口内联图片工具适配,runtime_provider,false
+68666e1f86f3a899991b9ce72ab22bf18ea06e58,2026-08-19T11:21:49Z,Merge pull request #5845 from vincenthcui/fix/openai-ws-later-turn-429-failover,runtime_provider,false
+23dc9377bcea49e0e2aaf011ac93d3a790fd5fc1,2026-08-19T11:22:08Z,Merge pull request #5844 from lyen1688/fix/grok-inline-image-view-image,runtime_provider,false
+d5484866faf53d130fa11cbd5616b677d276c6e0,2026-08-19T11:52:10Z,fix(config): register proxy probe URLs default,needs_review,false
+b7fe8ebaad2d7e6d2391f3be3d0900ef411fb61b,2026-08-19T12:27:42Z,Merge pull request #5762 from jaxxjj/codex/perf-usage-stats-grouping-sets,runtime_provider,false
+38a5f266e9289ee8914a4bd044bbb7de29fb70ad,2026-08-19T12:28:19Z,Merge pull request #5839 from xuhaihan/test/fix-grok-api-key-placeholder,runtime_provider,false
+32ecd5cc6269b67f73835ba607146b9f7f87452a,2026-08-19T12:28:36Z,Merge pull request #5847 from wucm667/feat/issue-5826-cn-header-overrides,needs_review,false
+32a0d9ba2d537875f605e0360c28c7f8d418a29a,2026-08-19T13:05:26Z,Merge pull request #5837 from xuhaihan/fix/cn-provider-quota-cell-layout,runtime_provider,false
+ec5a34593561518f974b0c3eff6d72808400194e,2026-08-19T13:10:08Z,fix(proxy): validate configurable probe targets,needs_review,false
+1ab3256783b3c32bc5fca1446dabbd28b5153d61,2026-08-19T13:31:11Z,fix(proxy): format validated probe targets,needs_review,false
+fce90ecf8924c54b9dd1fbd1593a6f4eb78a1bee,2026-08-19T12:23:56Z,渠道定价：持久化服务层级与区间倍率,needs_review,false
+5b2a386ed7ff66e3376791cca36e1eebe68fc398,2026-08-19T12:26:04Z,计费：应用渠道倍率与上下文区间价格,needs_review,false
+7dae055f2afe4921ddb84d6634afa07dba436b8a,2026-08-19T12:28:35Z,计费：识别并记录 Anthropic Fast 请求,needs_review,false
+26be82cc85802157405e5fd3523290c34c3f7453,2026-08-19T12:30:17Z,前端：配置渠道倍率并精简长上下文开关,needs_review,false
+d536795e93619b33414e86c8f3b034c1654d0022,2026-08-19T13:11:08Z,测试：同步长上下文计费断言,needs_review,false
+d4d2c746c56f6aeb71b190fbac45b44136e7b3e8,2026-08-19T13:11:20Z,前端：修正账号长上下文开关门控,needs_review,false
+5b2089c5a35fd4c1f83b53fd12e83efab45a7a9a,2026-08-19T22:55:47Z,fix(grok): lower Codex tool-search discovery outputs,runtime_provider,false
+1f2a87adb0ac37fe6c3203bfc4ccd59453d74388,2026-08-20T02:00:09Z,fix(admin): 补全平台筛选选项,needs_review,false
+2d03e40fd610d7d24b1e30fbfc70fb4c531123db,2026-08-20T02:07:11Z,Merge pull request #5868 from X-T-E-R/codex/fix-grok-tool-search-output,runtime_provider,false
+394b12afdc7c68effd1c1ffe19cf1ecd51fe56c2,2026-08-20T02:07:46Z,Merge pull request #5875 from hansnow/fix/admin-platform-filter-options,needs_review,false
+1b5dc676a9d35532ac2d88dbbe0ee2638b2ab05f,2026-08-20T02:13:17Z,Merge pull request #5851 from IanShaw027/feat/channel-pricing-tier-multipliers,productcore,false
+6b0ec50f24a95a8da3032c4d1db8bdf321e44479,2026-08-20T02:52:29Z,fix(ops): exclude model configuration errors from SLA,needs_review,false
+85051616f9e47e6e7668a0231ee4b3598bd23dcf,2026-08-19T09:30:08Z,feat(accounts): add adaptive API protocol routing,runtime_provider,false
+9ede0f71658a32ece3bf649a602aa973d4f662b6,2026-08-20T04:37:39Z,fix(grok): promote tool-search discoveries into callable tools,runtime_provider,false
+06fc0055cdfb4006f600704e2794e39bdcb1579b,2026-08-20T04:37:45Z,Merge remote-tracking branch 'origin/main' into codex/promote-grok-tool-search-discoveries,runtime_provider,false
+cb7fef14c09819bff84f2d22b86d33cbb17fbe47,2026-08-20T05:40:21Z,Merge pull request #5838 from xuhaihan/fix/admin-user-role-select-styling,productcore,false
+fb94fd352b10271f5054c7ee3de7ba762ae9b7e2,2026-08-20T05:40:35Z,Merge pull request #5834 from xuhaihan/feat/configurable-proxy-probe-targets,needs_review,false
+b3092145dbd56e3632d0b26c2b27426173ee6592,2026-08-20T04:40:59Z,fix(accounts): harden adaptive protocol compatibility,runtime_provider,false
+752b3d85740a1ac2270d7c8333a7437a7b96221f,2026-08-20T06:00:17Z,Merge pull request #5881 from X-T-E-R/codex/promote-grok-tool-search-discoveries,runtime_provider,false
+740f5808018bbc6addd22e1582e977341dcd8ccb,2026-08-20T06:43:41Z,Merge pull request #5842 from SavitarC/feat/adaptive-api-protocol,runtime_protocol,false
+75f88be5f75c27771836b586f7de1503afa0e3bc,2026-08-20T06:45:08Z,Merge pull request #5876 from wucm667/fix/issue-5872-exclude-model-not-found-sla,needs_review,false
