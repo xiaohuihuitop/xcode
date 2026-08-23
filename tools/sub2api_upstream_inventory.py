@@ -21,6 +21,31 @@ DISPOSITIONS = {
     "productcore_mapping",
     "not_runtime",
 }
+COMMIT_CATEGORIES = {
+    "database",
+    "documentation",
+    "frontend_product",
+    "infrastructure",
+    "merge",
+    "productcore",
+    "runtime_protocol",
+    "runtime_provider",
+    "test",
+}
+FILE_CATEGORIES = COMMIT_CATEGORIES | {"needs_review"}
+FILE_STATES = {"same", "different", "official_only", "current_only"}
+BASELINE_IDENTITIES = {
+    "v0.1.179": {
+        "repo": "Wei-Shaw/sub2api",
+        "base_tag": "v0.1.169",
+        "target_tag": "v0.1.179",
+        "target_commit": "75f88be5f75c27771836b586f7de1503afa0e3bc",
+        "release_published_at": "2026-08-20T07:06:32Z",
+        "archive_sha256": "80b2720941a10d4160090e2f99f3c8e2dd67cc2c6606aa4efc506b58ebff0ff4",
+        "official_version_file": "0.1.178",
+        "commit_count": 594,
+    }
+}
 
 RUNTIME_PROTOCOL_PREFIXES = (
     "backend/internal/pkg/apicompat/",
@@ -115,6 +140,7 @@ IGNORED_PARTS = {
     ".pytest_cache",
     "__pycache__",
     "coverage",
+    "dist",
     "node_modules",
 }
 IGNORED_SUFFIXES = {
@@ -129,7 +155,12 @@ IGNORED_SUFFIXES = {
     ".so",
     ".tar",
     ".tgz",
+    ".tsbuildinfo",
     ".zip",
+}
+IGNORED_FILENAMES = {
+    "vite.config.d.ts",
+    "vite.config.js",
 }
 METADATA_FIELDS = (
     "repo",
@@ -156,6 +187,7 @@ REVIEWED_COMMIT_SUBJECTS = {
         "修复工具输出图片桥接",
         "fix(anthropic): recognize classifier requests with extra system entries",
         "fix(gateway): 流内降载错误恢复 pre-output failover 并对客户端改写为可重试错误码",
+        "test(gateway): 校准 error 帧边界 flush 期望至 pre-output failover 新契约",
         "fix(claude): strip cache control from deferred tools",
         "fix(claude): support top-level deferred tools",
         "feat: 新增独立 /x_search，走原生 x_search 并沿用搜索计费",
@@ -175,6 +207,10 @@ REVIEWED_COMMIT_SUBJECTS = {
         "fix(config): register proxy probe URLs default",
         "fix(proxy): validate configurable probe targets",
         "fix(proxy): format validated probe targets",
+        "fix(billing-probe): 收口探测资格放宽后的抑制清单与调度信任面",
+        "fix(channel-monitor): 配额快照识别值通道失败并加 60s 负缓存与 singleflight",
+        "test(channel-monitor): adapt checker body test to 3-arg normalizeMonitorPrimaryModel",
+        "test(scheduler): update CN platform expectations",
     },
     "productcore": {
         "feat: ops 错误详情弹窗支持自定义时间区间",
@@ -628,11 +664,15 @@ def migration_number(path: str):
 
 
 def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    content = path.read_bytes()
+    if b"\0" not in content:
+        try:
+            content.decode("utf-8")
+        except UnicodeDecodeError:
+            pass
+        else:
+            content = content.replace(b"\r\n", b"\n")
+    return hashlib.sha256(content).hexdigest()
 
 
 def include_inventory_path(relative_path: str) -> bool:
@@ -640,27 +680,40 @@ def include_inventory_path(relative_path: str) -> bool:
     path = Path(normalized)
     if any(part in IGNORED_PARTS for part in path.parts):
         return False
-    if normalized == "frontend/dist" or normalized.startswith("frontend/dist/"):
+    if path.name in IGNORED_FILENAMES:
         return False
     return path.suffix.lower() not in IGNORED_SUFFIXES
 
 
-def compare_trees(official: Path, current: Path, excluded_current_prefixes: tuple[str, ...] = ()):
-    def include_current(path: Path) -> bool:
-        relative = path.relative_to(current).as_posix()
-        excluded = any(relative == prefix or relative.startswith(prefix + "/") for prefix in excluded_current_prefixes)
-        return not excluded and include_inventory_path(relative)
+def inventory_files(root: Path, excluded_prefixes: tuple[str, ...] = ()) -> dict[str, Path]:
+    root = Path(root)
+    files = {}
+    for directory, dirnames, filenames in os.walk(root):
+        directory_path = Path(directory)
+        relative_directory = directory_path.relative_to(root).as_posix()
+        if relative_directory == ".":
+            relative_directory = ""
 
-    official_files = {
-        p.relative_to(official).as_posix(): p
-        for p in official.rglob("*")
-        if p.is_file() and include_inventory_path(p.relative_to(official).as_posix())
-    }
-    current_files = {
-        p.relative_to(current).as_posix(): p
-        for p in current.rglob("*")
-        if p.is_file() and include_current(p)
-    }
+        kept_directories = []
+        for name in dirnames:
+            relative = f"{relative_directory}/{name}" if relative_directory else name
+            excluded = any(relative == prefix or relative.startswith(prefix + "/") for prefix in excluded_prefixes)
+            if not excluded and include_inventory_path(relative):
+                kept_directories.append(name)
+        dirnames[:] = kept_directories
+
+        for name in filenames:
+            path = directory_path / name
+            relative = f"{relative_directory}/{name}" if relative_directory else name
+            excluded = any(relative == prefix or relative.startswith(prefix + "/") for prefix in excluded_prefixes)
+            if not excluded and include_inventory_path(relative):
+                files[relative] = path
+    return files
+
+
+def compare_trees(official: Path, current: Path, excluded_current_prefixes: tuple[str, ...] = ()):
+    official_files = inventory_files(official)
+    current_files = inventory_files(current, excluded_current_prefixes)
     rows = []
     for path in sorted(set(official_files) | set(current_files)):
         left = official_files.get(path)
@@ -947,6 +1000,126 @@ def database_rows_from_markdown(markdown: str) -> list[dict]:
     ]
 
 
+def duplicate_values(values) -> list[str]:
+    seen = set()
+    duplicates = set()
+    for value in values:
+        if value in seen:
+            duplicates.add(value)
+        seen.add(value)
+    return sorted(duplicates)
+
+
+def validate_metadata(metadata: dict) -> None:
+    missing = sorted(set(METADATA_FIELDS) - set(metadata))
+    if missing:
+        raise ValueError("missing metadata fields: " + ", ".join(missing))
+    target_tag = metadata.get("target_tag", "")
+    expected = BASELINE_IDENTITIES.get(target_tag)
+    if expected:
+        for field, expected_value in expected.items():
+            actual = metadata.get(field)
+            if actual != expected_value:
+                raise ValueError(f"{field} mismatch: expected {expected_value}, got {actual}")
+    if not re.fullmatch(r"[0-9a-f]{40}", str(metadata.get("target_commit", ""))):
+        raise ValueError("target_commit must be a full lowercase commit SHA")
+    if not re.fullmatch(r"[0-9a-f]{64}", str(metadata.get("archive_sha256", ""))):
+        raise ValueError("archive_sha256 must be a lowercase SHA-256")
+    try:
+        if int(metadata.get("commit_count", -1)) < 0:
+            raise ValueError
+    except (TypeError, ValueError) as error:
+        raise ValueError("commit_count must be a non-negative integer") from error
+
+
+def validate_commit_rows(commits: list[dict], expected_count: int) -> None:
+    if len(commits) != expected_count:
+        raise ValueError(f"commit count mismatch: expected {expected_count}, got {len(commits)}")
+    duplicates = duplicate_values(row.get("sha", "") for row in commits)
+    if duplicates:
+        raise ValueError("duplicate commit shas: " + ", ".join(duplicates))
+    invalid_sha = sorted(row.get("sha", "") for row in commits if not re.fullmatch(r"[0-9a-f]{40}", row.get("sha", "")))
+    if invalid_sha:
+        raise ValueError("invalid commit shas: " + ", ".join(invalid_sha))
+    invalid_rows = sorted(
+        row.get("sha", "<missing>")
+        for row in commits
+        if not row.get("date")
+        or not row.get("subject")
+        or row.get("category") not in COMMIT_CATEGORIES
+        or row.get("files_known") not in {"true", "false"}
+    )
+    if invalid_rows:
+        raise ValueError("invalid commit rows: " + ", ".join(invalid_rows))
+
+
+def validate_file_rows(files: list[dict]) -> None:
+    duplicates = duplicate_values(row.get("path", "") for row in files)
+    if duplicates:
+        raise ValueError("duplicate file paths: " + ", ".join(duplicates))
+    invalid_paths = []
+    invalid_contracts = []
+    for row in files:
+        path = row.get("path", "")
+        parts = Path(path).parts
+        if not path or "\\" in path or path.startswith("/") or ".." in parts:
+            invalid_paths.append(path or "<missing>")
+            continue
+        state = row.get("state", "")
+        official_hash = row.get("official_sha256", "")
+        current_hash = row.get("current_sha256", "")
+        valid_official = bool(re.fullmatch(r"[0-9a-f]{64}", official_hash))
+        valid_current = bool(re.fullmatch(r"[0-9a-f]{64}", current_hash))
+        valid_contract = (
+            state == "same" and valid_official and official_hash == current_hash
+            or state == "different" and valid_official and valid_current and official_hash != current_hash
+            or state == "official_only" and valid_official and not current_hash
+            or state == "current_only" and not official_hash and valid_current
+        )
+        expected_migration = migration_number(path)
+        migration = row.get("migration_number", "")
+        valid_migration = migration == (str(expected_migration) if expected_migration is not None else "")
+        if (
+            state not in FILE_STATES
+            or row.get("category") not in FILE_CATEGORIES
+            or not valid_contract
+            or not valid_migration
+        ):
+            invalid_contracts.append(path)
+    if invalid_paths:
+        raise ValueError("invalid file paths: " + ", ".join(sorted(invalid_paths)))
+    if invalid_contracts:
+        raise ValueError("invalid file state/hash rows: " + ", ".join(sorted(invalid_contracts)))
+
+
+def validate_current_tree(
+    files: list[dict],
+    current_root: Path,
+    excluded_prefixes: tuple[str, ...] = (),
+) -> None:
+    current_root = Path(current_root)
+
+    current_files = inventory_files(current_root, excluded_prefixes)
+    inventoried_current_files = {
+        row["path"]: row["current_sha256"]
+        for row in files
+        if row.get("current_sha256")
+    }
+    missing_from_inventory = sorted(set(current_files) - set(inventoried_current_files))
+    if missing_from_inventory:
+        raise ValueError("current files missing from inventory: " + ", ".join(missing_from_inventory))
+    missing_from_tree = sorted(set(inventoried_current_files) - set(current_files))
+    if missing_from_tree:
+        raise ValueError("inventory current files missing from tree: " + ", ".join(missing_from_tree))
+    changed = sorted(
+        path
+        for path, expected_hash in inventoried_current_files.items()
+        if sha256_file(current_files[path]) != expected_hash
+    )
+    if changed:
+        raise ValueError("current file hash mismatch: " + ", ".join(changed))
+
+
 def validate_database_impact(files: list[dict], mappings: list[dict]) -> None:
     official = {
         Path(row["path"]).name
@@ -954,24 +1127,37 @@ def validate_database_impact(files: list[dict], mappings: list[dict]) -> None:
         if row.get("migration_number", "").isdigit()
         and 217 <= int(row["migration_number"]) <= 228
     }
-    mapped = {row.get("migration", "") for row in mappings}
+    migration_names = [row.get("migration", "") for row in mappings]
+    duplicates = duplicate_values(migration_names)
+    if duplicates:
+        raise ValueError("duplicate migration mappings: " + ", ".join(duplicates))
+    mapped = set(migration_names)
     missing = sorted(official - mapped)
     if missing:
         raise ValueError("missing migration mappings: " + ", ".join(missing))
+    extra = sorted(mapped - official)
+    if extra:
+        raise ValueError("unexpected migration mappings: " + ", ".join(extra))
     direct = sorted(row["migration"] for row in mappings if row.get("handling") == "direct_sql")
     if direct:
         raise ValueError("direct_sql is forbidden: " + ", ".join(direct))
+    invalid = sorted(
+        row.get("migration", "<missing>")
+        for row in mappings
+        if row.get("handling") not in DISPOSITIONS
+    )
+    if invalid:
+        raise ValueError("invalid migration handling: " + ", ".join(invalid))
 
 
-def validate_inventory(inventory_dir: Path) -> None:
+def validate_inventory(inventory_dir: Path, current_root: Path | None = None) -> None:
     inventory_dir = Path(inventory_dir)
     metadata = json.loads((inventory_dir / "metadata.json").read_text(encoding="utf-8"))
     commits = read_csv(inventory_dir / "commits.csv")
     files = read_csv(inventory_dir / "files.csv")
-    if metadata.get("target_tag") == "v0.1.179":
-        verify_target_commit(metadata.get("target_commit", ""), "75f88be5f75c27771836b586f7de1503afa0e3bc")
-        if len(commits) != 594 or int(metadata.get("commit_count", -1)) != 594:
-            raise ValueError(f"commit count mismatch: expected 594, got {len(commits)}")
+    validate_metadata(metadata)
+    validate_commit_rows(commits, int(metadata["commit_count"]))
+    validate_file_rows(files)
     unresolved_commits = [row["sha"] for row in commits if not row.get("category") or row["category"] == "needs_review"]
     unresolved_files = [row["path"] for row in files if not row.get("category") or row["category"] == "needs_review"]
     if unresolved_commits:
@@ -990,6 +1176,9 @@ def validate_inventory(inventory_dir: Path) -> None:
         (inventory_dir / "database-impact.md").read_text(encoding="utf-8")
     )
     validate_database_impact(files, mappings)
+    if current_root is not None:
+        inventory_prefix = f"docs/upstream/{inventory_dir.name}"
+        validate_current_tree(files, current_root, (inventory_prefix,))
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1010,6 +1199,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     validate = commands.add_parser("validate")
     validate.add_argument("--inventory-dir", type=Path, required=True)
+    validate.add_argument("--current-root", type=Path, default=Path("."))
     return parser
 
 
@@ -1026,7 +1216,7 @@ def main(argv=None) -> int:
     elif args.command == "generate":
         generate_inventory(args.snapshot_dir, args.current_root, args.output_dir)
     else:
-        validate_inventory(args.inventory_dir)
+        validate_inventory(args.inventory_dir, args.current_root)
     return 0
 
 
@@ -1034,11 +1224,35 @@ def validate_matrix(commits: list[dict], features: list[dict]) -> None:
     invalid = [
         row.get("id", "<missing>")
         for row in features
-        if row.get("disposition") not in DISPOSITIONS or row.get("phase") not in {"2", "3", "4", "5", "6"}
+        if not re.fullmatch(r"[FR]\d{3}", row.get("id", ""))
+        or not row.get("commits", "").strip()
+        or row.get("disposition") not in DISPOSITIONS
+        or row.get("phase") not in {"2", "3", "4", "5", "6"}
     ]
     if invalid:
         raise ValueError("invalid feature rows: " + ", ".join(invalid))
-    covered = {sha.strip() for row in features for sha in row.get("commits", "").split() if sha.strip()}
+    duplicate_ids = duplicate_values(row.get("id", "") for row in features)
+    if duplicate_ids:
+        raise ValueError("duplicate feature ids: " + ", ".join(duplicate_ids))
+    known = {row["sha"]: row.get("category", "") for row in commits}
+    referenced = [sha.strip() for row in features for sha in row.get("commits", "").split() if sha.strip()]
+    unknown = sorted(set(referenced) - set(known))
+    if unknown:
+        raise ValueError("unknown matrix commits: " + ", ".join(unknown))
+    authoritative = [
+        sha.strip()
+        for row in features
+        if row.get("id", "").startswith("F")
+        for sha in row.get("commits", "").split()
+        if sha.strip()
+    ]
+    duplicate_authoritative = duplicate_values(authoritative)
+    if duplicate_authoritative:
+        raise ValueError("duplicate authoritative commits: " + ", ".join(duplicate_authoritative))
+    non_runtime = sorted(sha for sha in authoritative if not known[sha].startswith("runtime_"))
+    if non_runtime:
+        raise ValueError("non-runtime authoritative commits: " + ", ".join(non_runtime))
+    covered = set(authoritative)
     runtime_commits = [row for row in commits if row.get("category", "").startswith("runtime_")]
     missing = sorted(row["sha"] for row in runtime_commits if row["sha"] not in covered)
     if missing:

@@ -34,7 +34,7 @@ python -B tools/sub2api_upstream_inventory.py validate `
   --inventory-dir docs/upstream/sub2api-v0.1.179
 ```
 
-`snapshot` 重新下载官方归档并校验身份；日常复核已有缓存时可以只运行 `generate` 和 `validate`。`generate` 会更新当前 XCode 文件的 SHA-256，因此工具自身改变后，`files.csv` 中对应行也会改变。
+`snapshot` 重新下载官方归档并校验身份；日常复核已有缓存时可以只运行 `generate` 和 `validate`。`generate` 会更新当前 XCode 文件的 SHA-256，因此工具自身改变后，`files.csv` 中对应行也会改变。`validate` 默认把当前目录作为 `--current-root`，会拒绝新增、删除或哈希变化但尚未重新生成的源码文件；Git 忽略的构建产物和清单目录自身不参与比较。
 
 ## 文件所有权
 

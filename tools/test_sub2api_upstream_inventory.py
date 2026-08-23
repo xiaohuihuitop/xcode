@@ -7,6 +7,7 @@ import unittest
 import zipfile
 from pathlib import Path
 
+import tools.sub2api_upstream_inventory as inventory
 from tools.sub2api_upstream_inventory import (
     classify_commit,
     classify_path,
@@ -16,6 +17,7 @@ from tools.sub2api_upstream_inventory import (
     compare_trees,
     migration_number,
     resolve_tag_commit,
+    sha256_file,
     snapshot_upstream,
     validate_matrix,
     validate_database_impact,
@@ -25,6 +27,16 @@ from tools.sub2api_upstream_inventory import (
 
 
 class InventoryTests(unittest.TestCase):
+    def test_sha256_file_normalizes_text_line_endings(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            lf_path = root / "lf.txt"
+            crlf_path = root / "crlf.txt"
+            lf_path.write_bytes(b"first\nsecond\n")
+            crlf_path.write_bytes(b"first\r\nsecond\r\n")
+
+            self.assertEqual(sha256_file(lf_path), sha256_file(crlf_path))
+
     def test_classify_path_separates_runtime_product_and_database(self):
         self.assertEqual(classify_path("backend/internal/pkg/apicompat/a.go"), "runtime_protocol")
         self.assertEqual(classify_path("backend/internal/service/openai_gateway.go"), "runtime_provider")
@@ -97,6 +109,23 @@ class InventoryTests(unittest.TestCase):
         )
         self.assertEqual(classify_commit("完善大文件备份分卷上传与恢复"), "infrastructure")
         self.assertEqual(classify_commit("测试：同步长上下文计费断言"), "test")
+        self.assertEqual(
+            classify_commit("fix(billing-probe): 收口探测资格放宽后的抑制清单与调度信任面"),
+            "runtime_provider",
+        )
+        self.assertEqual(
+            classify_commit("fix(channel-monitor): 配额快照识别值通道失败并加 60s 负缓存与 singleflight"),
+            "runtime_provider",
+        )
+        self.assertEqual(
+            classify_commit("test(channel-monitor): adapt checker body test to 3-arg normalizeMonitorPrimaryModel"),
+            "runtime_provider",
+        )
+        self.assertEqual(
+            classify_commit("test(gateway): 校准 error 帧边界 flush 期望至 pre-output failover 新契约"),
+            "runtime_protocol",
+        )
+        self.assertEqual(classify_commit("test(scheduler): update CN platform expectations"), "runtime_provider")
 
     def test_migration_number_handles_numeric_prefix_and_non_migration(self):
         self.assertEqual(migration_number("backend/migrations/228_channel.sql"), 228)
@@ -129,6 +158,25 @@ class InventoryTests(unittest.TestCase):
             self.assertEqual(states["new.go"], "official_only")
             self.assertEqual(states["local.go"], "current_only")
 
+    def test_inventory_files_prunes_ignored_directories(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "kept").mkdir()
+            (root / "kept" / "a.txt").write_text("kept\n", encoding="utf-8")
+            (root / "node_modules" / "package").mkdir(parents=True)
+            (root / "node_modules" / "package" / "ignored.js").write_text("ignored\n", encoding="utf-8")
+            (root / "frontend" / "dist").mkdir(parents=True)
+            (root / "frontend" / "dist" / "ignored.js").write_text("ignored\n", encoding="utf-8")
+            (root / "backend" / "internal" / "web" / "dist").mkdir(parents=True)
+            (root / "backend" / "internal" / "web" / "dist" / "ignored.js").write_text("ignored\n", encoding="utf-8")
+            (root / "frontend" / "tsconfig.tsbuildinfo").write_text("ignored\n", encoding="utf-8")
+            (root / "frontend" / "vite.config.js").write_text("ignored\n", encoding="utf-8")
+            (root / "frontend" / "vite.config.d.ts").write_text("ignored\n", encoding="utf-8")
+
+            paths = inventory.inventory_files(root)
+
+            self.assertEqual(set(paths), {"kept/a.txt"})
+
     def test_validate_matrix_rejects_empty_disposition_and_uncovered_commit(self):
         commits = [
             {"sha": "a", "category": "runtime_protocol"},
@@ -136,6 +184,57 @@ class InventoryTests(unittest.TestCase):
         ]
         features = [{"id": "F001", "commits": "a", "disposition": "direct_sync", "phase": "2"}]
         with self.assertRaisesRegex(ValueError, "uncovered commits: b"):
+            validate_matrix(commits, features)
+
+    def test_validate_matrix_rejects_unknown_commit(self):
+        commits = [{"sha": "a", "category": "runtime_protocol"}]
+        features = [{"id": "F001", "commits": "a missing", "disposition": "direct_sync", "phase": "2"}]
+        with self.assertRaisesRegex(ValueError, "unknown matrix commits: missing"):
+            validate_matrix(commits, features)
+
+    def test_validate_matrix_rejects_invalid_id_and_empty_commits(self):
+        commits = [{"sha": "a", "category": "runtime_protocol"}]
+        invalid_id = [{"id": "X001", "commits": "a", "disposition": "direct_sync", "phase": "2"}]
+        with self.assertRaisesRegex(ValueError, "invalid feature rows: X001"):
+            validate_matrix(commits, invalid_id)
+
+        empty_commits = [{"id": "F001", "commits": "", "disposition": "direct_sync", "phase": "2"}]
+        with self.assertRaisesRegex(ValueError, "invalid feature rows: F001"):
+            validate_matrix(commits, empty_commits)
+
+    def test_validate_matrix_rejects_duplicate_feature_id(self):
+        commits = [
+            {"sha": "a", "category": "runtime_protocol"},
+            {"sha": "b", "category": "runtime_provider"},
+        ]
+        features = [
+            {"id": "F001", "commits": "a", "disposition": "direct_sync", "phase": "2"},
+            {"id": "F001", "commits": "b", "disposition": "adapter_port", "phase": "3"},
+        ]
+        with self.assertRaisesRegex(ValueError, "duplicate feature ids: F001"):
+            validate_matrix(commits, features)
+
+    def test_validate_matrix_rejects_duplicate_authoritative_commit(self):
+        commits = [
+            {"sha": "a", "category": "runtime_protocol"},
+            {"sha": "b", "category": "runtime_provider"},
+        ]
+        features = [
+            {"id": "F001", "commits": "a", "disposition": "direct_sync", "phase": "2"},
+            {"id": "F002", "commits": "a b", "disposition": "adapter_port", "phase": "3"},
+        ]
+        with self.assertRaisesRegex(ValueError, "duplicate authoritative commits: a"):
+            validate_matrix(commits, features)
+
+    def test_validate_matrix_rejects_non_runtime_commit_in_authoritative_row(self):
+        commits = [
+            {"sha": "a", "category": "runtime_protocol"},
+            {"sha": "b", "category": "productcore"},
+        ]
+        features = [
+            {"id": "F001", "commits": "a b", "disposition": "direct_sync", "phase": "2"},
+        ]
+        with self.assertRaisesRegex(ValueError, "non-runtime authoritative commits: b"):
             validate_matrix(commits, features)
 
     def test_feature_matrix_parser_feeds_uncovered_commit_validation(self):
@@ -174,6 +273,89 @@ class InventoryTests(unittest.TestCase):
 """
         with self.assertRaisesRegex(ValueError, "direct_sql is forbidden: 218_two.sql"):
             validate_database_impact(files, database_rows_from_markdown(direct_markdown))
+
+    def test_database_impact_rejects_duplicate_migration(self):
+        files = [{"path": "backend/migrations/217_one.sql", "migration_number": "217"}]
+        mappings = [
+            {"migration": "217_one.sql", "handling": "productcore_mapping"},
+            {"migration": "217_one.sql", "handling": "productcore_mapping"},
+        ]
+        with self.assertRaisesRegex(ValueError, "duplicate migration mappings: 217_one.sql"):
+            validate_database_impact(files, mappings)
+
+    def test_database_impact_rejects_extra_migration(self):
+        files = [{"path": "backend/migrations/217_one.sql", "migration_number": "217"}]
+        mappings = [
+            {"migration": "217_one.sql", "handling": "productcore_mapping"},
+            {"migration": "999_extra.sql", "handling": "not_runtime"},
+        ]
+        with self.assertRaisesRegex(ValueError, "unexpected migration mappings: 999_extra.sql"):
+            validate_database_impact(files, mappings)
+
+    def test_database_impact_rejects_unknown_handling(self):
+        files = [{"path": "backend/migrations/217_one.sql", "migration_number": "217"}]
+        mappings = [{"migration": "217_one.sql", "handling": "direct sql"}]
+        with self.assertRaisesRegex(ValueError, "invalid migration handling: 217_one.sql"):
+            validate_database_impact(files, mappings)
+
+    def test_validate_metadata_rejects_modified_v01179_archive(self):
+        metadata = {
+            "repo": "Wei-Shaw/sub2api",
+            "base_tag": "v0.1.169",
+            "target_tag": "v0.1.179",
+            "target_commit": "75f88be5f75c27771836b586f7de1503afa0e3bc",
+            "release_published_at": "2026-08-20T07:06:32Z",
+            "archive_sha256": "0" * 64,
+            "official_version_file": "0.1.178",
+            "commit_count": 594,
+            "generated_at": "2026-08-23T13:18:59Z",
+        }
+        with self.assertRaisesRegex(ValueError, "archive_sha256 mismatch"):
+            inventory.validate_metadata(metadata)
+
+    def test_validate_commit_rows_rejects_duplicate_sha(self):
+        sha = "a" * 40
+        rows = [
+            {"sha": sha, "date": "2026-08-01T00:00:00Z", "subject": "one", "category": "runtime_protocol", "files_known": "false"},
+            {"sha": sha, "date": "2026-08-02T00:00:00Z", "subject": "two", "category": "runtime_provider", "files_known": "false"},
+        ]
+        with self.assertRaisesRegex(ValueError, f"duplicate commit shas: {sha}"):
+            inventory.validate_commit_rows(rows, expected_count=2)
+
+    def test_validate_file_rows_rejects_duplicate_path(self):
+        digest = "a" * 64
+        rows = [
+            {"path": "a.txt", "state": "current_only", "category": "documentation", "official_sha256": "", "current_sha256": digest, "migration_number": ""},
+            {"path": "a.txt", "state": "current_only", "category": "documentation", "official_sha256": "", "current_sha256": digest, "migration_number": ""},
+        ]
+        with self.assertRaisesRegex(ValueError, "duplicate file paths: a.txt"):
+            inventory.validate_file_rows(rows)
+
+    def test_validate_file_rows_rejects_invalid_state_hash_contract(self):
+        rows = [
+            {"path": "a.txt", "state": "same", "category": "documentation", "official_sha256": "a" * 64, "current_sha256": "b" * 64, "migration_number": ""},
+        ]
+        with self.assertRaisesRegex(ValueError, "invalid file state/hash rows: a.txt"):
+            inventory.validate_file_rows(rows)
+
+    def test_validate_current_tree_rejects_new_file_missing_from_inventory(self):
+        with tempfile.TemporaryDirectory() as temp:
+            current = Path(temp)
+            tracked = current / "tracked.txt"
+            tracked.write_text("tracked\n", encoding="utf-8")
+            rows = [
+                {
+                    "path": "tracked.txt",
+                    "state": "current_only",
+                    "category": "needs_review",
+                    "official_sha256": "",
+                    "current_sha256": hashlib.sha256(tracked.read_bytes()).hexdigest(),
+                    "migration_number": "",
+                }
+            ]
+            (current / "new.txt").write_text("new\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "current files missing from inventory: new.txt"):
+                inventory.validate_current_tree(rows, current)
 
     def test_snapshot_rejects_wrong_target_commit(self):
         with self.assertRaisesRegex(ValueError, "target commit mismatch"):

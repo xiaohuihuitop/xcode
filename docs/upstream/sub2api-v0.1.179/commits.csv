@@ -65,7 +65,7 @@ ddf4c6fd813c7bab3d776c64bf0b6c604b350f34,2026-08-01T10:45:33Z,fix(openai): fail 
 21aacde0b3d340e21253b73a04f6e724b40a77de,2026-08-01T12:32:10Z,fix(openai-ws): keep downstream writes off the relay cancellation context,runtime_provider,false
 b74024c7868ee88a0bf921306cbc22a2f922872a,2026-08-01T12:47:42Z,Merge pull request #5167 from Wei-Shaw/fix/openai-ws-passthrough-close-frame-race,merge,false
 d60f4e442baeadb66d8dc693f306f9de2ed8ca6d,2026-08-01T13:15:38Z,feat(composite): enforce reasoning effort policy,runtime_protocol,false
-56f3d3c9b0ab23a68d648f97f2b011707b9f016c,2026-08-01T13:53:55Z,fix(billing-probe): 收口探测资格放宽后的抑制清单与调度信任面,productcore,false
+56f3d3c9b0ab23a68d648f97f2b011707b9f016c,2026-08-01T13:53:55Z,fix(billing-probe): 收口探测资格放宽后的抑制清单与调度信任面,runtime_provider,false
 b0f5007f0433077e1f71bb39c96df0610e967f99,2026-07-26T11:49:30Z,feat(billing-probe): optionally sync account rate from upstream declared rate,runtime_provider,false
 0b6b4ea95675fffabc42e9f471045cb9c7df3867,2026-08-01T14:01:56Z,fix(billing-probe): govern the automatic account rate write-back,runtime_provider,false
 20ad5ec506d1e0e68d36a714b423784ccb3afebc,2026-07-26T18:18:13Z,feat(scheduler): per-group profit control for token account admission,runtime_provider,false
@@ -243,7 +243,7 @@ db0bff82c7f954607f4b66421a79200e150ac836,2026-08-04T13:44:29Z,feat(usage): audit
 815035fcc9adb0536fd89896da1f8a04da95fd8d,2026-08-07T03:48:44Z,fix(openai): send OAuth routing hints,runtime_provider,false
 de349187d91f5d458199d332aa90966d732bd55d,2026-08-07T05:11:08Z,fix(openai): harden priority routing hints,runtime_provider,false
 c33c3208e307c53c82daebc0ba303c3f09b51308,2026-08-07T14:42:33Z,fix(gateway): 流内降载错误恢复 pre-output failover 并对客户端改写为可重试错误码,runtime_protocol,false
-14a27f1960c46244977fec18ad25acb438261c0a,2026-08-07T14:55:42Z,test(gateway): 校准 error 帧边界 flush 期望至 pre-output failover 新契约,test,false
+14a27f1960c46244977fec18ad25acb438261c0a,2026-08-07T14:55:42Z,test(gateway): 校准 error 帧边界 flush 期望至 pre-output failover 新契约,runtime_protocol,false
 de904c433e3a2b5bce18f2937ef5ce99a70e6874,2026-08-07T15:00:46Z,Merge pull request #5396 from Brisbanehuang/codex/upstream-response-model-audit,merge,false
 64090de6645f738e1a6dbdcf84cc08495304dd0a,2026-08-07T15:09:03Z,fix(apicompat): Responses→Anthropic 转换不再发出上游会拒收的 content block,runtime_protocol,false
 8f7b0a314de816daabb5b761db3025cb10c3eca9,2026-08-07T15:11:20Z,Merge pull request #5398 from Wei-Shaw/fix/openai-capacity-shed-stream-recovery,merge,false
@@ -475,7 +475,7 @@ c44711ac98dd7f2cafacff18aa9b3bfa9e7bcbb1,2026-08-18T04:03:13Z,feat(channel-monit
 6a6fd304f68e2a8f5dbe6a96e424c4baffc203c6,2026-08-18T04:06:18Z,feat(settings): channel_monitor_show_quota public setting (default off),runtime_provider,false
 41344c20ff54e4a828a09fa0ca77d0167a66b7f4,2026-08-18T04:14:15Z,feat(monitor): wire quota fetcher & expose check_mode in handlers,runtime_provider,false
 7ab6d3db66c4862013a6ee998c014327c843b3ca,2026-08-18T04:51:02Z,test(channel-monitor): quota mode unit/integration/migration coverage,runtime_provider,false
-c51fd7d0b351da9df3459da280778d30b182a24e,2026-08-18T04:51:06Z,test(channel-monitor): adapt checker body test to 3-arg normalizeMonitorPrimaryModel,productcore,false
+c51fd7d0b351da9df3459da280778d30b182a24e,2026-08-18T04:51:06Z,test(channel-monitor): adapt checker body test to 3-arg normalizeMonitorPrimaryModel,runtime_provider,false
 bb6c3b4f6a0543788dac7cafb8025846ae293709,2026-08-18T05:03:20Z,fix: unify Codex OAuth outbound identity onto the inference resolver,runtime_provider,false
 16e4f7ecc33ad895587a3581b8f8d1c6f3dbf44e,2026-08-18T05:02:29Z,修复 Codex 额度探针模型兼容性,runtime_provider,false
 a20e1c00cc1736378d7510c48ab52cac66489739,2026-08-18T05:09:58Z,feat(monitor-ui): 配额模式表单、用量快照视图与 8 平台支持,frontend_product,false
@@ -517,7 +517,7 @@ f211a630c85e5031da13d405a45a89861e3a47e4,2026-08-18T07:35:16Z,Merge pull request
 c253bd2c72dcce1aee21a4bc671ad23eb1bf5a34,2026-08-18T07:48:02Z,fix(openai): restore client tools in terminal events,runtime_provider,false
 58ccea4eaa031758974fa70bb588d42bc5876019,2026-08-18T08:21:50Z,Merge pull request #5767 from hansnow/fix/ws-http-bridge-custom-tools,merge,false
 8f6f459835779efa2e3308b90addfa20e81a4a66,2026-08-18T09:12:01Z,fix(channels): support kimi/zhipu/deepseek platforms in channel pricing,runtime_provider,false
-22df600d090479ea42070eb79c42c520ea9e1eab,2026-08-18T09:14:20Z,fix(channel-monitor): 配额快照识别值通道失败并加 60s 负缓存与 singleflight,productcore,false
+22df600d090479ea42070eb79c42c520ea9e1eab,2026-08-18T09:14:20Z,fix(channel-monitor): 配额快照识别值通道失败并加 60s 负缓存与 singleflight,runtime_provider,false
 03c3f3b6fcf51e2c7c1dcc7a6c2fdbd4931bf67d,2026-08-18T09:14:31Z,feat(ui): Select 组件支持可选远程搜索（remote/loading props + search 事件）,frontend_product,false
 5cbd0c96a2eec8133cc504946767fcc7e83b9f1a,2026-08-18T09:14:44Z,fix(monitor-ui): 关联账号选择器改服务端搜索+回填，OpenAI 配额模式加消耗提示,runtime_provider,false
 dd04503e1ff0298d8e61b8adf61febec9210f6a2,2026-08-18T09:27:43Z,Merge pull request #5773 from Wei-Shaw/fix/channel-pricing-cn-platforms,merge,false
@@ -542,7 +542,7 @@ bfac49fef9e9ba7543e312327c3625ab5210668f,2026-08-19T03:34:06Z,fix(codex): handle
 58e147fba6f6343ae5c2078de96803635b2cab4f,2026-08-19T04:40:32Z,feat(composite): support Codex endpoints,runtime_provider,false
 b171bb0e4a84509ec5afaba8ec8c750d1857e246,2026-08-19T05:01:25Z,fix(composite): support CN providers,runtime_provider,false
 e943f817b118936eb776f20a3a4040a4123dcfff,2026-08-19T06:03:03Z,Merge pull request #5729 from lbyxiaolizi/fix/responses-chat-reasoning-content-passback,merge,false
-4d3b300a255a6158d00f450e2d249c3403f8b5e7,2026-08-19T06:05:52Z,test(scheduler): update CN platform expectations,test,false
+4d3b300a255a6158d00f450e2d249c3403f8b5e7,2026-08-19T06:05:52Z,test(scheduler): update CN platform expectations,runtime_provider,false
 2a5ae2b2dc4b8ffe016f44d66245bfe234a1a398,2026-08-19T06:19:26Z,Merge pull request #5816 from kingsleydon/fix/composite-codex-support,merge,false
 7d9c958482eaf4f81a820702a98b40db6cbddf54,2026-08-19T06:43:33Z,Merge pull request #5810 from Pluviobyte/codex/fix-responses-input-tokens,merge,false
 bd1ccd97366540496dfebbeb6d20f2ae1a7edd21,2026-08-19T06:47:34Z,Merge remote-tracking branch 'origin/main' into fix/issue-5796-composite-new-platforms,merge,false
