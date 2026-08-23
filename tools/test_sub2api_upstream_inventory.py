@@ -10,6 +10,7 @@ from pathlib import Path
 from tools.sub2api_upstream_inventory import (
     classify_commit,
     classify_path,
+    database_rows_from_markdown,
     feature_rows_from_markdown,
     generate_inventory,
     compare_trees,
@@ -17,6 +18,7 @@ from tools.sub2api_upstream_inventory import (
     resolve_tag_commit,
     snapshot_upstream,
     validate_matrix,
+    validate_database_impact,
     verify_target_commit,
     write_csv,
 )
@@ -150,6 +152,28 @@ class InventoryTests(unittest.TestCase):
         ]
         with self.assertRaisesRegex(ValueError, "uncovered commits: b"):
             validate_matrix(commits, features)
+
+    def test_database_impact_rejects_missing_migration_and_direct_sql(self):
+        files = [
+            {"path": "backend/migrations/217_one.sql", "migration_number": "217"},
+            {"path": "backend/migrations/218_two.sql", "migration_number": "218"},
+        ]
+        missing_markdown = """
+| 官方迁移 | 处理方式 |
+| --- | --- |
+| `217_one.sql` | productcore_mapping |
+"""
+        with self.assertRaisesRegex(ValueError, "missing migration mappings: 218_two.sql"):
+            validate_database_impact(files, database_rows_from_markdown(missing_markdown))
+
+        direct_markdown = """
+| 官方迁移 | 处理方式 |
+| --- | --- |
+| `217_one.sql` | productcore_mapping |
+| `218_two.sql` | direct_sql |
+"""
+        with self.assertRaisesRegex(ValueError, "direct_sql is forbidden: 218_two.sql"):
+            validate_database_impact(files, database_rows_from_markdown(direct_markdown))
 
     def test_snapshot_rejects_wrong_target_commit(self):
         with self.assertRaisesRegex(ValueError, "target commit mismatch"):

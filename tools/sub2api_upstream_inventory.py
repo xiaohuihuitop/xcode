@@ -894,32 +894,73 @@ def read_csv(path: Path) -> list[dict]:
         return list(csv.DictReader(handle))
 
 
-def feature_rows_from_markdown(markdown: str) -> list[dict]:
+def markdown_table_rows(markdown: str, required_headers: set[str], table_name: str) -> list[dict]:
     lines = markdown.splitlines()
-    required = {"ID", "官方提交", "归宿", "阶段"}
     for index, line in enumerate(lines[:-1]):
         if not line.strip().startswith("|"):
             continue
         headers = [cell.strip() for cell in line.strip().strip("|").split("|")]
-        if not required.issubset(headers):
+        if not required_headers.issubset(headers):
             continue
         separator = [cell.strip() for cell in lines[index + 1].strip().strip("|").split("|")]
         if len(separator) != len(headers) or not all(re.fullmatch(r":?-{3,}:?", cell) for cell in separator):
-            raise ValueError("feature matrix header is missing its separator row")
-        aliases = {"ID": "id", "官方提交": "commits", "归宿": "disposition", "阶段": "phase"}
+            raise ValueError(f"{table_name} header is missing its separator row")
         rows = []
         for row_line in lines[index + 2 :]:
             if not row_line.strip().startswith("|"):
                 break
             cells = [cell.strip() for cell in row_line.strip().strip("|").split("|")]
             if len(cells) != len(headers):
-                raise ValueError(f"feature matrix row has {len(cells)} cells, expected {len(headers)}")
-            source = dict(zip(headers, cells))
-            rows.append({target: source[header].strip("`") for header, target in aliases.items()})
+                raise ValueError(f"{table_name} row has {len(cells)} cells, expected {len(headers)}")
+            rows.append(dict(zip(headers, cells)))
         if not rows:
-            raise ValueError("feature matrix contains no rows")
+            raise ValueError(f"{table_name} contains no rows")
         return rows
-    raise ValueError("feature matrix table is missing")
+    raise ValueError(f"{table_name} table is missing")
+
+
+def feature_rows_from_markdown(markdown: str) -> list[dict]:
+    source_rows = markdown_table_rows(
+        markdown,
+        {"ID", "官方提交", "归宿", "阶段"},
+        "feature matrix",
+    )
+    aliases = {"ID": "id", "官方提交": "commits", "归宿": "disposition", "阶段": "phase"}
+    return [
+        {target: row[header].strip("`") for header, target in aliases.items()}
+        for row in source_rows
+    ]
+
+
+def database_rows_from_markdown(markdown: str) -> list[dict]:
+    source_rows = markdown_table_rows(
+        markdown,
+        {"官方迁移", "处理方式"},
+        "database impact",
+    )
+    return [
+        {
+            "migration": row["官方迁移"].strip("` "),
+            "handling": row["处理方式"].strip("` "),
+        }
+        for row in source_rows
+    ]
+
+
+def validate_database_impact(files: list[dict], mappings: list[dict]) -> None:
+    official = {
+        Path(row["path"]).name
+        for row in files
+        if row.get("migration_number", "").isdigit()
+        and 217 <= int(row["migration_number"]) <= 228
+    }
+    mapped = {row.get("migration", "") for row in mappings}
+    missing = sorted(official - mapped)
+    if missing:
+        raise ValueError("missing migration mappings: " + ", ".join(missing))
+    direct = sorted(row["migration"] for row in mappings if row.get("handling") == "direct_sql")
+    if direct:
+        raise ValueError("direct_sql is forbidden: " + ", ".join(direct))
 
 
 def validate_inventory(inventory_dir: Path) -> None:
@@ -945,6 +986,10 @@ def validate_inventory(inventory_dir: Path) -> None:
     validate_matrix(commits, features)
     if not (inventory_dir / "database-impact.md").is_file():
         raise ValueError("database impact mapping is missing")
+    mappings = database_rows_from_markdown(
+        (inventory_dir / "database-impact.md").read_text(encoding="utf-8")
+    )
+    validate_database_impact(files, mappings)
 
 
 def build_parser() -> argparse.ArgumentParser:
