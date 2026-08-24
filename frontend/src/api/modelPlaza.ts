@@ -26,6 +26,9 @@ export interface PlatformPlazaModel {
   upstream_model?: string
   endpoint_capabilities: string[]
   pricing: PlatformPlazaPricing | null
+  official_pricing?: PlatformPlazaPricing | null
+  sale_pricing?: PlatformPlazaPricing | null
+  sale_pricing_source?: 'official' | 'custom' | 'unavailable'
 }
 
 export interface ModelPlazaPlatform {
