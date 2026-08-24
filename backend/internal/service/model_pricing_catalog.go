@@ -55,6 +55,10 @@ type ModelPricingCatalog struct {
 	repo ModelPricingOverrideRepository
 }
 
+type ModelPricingRuleSnapshot struct {
+	rulesByAdapter map[string][]ModelPricingOverride
+}
+
 func NewModelPricingCatalog(repo ModelPricingOverrideRepository) *ModelPricingCatalog {
 	return &ModelPricingCatalog{repo: repo}
 }
@@ -131,6 +135,44 @@ func validateModelPricingOverride(item *ModelPricingOverride) error {
 	if item.Intervals == nil {
 		item.Intervals = []domain.ModelPricingInterval{}
 	}
+	intervals := make([]PricingInterval, 0, len(item.Intervals))
+	for _, interval := range item.Intervals {
+		intervals = append(intervals, domainIntervalToPricingInterval(interval))
+	}
+	if err := ValidateIntervals(intervals, item.BillingMode); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *ModelPricingCatalog) LoadSnapshot(ctx context.Context) (*ModelPricingRuleSnapshot, error) {
+	snapshot := &ModelPricingRuleSnapshot{rulesByAdapter: make(map[string][]ModelPricingOverride)}
+	if c == nil || c.repo == nil {
+		return snapshot, nil
+	}
+	rules, err := c.repo.List(ctx, "")
+	if err != nil {
+		return nil, fmt.Errorf("list model pricing overrides: %w", err)
+	}
+	for _, rule := range rules {
+		adapter := strings.ToLower(strings.TrimSpace(rule.Adapter))
+		if adapter == "" {
+			continue
+		}
+		snapshot.rulesByAdapter[adapter] = append(snapshot.rulesByAdapter[adapter], rule)
+	}
+	return snapshot, nil
+}
+
+func (s *ModelPricingRuleSnapshot) ResolveForPricingInput(input PricingInput) *ModelPricingOverride {
+	if s == nil {
+		return nil
+	}
+	for _, identity := range pricingIdentitiesForInput(input) {
+		if override := resolveModelPricingRules(s.rulesByAdapter[identity.adapter], identity.model); override != nil {
+			return override
+		}
+	}
 	return nil
 }
 
@@ -185,25 +227,7 @@ func resolveModelPricingRules(rules []ModelPricingOverride, model string) *Model
 // adapter rules. Platform codes distinguish pools such as codex and glm even
 // when both pools use the same account adapter.
 func (c *ModelPricingCatalog) ResolveForPricingInput(ctx context.Context, input PricingInput) (*ModelPricingOverride, error) {
-	identities := make([]struct{ adapter, model string }, 0, 4)
-	seen := make(map[string]struct{}, 4)
-	add := func(adapter, model string) {
-		adapter = strings.ToLower(strings.TrimSpace(adapter))
-		model = strings.TrimSpace(model)
-		if adapter == "" || model == "" {
-			return
-		}
-		key := adapter + "\x00" + strings.ToLower(model)
-		if _, exists := seen[key]; exists {
-			return
-		}
-		seen[key] = struct{}{}
-		identities = append(identities, struct{ adapter, model string }{adapter: adapter, model: model})
-	}
-	add(input.PlatformCode, input.PublicModel)
-	add(input.PlatformCode, input.Model)
-	add(input.Adapter, input.PublicModel)
-	add(input.Adapter, input.Model)
+	identities := pricingIdentitiesForInput(input)
 	if c == nil || c.repo == nil {
 		return nil, nil
 	}
@@ -226,6 +250,34 @@ func (c *ModelPricingCatalog) ResolveForPricingInput(ctx context.Context, input 
 	return nil, nil
 }
 
+type pricingIdentity struct {
+	adapter string
+	model   string
+}
+
+func pricingIdentitiesForInput(input PricingInput) []pricingIdentity {
+	identities := make([]pricingIdentity, 0, 4)
+	seen := make(map[string]struct{}, 4)
+	add := func(adapter, model string) {
+		adapter = strings.ToLower(strings.TrimSpace(adapter))
+		model = strings.TrimSpace(model)
+		if adapter == "" || model == "" {
+			return
+		}
+		key := adapter + "\x00" + strings.ToLower(model)
+		if _, exists := seen[key]; exists {
+			return
+		}
+		seen[key] = struct{}{}
+		identities = append(identities, pricingIdentity{adapter: adapter, model: model})
+	}
+	add(input.PlatformCode, input.PublicModel)
+	add(input.PlatformCode, input.Model)
+	add(input.Adapter, input.PublicModel)
+	add(input.Adapter, input.Model)
+	return identities
+}
+
 func modelPatternMatches(pattern, model string) bool {
 	pattern = strings.ToLower(strings.TrimSpace(pattern))
 	model = strings.ToLower(strings.TrimSpace(model))
@@ -243,10 +295,19 @@ func patternSpecificity(pattern string) int {
 	return len(strings.NewReplacer("*", "", "?", "").Replace(strings.TrimSpace(pattern)))
 }
 
-func pricingOverrideToResolved(override *ModelPricingOverride, base *ModelPricing) *ResolvedPricing {
+func pricingOverrideToResolved(
+	override *ModelPricingOverride,
+	base *ModelPricing,
+	officialSource PricingSourceInfo,
+) *ResolvedPricing {
+	matchedOverride := *override
+	matchedOverride.Intervals = append([]domain.ModelPricingInterval(nil), override.Intervals...)
 	resolved := &ResolvedPricing{
 		Mode:                   override.BillingMode,
 		BasePricing:            cloneModelPricing(base),
+		OfficialPricing:        cloneModelPricing(base),
+		OfficialSource:         officialSource,
+		MatchedOverride:        &matchedOverride,
 		Source:                 PricingSourceOverride,
 		SupportsCacheBreakdown: base != nil && base.SupportsCacheBreakdown,
 	}

@@ -110,6 +110,13 @@ type ModelPricing struct {
 	ImageOutputPriceExplicit           bool    // 是否由渠道定价显式设定（为 true 时即使 == 0 也不回退）
 }
 
+type ModelPricingLookup struct {
+	Pricing                *ModelPricing
+	Mode                   BillingMode
+	DefaultPerRequestPrice float64
+	Source                 PricingSourceInfo
+}
+
 const (
 	openAIGPT54LongContextInputThreshold   = 272000
 	openAIGPT54LongContextInputMultiplier  = 2.0
@@ -817,6 +824,99 @@ func (s *BillingService) getFallbackPricing(model string) *ModelPricing {
 	}
 
 	return nil
+}
+
+func (s *BillingService) LookupModelPricing(model string) (*ModelPricingLookup, error) {
+	model = strings.ToLower(strings.TrimSpace(model))
+	if s.pricingService != nil {
+		catalogLookup := s.pricingService.LookupModelPricing(model)
+		if catalogLookup != nil && catalogLookup.Pricing != nil {
+			catalogPricing := catalogLookup.Pricing
+			if catalogPricing.TokenPricingAbsent && catalogPricing.OutputCostPerImage > 0 {
+				return &ModelPricingLookup{
+					Pricing:                liteLLMToModelPricing(catalogPricing),
+					Mode:                   BillingModeImage,
+					DefaultPerRequestPrice: catalogPricing.OutputCostPerImage,
+					Source:                 catalogLookup.Source,
+				}, nil
+			}
+			if !catalogPricing.TokenPricingAbsent {
+				return &ModelPricingLookup{
+					Pricing: s.applyModelSpecificPricingPolicy(model, liteLLMToModelPricing(catalogPricing)),
+					Mode:    BillingModeToken,
+					Source:  catalogLookup.Source,
+				}, nil
+			}
+		}
+	}
+
+	fallback := s.getFallbackPricing(model)
+	if fallback != nil {
+		if _, seen := s.fallbackWarnSeen.LoadOrStore(model, struct{}{}); !seen {
+			log.Printf("[Billing] Using fallback pricing for model: %s", model)
+		}
+		return &ModelPricingLookup{
+			Pricing: s.applyModelSpecificPricingPolicy(model, fallback),
+			Mode:    BillingModeToken,
+			Source: PricingSourceInfo{
+				Type:         PricingSourceCodeFallback,
+				Name:         "XCode built-in pricing",
+				MatchedModel: s.fallbackMatchedModel(model, fallback),
+			},
+		}, nil
+	}
+
+	return nil, fmt.Errorf("%w for model: %s", ErrModelPricingUnavailable, model)
+}
+
+func liteLLMToModelPricing(pricing *LiteLLMModelPricing) *ModelPricing {
+	if pricing == nil {
+		return nil
+	}
+	price5m := pricing.CacheCreationInputTokenCost
+	price1h := pricing.CacheCreationInputTokenCostAbove1hr
+	return &ModelPricing{
+		InputPricePerToken:                 pricing.InputCostPerToken,
+		InputPricePerTokenPriority:         pricing.InputCostPerTokenPriority,
+		OutputPricePerToken:                pricing.OutputCostPerToken,
+		OutputPricePerTokenPriority:        pricing.OutputCostPerTokenPriority,
+		CacheCreationPricePerToken:         pricing.CacheCreationInputTokenCost,
+		CacheCreationPricePerTokenPriority: pricing.CacheCreationInputTokenCostPriority,
+		CacheReadPricePerToken:             pricing.CacheReadInputTokenCost,
+		CacheReadPricePerTokenPriority:     pricing.CacheReadInputTokenCostPriority,
+		CacheCreation5mPrice:               price5m,
+		CacheCreation1hPrice:               price1h,
+		SupportsCacheBreakdown:             price1h > 0 && price1h > price5m,
+		LongContextInputThreshold:          pricing.LongContextInputTokenThreshold,
+		LongContextInputMultiplier:         pricing.LongContextInputCostMultiplier,
+		LongContextOutputMultiplier:        pricing.LongContextOutputCostMultiplier,
+		ImageInputPricePerToken:            pricing.InputCostPerImageToken,
+		ImageOutputPricePerToken:           pricing.OutputCostPerImageToken,
+	}
+}
+
+func (s *BillingService) fallbackMatchedModel(model string, pricing *ModelPricing) string {
+	candidates := []string{model, normalizeKnownOpenAICodexModel(model)}
+	for _, candidate := range candidates {
+		if candidate != "" && s.fallbackPrices[candidate] == pricing {
+			return candidate
+		}
+	}
+	matched := ""
+	for candidate, candidatePricing := range s.fallbackPrices {
+		if candidatePricing == pricing && strings.Contains(model, candidate) && len(candidate) > len(matched) {
+			matched = candidate
+		}
+	}
+	if matched != "" {
+		return matched
+	}
+	for candidate, candidatePricing := range s.fallbackPrices {
+		if candidatePricing == pricing && (matched == "" || candidate < matched) {
+			matched = candidate
+		}
+	}
+	return matched
 }
 
 // GetModelPricing 获取模型价格配置

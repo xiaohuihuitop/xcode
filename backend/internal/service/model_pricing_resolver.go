@@ -18,7 +18,10 @@ type ResolvedPricing struct {
 	Mode BillingMode
 
 	// Token 模式：基础定价（来自 LiteLLM 或 fallback）
-	BasePricing *ModelPricing
+	BasePricing     *ModelPricing
+	OfficialPricing *ModelPricing
+	OfficialSource  PricingSourceInfo
+	MatchedOverride *ModelPricingOverride
 
 	// Token 模式：区间定价列表（如有，覆盖 BasePricing 中的对应字段）
 	Intervals []PricingInterval
@@ -69,24 +72,33 @@ type PricingInput struct {
 // 1. 获取基础定价（LiteLLM → Fallback）
 // 2. 未命中覆盖时使用 LiteLLM 或静态 fallback
 func (r *ModelPricingResolver) Resolve(ctx context.Context, input PricingInput) *ResolvedPricing {
+	lookup, source := r.resolveBasePricing(pricingModelForInput(input))
+	var basePricing *ModelPricing
+	var officialSource PricingSourceInfo
+	if lookup != nil {
+		basePricing = lookup.Pricing
+		officialSource = lookup.Source
+	}
 	if r.pricingCatalog != nil {
 		override, err := r.pricingCatalog.ResolveForPricingInput(ctx, input)
 		if err == nil && override != nil {
-			basePricing, _ := r.resolveBasePricing(pricingModelForInput(input))
-			return pricingOverrideToResolved(override, basePricing)
+			return pricingOverrideToResolved(override, basePricing, officialSource)
 		}
 		if err != nil {
 			slog.Debug("failed to resolve model pricing override", "adapter", input.Adapter, "platform_code", input.PlatformCode, "public_model", input.PublicModel, "model", input.Model, "error", err)
 		}
 	}
-	// 1. 获取基础定价
-	basePricing, source := r.resolveBasePricing(pricingModelForInput(input))
-
 	resolved := &ResolvedPricing{
 		Mode:                   BillingModeToken,
-		BasePricing:            basePricing,
+		BasePricing:            cloneModelPricing(basePricing),
+		OfficialPricing:        cloneModelPricing(basePricing),
+		OfficialSource:         officialSource,
 		Source:                 source,
 		SupportsCacheBreakdown: basePricing != nil && basePricing.SupportsCacheBreakdown,
+	}
+	if lookup != nil {
+		resolved.Mode = lookup.Mode
+		resolved.DefaultPerRequestPrice = lookup.DefaultPerRequestPrice
 	}
 
 	return resolved
@@ -100,12 +112,15 @@ func pricingModelForInput(input PricingInput) string {
 }
 
 // resolveBasePricing 从 LiteLLM 或 Fallback 获取基础定价
-func (r *ModelPricingResolver) resolveBasePricing(model string) (*ModelPricing, string) {
-	pricing, err := r.billingService.GetModelPricing(model)
+func (r *ModelPricingResolver) resolveBasePricing(model string) (*ModelPricingLookup, string) {
+	pricing, err := r.billingService.LookupModelPricing(model)
 	if err != nil {
 		slog.Debug("failed to get model pricing from LiteLLM, using fallback",
 			"model", model, "error", err)
 		return nil, PricingSourceFallback
+	}
+	if pricing.Source.Type == PricingSourceCodeFallback {
+		return pricing, PricingSourceFallback
 	}
 	return pricing, PricingSourceLiteLLM
 }

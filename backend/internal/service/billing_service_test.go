@@ -34,6 +34,36 @@ func newTestBillingService() *BillingService {
 	return NewBillingService(&config.Config{}, nil)
 }
 
+func TestBillingLookupMarksProgramFallback(t *testing.T) {
+	lookup, err := newTestBillingService().LookupModelPricing("glm-5.2")
+
+	require.NoError(t, err)
+	require.Equal(t, BillingModeToken, lookup.Mode)
+	require.Equal(t, PricingSourceCodeFallback, lookup.Source.Type)
+	require.Equal(t, "glm-5.2", lookup.Source.MatchedModel)
+}
+
+func TestBillingLookupPreservesImageOnlyCatalogMode(t *testing.T) {
+	pricingService := &PricingService{
+		pricingData: map[string]*LiteLLMModelPricing{
+			"image-model": {
+				OutputCostPerImage: 0.04,
+				TokenPricingAbsent: true,
+			},
+		},
+		pricingSources: map[string]PricingSourceInfo{
+			"image-model": {Type: PricingSourceBundledCatalog, Name: "Bundled pricing catalog"},
+		},
+	}
+
+	lookup, err := NewBillingService(&config.Config{}, pricingService).LookupModelPricing("image-model")
+
+	require.NoError(t, err)
+	require.Equal(t, BillingModeImage, lookup.Mode)
+	require.InDelta(t, 0.04, lookup.DefaultPerRequestPrice, 1e-12)
+	require.Equal(t, PricingSourceBundledCatalog, lookup.Source.Type)
+}
+
 func TestCalculateCostUnifiedUsesPlatformPricingIdentity(t *testing.T) {
 	catalog := NewModelPricingCatalog(&modelPricingOverrideRepoStub{rules: []ModelPricingOverride{
 		{Adapter: "codex", ModelPattern: "gpt-5.6-sol", InputPrice: floatPtr(4e-6), OutputPrice: floatPtr(8e-6), Status: ModelPricingStatusActive},
