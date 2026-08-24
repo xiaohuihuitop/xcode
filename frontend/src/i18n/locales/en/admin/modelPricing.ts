@@ -69,6 +69,8 @@ export default {
     imageUnit: 'USD / image',
     intervals: 'Pricing intervals',
     interval: 'Interval',
+    rangeBounded: '{min}–{max} Tokens',
+    rangeUnbounded: '{min}+ Tokens',
     addInterval: 'Add interval',
     deleteInterval: 'Delete interval',
     sortIntervals: 'Sort intervals',

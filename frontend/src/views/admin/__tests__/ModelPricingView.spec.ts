@@ -42,6 +42,8 @@ vi.mock('vue-i18n', async () => {
     'admin.modelPricing.effectiveSalePrice': '实际售价',
     'admin.modelPricing.priceDifference': '价差比例',
     'admin.modelPricing.resolvedAfterSave': '保存后重新解析',
+    'admin.modelPricing.rangeBounded': '{min}–{max} Tokens',
+    'admin.modelPricing.rangeUnbounded': '{min}+ Tokens',
     'admin.modelPricing.notAvailable': '暂无',
     'common.save': '保存',
     'common.cancel': '取消',
@@ -49,7 +51,12 @@ vi.mock('vue-i18n', async () => {
   }
   return {
     ...actual,
-    useI18n: () => ({ t: (key: string) => messages[key] ?? key }),
+    useI18n: () => ({
+      t: (key: string, values?: Record<string, number>) => (messages[key] ?? key).replace(
+        /\{(\w+)\}/g,
+        (_, name: string) => String(values?.[name] ?? `{${name}}`),
+      ),
+    }),
   }
 })
 
@@ -733,6 +740,28 @@ describe('ModelPricingView', () => {
     expect(interval.get('[data-testid="interval-price-cache_write_price"]').text()).toContain('$0')
     expect(interval.get('[data-testid="interval-price-cache_read_price"]').text()).toContain('admin.modelPricing.noPrice')
     expect(interval.text()).toContain('USD / 1M Token')
+  })
+
+  it('renders interval ranges with the exclusive lower bound converted to matching tokens', async () => {
+    const intervals = [
+      { min_tokens: 0, max_tokens: 10, tier_label: 'Standard', input_price: 0.000001, sort_order: 0 },
+      { min_tokens: 11, max_tokens: null, input_price: 0.000008, sort_order: 1 },
+    ]
+    modelPricing.catalog.mockResolvedValue([{
+      ...customRow,
+      sale_pricing: { ...customRow.sale_pricing, intervals },
+      override: { ...customRow.override, intervals },
+      intervals,
+    }])
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="catalog-row"] button').trigger('click')
+
+    expect(wrapper.get('[data-testid="catalog-interval-0"]').text()).toContain('Standard: 1–10 Tokens')
+    expect(wrapper.get('[data-testid="catalog-interval-1"]').text()).toContain('12+ Tokens')
+    expect(wrapper.text()).not.toContain('0-10')
+    expect(wrapper.text()).not.toContain('11-∞')
   })
 
   it('keeps the advanced wildcard and adapter rule workflow available', async () => {

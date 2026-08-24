@@ -69,6 +69,8 @@ export default {
     imageUnit: 'USD / 图片',
     intervals: '价格区间',
     interval: '区间',
+    rangeBounded: '{min}–{max} Tokens',
+    rangeUnbounded: '{min}+ Tokens',
     addInterval: '添加区间',
     deleteInterval: '删除区间',
     sortIntervals: '排序区间',
