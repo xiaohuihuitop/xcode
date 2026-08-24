@@ -90,9 +90,8 @@
       </section>
     </div>
 
-    <div v-if="saleEditorOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3" role="dialog" aria-modal="true" :aria-label="t('admin.modelPricing.editSale')">
-      <div data-testid="sale-editor" class="max-h-[calc(100vh-1.5rem)] w-full max-w-4xl overflow-y-auto rounded-lg border border-gray-200 bg-white p-4 shadow-xl dark:border-dark-600 dark:bg-dark-800 sm:p-5">
-        <div class="flex items-center justify-between gap-3"><h2 class="text-lg font-semibold">{{ t('admin.modelPricing.editSale') }}</h2><button class="icon-button" type="button" :title="t('common.close')" :aria-label="t('common.close')" @click="saleEditorOpen = false"><Icon name="x" size="sm" /></button></div>
+    <BaseDialog :show="saleEditorOpen" :title="t('admin.modelPricing.editSale')" width="wide" :close-on-escape="!savingSale" :show-close-button="!savingSale" @close="closeSaleEditor">
+      <div data-testid="sale-editor" class="min-w-0">
         <dl class="mt-4 grid min-w-0 grid-cols-[minmax(0,7rem)_minmax(0,1fr)] gap-x-3 gap-y-2 border-y border-gray-200 py-3 text-sm dark:border-dark-700 sm:grid-cols-[7rem_minmax(0,1fr)_7rem_minmax(0,1fr)]"><dt class="text-gray-500">{{ t('admin.modelPricing.platform') }}</dt><dd class="min-w-0 break-words">{{ editingCatalogRow?.platform_name }}</dd><dt class="text-gray-500">{{ t('admin.modelPricing.modelPattern') }}</dt><dd class="min-w-0 break-words font-mono">{{ saleDraft.model_pattern }}</dd></dl>
         <div class="mt-4 min-w-0 space-y-4">
           <fieldset v-for="field in editablePriceFields(saleDraft.billing_mode)" :key="field.key" class="m-0 min-w-0 border-0 border-b border-gray-200 p-0 pb-4 text-sm last:border-b-0 last:pb-0 dark:border-dark-700" :data-price-field="field.key">
@@ -106,26 +105,29 @@
               <div class="min-w-0">
                 <div class="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('admin.modelPricing.salePrice') }}</div>
                 <PricingValueEditor :model-value="saleDraft[field.key]" :scale="field.scale" :unit-label="t(field.unitKey)" :labels="priceEditorLabels(field.labelKey)" @update:model-value="saleDraft[field.key] = $event" @validity-change="saleFieldValidity[field.key] = $event" />
+                <dl class="mt-2 grid min-w-0 grid-cols-2 gap-2 border-t border-gray-200 pt-2 text-xs dark:border-dark-700">
+                  <div class="min-w-0"><dt class="text-gray-500">{{ t('admin.modelPricing.effectiveSalePrice') }}</dt><dd :data-testid="`effective-price-${field.key}`" class="mt-0.5 break-words font-mono tabular-nums">{{ displayPrice(effectiveSalePrice(field.key), field.scale) }}</dd></div>
+                  <div class="min-w-0"><dt class="text-gray-500">{{ t('admin.modelPricing.priceDifference') }}</dt><dd :data-testid="`draft-difference-${field.key}`" class="mt-0.5 break-words font-mono tabular-nums">{{ displayDifferenceRatio(editingCatalogRow?.official_pricing?.[field.key], effectiveSalePrice(field.key)) }}</dd></div>
+                </dl>
               </div>
             </div>
           </fieldset>
         </div>
-        <div class="mt-5"><PricingIntervalsEditor v-model="saleDraft.intervals" v-model:valid="saleIntervalsValid" :billing-mode="saleDraft.billing_mode" :labels="intervalEditorLabels" /></div>
+        <div class="mt-5"><PricingIntervalsEditor v-model="saleDraft.intervals" v-model:valid="saleIntervalsValid" :billing-mode="saleDraft.billing_mode" :labels="intervalEditorLabels(saleDraft.billing_mode)" /></div>
         <p v-if="!saleCanSave" class="mt-3 text-sm text-red-600">{{ t('admin.modelPricing.invalidIntervals') }}</p>
-        <div class="mt-5 flex justify-end gap-2"><button class="btn btn-secondary" type="button" @click="saleEditorOpen = false">{{ t('common.cancel') }}</button><button class="btn btn-primary" data-testid="sale-save" type="button" :disabled="savingSale || !saleCanSave" @click="saveSale">{{ savingSale ? t('common.saving') : t('common.save') }}</button></div>
+        <div class="mt-5 flex justify-end gap-2"><button class="btn btn-secondary" type="button" :disabled="savingSale" @click="closeSaleEditor">{{ t('common.cancel') }}</button><button class="btn btn-primary" data-testid="sale-save" type="button" :disabled="savingSale || !saleCanSave" @click="saveSale">{{ savingSale ? t('common.saving') : t('common.save') }}</button></div>
       </div>
-    </div>
+    </BaseDialog>
 
-    <div v-if="advancedEditorOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3" role="dialog" aria-modal="true" :aria-label="editingRule ? t('admin.modelPricing.edit') : t('admin.modelPricing.createRule')">
-      <div data-testid="advanced-editor" class="max-h-[calc(100vh-1.5rem)] w-full max-w-4xl overflow-y-auto rounded-lg border border-gray-200 bg-white p-4 shadow-xl dark:border-dark-600 dark:bg-dark-800 sm:p-5">
-        <div class="flex items-center justify-between gap-3"><h2 class="text-lg font-semibold">{{ editingRule ? t('admin.modelPricing.edit') : t('admin.modelPricing.createRule') }}</h2><button class="icon-button" type="button" :title="t('common.close')" :aria-label="t('common.close')" @click="advancedEditorOpen = false"><Icon name="x" size="sm" /></button></div>
+    <BaseDialog :show="advancedEditorOpen" :title="editingRule ? t('admin.modelPricing.edit') : t('admin.modelPricing.createRule')" width="wide" :close-on-escape="!savingRule" :show-close-button="!savingRule" @close="closeAdvancedEditor">
+      <div data-testid="advanced-editor" class="min-w-0">
         <div class="mt-4 grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2"><label class="text-sm"><span class="input-label">{{ t('admin.modelPricing.adapter') }}</span><input v-model="advancedDraft.adapter" class="input min-w-0 font-mono" maxlength="50" /></label><label class="text-sm"><span class="input-label">{{ t('admin.modelPricing.modelPattern') }}</span><input v-model="advancedDraft.model_pattern" class="input min-w-0 font-mono" maxlength="100" /></label><label class="text-sm"><span class="input-label">{{ t('admin.modelPricing.billingMode') }}</span><select v-model="advancedDraft.billing_mode" class="input min-w-0"><option value="token">{{ t('admin.modelPricing.token') }}</option><option value="per_request">{{ t('admin.modelPricing.perRequest') }}</option><option value="image">{{ t('admin.modelPricing.image') }}</option></select></label><label class="text-sm"><span class="input-label">{{ t('admin.modelPricing.status') }}</span><select v-model="advancedDraft.status" class="input min-w-0"><option value="active">{{ t('admin.modelPricing.active') }}</option><option value="disabled">{{ t('admin.modelPricing.disabled') }}</option></select></label></div>
         <div class="mt-4 grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2"><fieldset v-for="field in editablePriceFields(advancedDraft.billing_mode)" :key="field.key" class="m-0 min-w-0 border-0 p-0 text-sm" :data-price-field="field.key"><legend class="input-label break-words">{{ t(field.labelKey) }}</legend><PricingValueEditor :model-value="advancedDraft[field.key] ?? null" :scale="field.scale" :unit-label="t(field.unitKey)" :labels="priceEditorLabels(field.labelKey)" @update:model-value="advancedDraft[field.key] = $event" @validity-change="advancedFieldValidity[field.key] = $event" /></fieldset></div>
-        <div class="mt-5"><PricingIntervalsEditor v-model="advancedDraft.intervals" v-model:valid="advancedIntervalsValid" :billing-mode="advancedDraft.billing_mode" :labels="intervalEditorLabels" /></div>
+        <div class="mt-5"><PricingIntervalsEditor v-model="advancedDraft.intervals" v-model:valid="advancedIntervalsValid" :billing-mode="advancedDraft.billing_mode" :labels="intervalEditorLabels(advancedDraft.billing_mode)" /></div>
         <p v-if="advancedFormError" class="mt-3 text-sm text-red-600">{{ advancedFormError }}</p>
-        <div class="mt-5 flex justify-end gap-2"><button class="btn btn-secondary" type="button" @click="advancedEditorOpen = false">{{ t('common.cancel') }}</button><button class="btn btn-primary" type="button" :disabled="savingRule || !advancedCanSave" @click="saveRule">{{ savingRule ? t('common.saving') : t('common.save') }}</button></div>
+        <div class="mt-5 flex justify-end gap-2"><button class="btn btn-secondary" type="button" :disabled="savingRule" @click="closeAdvancedEditor">{{ t('common.cancel') }}</button><button class="btn btn-primary" type="button" :disabled="savingRule || !advancedCanSave" @click="saveRule">{{ savingRule ? t('common.saving') : t('common.save') }}</button></div>
       </div>
-    </div>
+    </BaseDialog>
   </AppLayout>
 </template>
 
@@ -136,6 +138,7 @@ import { adminAPI } from '@/api/admin'
 import type { ModelPricingBillingMode, ModelPricingCatalogQuery, ModelPricingCatalogRow, ModelPricingInterval, ModelPricingOfficialSourceType, ModelPricingOverride, ModelPricingOverrideInput, ModelPricingSaleSource, ModelPricingValues, PlatformSalePricingInput } from '@/api/admin/modelPricing'
 import PricingIntervalsEditor from '@/components/admin/modelPricing/PricingIntervalsEditor.vue'
 import PricingValueEditor from '@/components/admin/modelPricing/PricingValueEditor.vue'
+import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { useAppStore } from '@/stores/app'
@@ -155,23 +158,34 @@ const tokenFields: PriceField[] = [
   { key: 'cache_read_price', labelKey: 'admin.modelPricing.cacheReadPrice', scale: TOKEN_PRICE_SCALE, unitKey: 'admin.modelPricing.tokenUnit' },
 ]
 const imageFields: PriceField[] = [
-  { key: 'image_input_price', labelKey: 'admin.modelPricing.imageInputPrice', scale: 1, unitKey: 'admin.modelPricing.imageUnit' },
-  { key: 'image_output_price', labelKey: 'admin.modelPricing.imageOutputPrice', scale: 1, unitKey: 'admin.modelPricing.imageUnit' },
-  { key: 'per_request_price', labelKey: 'admin.modelPricing.perRequestPrice', scale: 1, unitKey: 'admin.modelPricing.requestUnit' },
+  { key: 'image_input_price', labelKey: 'admin.modelPricing.imageInputPrice', scale: TOKEN_PRICE_SCALE, unitKey: 'admin.modelPricing.tokenUnit' },
+  { key: 'image_output_price', labelKey: 'admin.modelPricing.imageOutputPrice', scale: TOKEN_PRICE_SCALE, unitKey: 'admin.modelPricing.tokenUnit' },
+  { key: 'per_request_price', labelKey: 'admin.modelPricing.perImagePrice', scale: 1, unitKey: 'admin.modelPricing.imageUnit' },
 ]
 const requestFields: PriceField[] = [{ key: 'per_request_price', labelKey: 'admin.modelPricing.perRequestPrice', scale: 1, unitKey: 'admin.modelPricing.requestUnit' }]
 const allPriceKeys: PriceKey[] = ['input_price', 'output_price', 'cache_write_price', 'cache_read_price', 'image_input_price', 'image_output_price', 'per_request_price']
-function primaryPriceFields(mode: ModelPricingBillingMode) { return mode === 'token' ? tokenFields.slice(0, 2) : mode === 'image' ? imageFields.slice(0, 2) : requestFields }
+function primaryPriceFields(mode: ModelPricingBillingMode) { return mode === 'token' ? tokenFields.slice(0, 2) : mode === 'image' ? imageFields.slice(2) : requestFields }
 function editablePriceFields(mode: ModelPricingBillingMode) { return mode === 'token' ? tokenFields : mode === 'image' ? imageFields : requestFields }
 function displayPrice(value: number | null | undefined, scale: number) { return value == null ? t('admin.modelPricing.noPrice') : formatScaled(value, scale) }
-function displayDifference(official: number | null | undefined, sale: number | null | undefined, scale: number) { if (official == null || sale == null) return t('admin.modelPricing.notAvailable'); const value = sale - official; if (value === 0) return '$0'; return `${value > 0 ? '+' : '-'}${formatScaled(Math.abs(value), scale)}` }
+function priceDifferenceRatio(official: number | null | undefined, sale: number | null | undefined) {
+  if (official == null || sale == null) return null
+  if (official === 0) return sale === 0 ? 0 : null
+  return ((sale - official) / official) * 100
+}
+function displayDifferenceRatio(official: number | null | undefined, sale: number | null | undefined) {
+  const ratio = priceDifferenceRatio(official, sale)
+  if (ratio == null) return t('admin.modelPricing.notAvailable')
+  if (ratio === 0) return '0%'
+  const normalized = Number(ratio.toPrecision(10))
+  return `${normalized > 0 ? '+' : ''}${normalized}%`
+}
 
 const PriceLines = defineComponent({ props: { fields: { type: Array as PropType<PriceField[]>, required: true }, pricing: { type: Object as PropType<ModelPricingValues | null>, default: null } }, setup(props) { return () => h('div', { class: 'space-y-0.5 tabular-nums' }, props.fields.map(field => h('div', { class: 'flex min-w-0 justify-between gap-2 text-xs' }, [h('span', { class: 'truncate text-gray-500', title: t(field.labelKey) }, t(field.labelKey)), h('span', { class: 'shrink-0 font-mono' }, displayPrice(props.pricing?.[field.key], field.scale))]))) } })
-const DifferenceLines = defineComponent({ props: { fields: { type: Array as PropType<PriceField[]>, required: true }, official: { type: Object as PropType<ModelPricingValues | null>, default: null }, sale: { type: Object as PropType<ModelPricingValues | null>, default: null } }, setup(props) { return () => h('div', { class: 'space-y-0.5 tabular-nums' }, props.fields.map(field => { const official = props.official?.[field.key]; const sale = props.sale?.[field.key]; const delta = official != null && sale != null ? sale - official : null; return h('div', { class: 'flex min-w-0 justify-between gap-2 text-xs' }, [h('span', { class: 'truncate text-gray-500' }, t(field.labelKey)), h('span', { class: delta == null || delta === 0 ? 'shrink-0 font-mono text-gray-500' : delta > 0 ? 'shrink-0 font-mono text-amber-600' : 'shrink-0 font-mono text-emerald-600' }, displayDifference(official, sale, field.scale))]) })) } })
+const DifferenceLines = defineComponent({ props: { fields: { type: Array as PropType<PriceField[]>, required: true }, official: { type: Object as PropType<ModelPricingValues | null>, default: null }, sale: { type: Object as PropType<ModelPricingValues | null>, default: null } }, setup(props) { return () => h('div', { class: 'space-y-0.5 tabular-nums' }, props.fields.map(field => { const official = props.official?.[field.key]; const sale = props.sale?.[field.key]; const ratio = priceDifferenceRatio(official, sale); return h('div', { class: 'flex min-w-0 justify-between gap-2 text-xs' }, [h('span', { class: 'truncate text-gray-500' }, t(field.labelKey)), h('span', { class: ratio == null || ratio === 0 ? 'shrink-0 font-mono text-gray-500' : ratio > 0 ? 'shrink-0 font-mono text-amber-600' : 'shrink-0 font-mono text-emerald-600' }, displayDifferenceRatio(official, sale))]) })) } })
 
 function sourceTypeLabel(type: ModelPricingOfficialSourceType) { if (!type) return t('admin.modelPricing.sourceTypeUnavailable'); const suffix = type.split('_').map(part => part[0].toUpperCase() + part.slice(1)).join(''); return t(`admin.modelPricing.sourceType${suffix}`) }
 function formatDate(value?: string | null) { if (!value) return t('admin.modelPricing.notAvailable'); const date = new Date(value); return Number.isNaN(date.getTime()) ? t('admin.modelPricing.notAvailable') : date.toLocaleString() }
-function intervalPriceFields(mode: ModelPricingBillingMode) { return mode === 'token' ? tokenFields : requestFields }
+function intervalPriceFields(mode: ModelPricingBillingMode) { return mode === 'token' ? tokenFields : mode === 'image' ? imageFields.slice(2) : requestFields }
 function intervalFieldValue(interval: ModelPricingInterval, key: PriceKey) {
   if (key === 'input_price') return interval.input_price
   if (key === 'output_price') return interval.output_price
@@ -189,7 +203,32 @@ const CatalogDetails = defineComponent({ props: { row: { type: Object as PropTyp
 const catalogRows = ref<ModelPricingCatalogRow[]>([]); const catalogLoading = ref(false); const catalogError = ref(false)
 const rules = ref<ModelPricingOverride[]>([]); const rulesLoading = ref(false); const rulesError = ref(false); const advancedOpen = ref(false)
 const filters = reactive({ platform_id: '', query: '' }); const knownPlatforms = ref<Array<{ id: number; name: string }>>([]); const platformOptions = computed(() => knownPlatforms.value); const expandedRows = reactive(new Set<string>())
-async function loadCatalog() { catalogLoading.value = true; catalogError.value = false; const query: ModelPricingCatalogQuery = {}; if (filters.platform_id) query.platform_id = Number(filters.platform_id); if (filters.query.trim()) query.query = filters.query.trim(); try { const rows = await adminAPI.modelPricing.catalog(query); catalogRows.value = rows; if (!query.platform_id && !query.query) { const platforms = new Map<number, string>(); rows.forEach(row => platforms.set(row.platform_id, row.platform_name)); knownPlatforms.value = [...platforms].map(([id, name]) => ({ id, name })) } } catch (error) { catalogRows.value = []; catalogError.value = true; appStore.showError(extractApiErrorMessage(error, t('admin.modelPricing.loadFailed'))) } finally { catalogLoading.value = false } }
+let catalogRequestEpoch = 0
+async function loadCatalog() {
+  const requestEpoch = ++catalogRequestEpoch
+  const query: ModelPricingCatalogQuery = {}
+  if (filters.platform_id) query.platform_id = Number(filters.platform_id)
+  if (filters.query.trim()) query.query = filters.query.trim()
+  catalogLoading.value = true
+  catalogError.value = false
+  try {
+    const rows = await adminAPI.modelPricing.catalog(query)
+    if (requestEpoch !== catalogRequestEpoch) return
+    catalogRows.value = rows
+    if (!query.platform_id && !query.query) {
+      const platforms = new Map<number, string>()
+      rows.forEach(row => platforms.set(row.platform_id, row.platform_name))
+      knownPlatforms.value = [...platforms].map(([id, name]) => ({ id, name }))
+    }
+  } catch (error) {
+    if (requestEpoch !== catalogRequestEpoch) return
+    catalogRows.value = []
+    catalogError.value = true
+    appStore.showError(extractApiErrorMessage(error, t('admin.modelPricing.loadFailed')))
+  } finally {
+    if (requestEpoch === catalogRequestEpoch) catalogLoading.value = false
+  }
+}
 async function loadRules() { rulesLoading.value = true; rulesError.value = false; try { rules.value = await adminAPI.modelPricing.list() } catch (error) { rules.value = []; rulesError.value = true; appStore.showError(extractApiErrorMessage(error, t('admin.modelPricing.rulesLoadFailed'))) } finally { rulesLoading.value = false } }
 async function loadAll() { await Promise.all([loadCatalog(), loadRules()]) }
 function clearFilters() { filters.platform_id = ''; filters.query = ''; void loadCatalog() }
@@ -204,20 +243,54 @@ function saleSourceClass(source: ModelPricingSaleSource) { return source === 'cu
 function emptyPricing(mode: ModelPricingBillingMode = 'token'): PricingDraft { return { billing_mode: mode, status: 'active', intervals: [], input_price: null, output_price: null, cache_write_price: null, cache_read_price: null, image_input_price: null, image_output_price: null, per_request_price: null } }
 function pricingFromOverride(item: ModelPricingOverride | null, mode: ModelPricingBillingMode) { const draft = emptyPricing(mode); if (!item) return draft; draft.status = item.status; draft.intervals = item.intervals.map(interval => ({ ...interval })); allPriceKeys.forEach(key => { draft[key] = item[key] ?? null }); return draft }
 function resetValidity(target: Record<PriceKey, boolean>) { allPriceKeys.forEach(key => { target[key] = true }) }
+function normalizedIdentity(value: string) { return value.trim().toLowerCase() }
+function isEmptySaleDraft() { return saleDraft.intervals.length === 0 && allPriceKeys.every(key => saleDraft[key] === null) }
+function exactEditingOverride() {
+  const row = editingCatalogRow.value
+  const override = row?.override
+  if (!row || !override) return null
+  if (override.model_pattern.includes('*') || override.model_pattern.includes('?') || override.model_pattern.includes('[')) return null
+  const sameAdapter = normalizedIdentity(override.adapter) === normalizedIdentity(row.platform_code)
+  const sameModel = normalizedIdentity(override.model_pattern) === normalizedIdentity(row.model_pattern)
+  return sameAdapter && sameModel ? override : null
+}
+function effectiveSalePrice(key: PriceKey) { return saleDraft[key] ?? editingCatalogRow.value?.official_pricing?.[key] ?? null }
 function priceEditorLabels(labelKey: string) { return { modeGroup: t('admin.modelPricing.priceBehavior'), inherit: t('admin.modelPricing.inherit'), custom: t('admin.modelPricing.custom'), zero: t('admin.modelPricing.zero'), inputLabel: t(labelKey), required: t('admin.modelPricing.customPriceRequired'), invalid: t('admin.modelPricing.invalidPrice') } }
-const intervalEditorLabels = computed(() => ({ title: t('admin.modelPricing.intervals'), interval: t('admin.modelPricing.interval'), add: t('admin.modelPricing.addInterval'), delete: t('admin.modelPricing.deleteInterval'), sort: t('admin.modelPricing.sortIntervals'), empty: t('admin.modelPricing.noIntervals'), minTokens: t('admin.modelPricing.minTokens'), maxTokens: t('admin.modelPricing.maxTokens'), tierLabel: t('admin.modelPricing.tierLabel'), unbounded: t('admin.modelPricing.unbounded'), inputPrice: t('admin.modelPricing.inputPrice'), outputPrice: t('admin.modelPricing.outputPrice'), cacheWritePrice: t('admin.modelPricing.cacheWritePrice'), cacheReadPrice: t('admin.modelPricing.cacheReadPrice'), perRequestPrice: t('admin.modelPricing.perRequestPrice'), invalidPrice: t('admin.modelPricing.invalidPrice') }))
+function intervalEditorLabels(mode: ModelPricingBillingMode) { return { title: t('admin.modelPricing.intervals'), interval: t('admin.modelPricing.interval'), add: t('admin.modelPricing.addInterval'), delete: t('admin.modelPricing.deleteInterval'), sort: t('admin.modelPricing.sortIntervals'), empty: t('admin.modelPricing.noIntervals'), minTokens: t('admin.modelPricing.minTokens'), maxTokens: t('admin.modelPricing.maxTokens'), tierLabel: t('admin.modelPricing.tierLabel'), unbounded: t('admin.modelPricing.unbounded'), inputPrice: t('admin.modelPricing.inputPrice'), outputPrice: t('admin.modelPricing.outputPrice'), cacheWritePrice: t('admin.modelPricing.cacheWritePrice'), cacheReadPrice: t('admin.modelPricing.cacheReadPrice'), perRequestPrice: mode === 'image' ? `${t('admin.modelPricing.perImagePrice')} (${t('admin.modelPricing.imageUnit')})` : t('admin.modelPricing.perRequestPrice'), invalidPrice: t('admin.modelPricing.invalidPrice') } }
 const blankValidity = (): Record<PriceKey, boolean> => ({ input_price: true, output_price: true, cache_write_price: true, cache_read_price: true, image_input_price: true, image_output_price: true, per_request_price: true })
 
 const saleEditorOpen = ref(false); const savingSale = ref(false); const editingCatalogRow = ref<ModelPricingCatalogRow | null>(null)
 const saleDraft = reactive<PricingDraft & { platform_id: number; model_pattern: string }>({ ...emptyPricing(), platform_id: 0, model_pattern: '' }); const saleIntervalsValid = ref(true); const saleFieldValidity = reactive(blankValidity()); const saleCanSave = computed(() => saleIntervalsValid.value && editablePriceFields(saleDraft.billing_mode).every(field => saleFieldValidity[field.key]))
-function openSaleEditor(row: ModelPricingCatalogRow) { editingCatalogRow.value = row; Object.assign(saleDraft, pricingFromOverride(row.override, row.billing_mode), { platform_id: row.platform_id, model_pattern: row.model_pattern }); resetValidity(saleFieldValidity); saleIntervalsValid.value = true; saleEditorOpen.value = true }
-async function saveSale() { if (!saleCanSave.value) return; const payload: PlatformSalePricingInput = { platform_id: saleDraft.platform_id, model_pattern: saleDraft.model_pattern, billing_mode: saleDraft.billing_mode, status: saleDraft.status, intervals: saleDraft.intervals.map(interval => ({ ...interval })) }; allPriceKeys.forEach(key => { payload[key] = saleDraft[key] }); savingSale.value = true; try { await adminAPI.modelPricing.upsertPlatformSale(payload); appStore.showSuccess(t('admin.modelPricing.saved')); saleEditorOpen.value = false; await loadCatalog() } catch (error) { appStore.showError(extractApiErrorMessage(error, t('admin.modelPricing.saveFailed'))) } finally { savingSale.value = false } }
+function closeSaleEditor() { if (!savingSale.value) saleEditorOpen.value = false }
+function openSaleEditor(row: ModelPricingCatalogRow) { if (savingSale.value) return; editingCatalogRow.value = row; Object.assign(saleDraft, pricingFromOverride(row.override, row.billing_mode), { platform_id: row.platform_id, model_pattern: row.model_pattern }); resetValidity(saleFieldValidity); saleIntervalsValid.value = true; saleEditorOpen.value = true }
+async function saveSale() {
+  if (savingSale.value || !saleCanSave.value) return
+  const payload: PlatformSalePricingInput = { platform_id: saleDraft.platform_id, model_pattern: saleDraft.model_pattern, billing_mode: saleDraft.billing_mode, status: saleDraft.status, intervals: saleDraft.intervals.map(interval => ({ ...interval })) }
+  allPriceKeys.forEach(key => { payload[key] = saleDraft[key] })
+  const exactOverride = isEmptySaleDraft() ? exactEditingOverride() : null
+  savingSale.value = true
+  try {
+    if (exactOverride) {
+      await adminAPI.modelPricing.remove(exactOverride.id)
+    } else {
+      await adminAPI.modelPricing.upsertPlatformSale(payload)
+    }
+    appStore.showSuccess(t('admin.modelPricing.saved'))
+    saleEditorOpen.value = false
+    await Promise.all([loadCatalog(), loadRules()])
+  } catch (error) {
+    appStore.showError(extractApiErrorMessage(error, t('admin.modelPricing.saveFailed')))
+  } finally {
+    savingSale.value = false
+  }
+}
 
 const advancedEditorOpen = ref(false); const savingRule = ref(false); const editingRule = ref<ModelPricingOverride | null>(null); const advancedDraft = reactive<ModelPricingOverrideInput>({ adapter: '', model_pattern: '', ...emptyPricing() }); const advancedIntervalsValid = ref(true); const advancedFormError = ref(''); const advancedFieldValidity = reactive(blankValidity()); const advancedCanSave = computed(() => advancedIntervalsValid.value && editablePriceFields(advancedDraft.billing_mode).every(field => advancedFieldValidity[field.key]))
 function resetAdvancedDraft(item?: ModelPricingOverride) { Object.assign(advancedDraft, pricingFromOverride(item ?? null, item?.billing_mode ?? 'token'), { adapter: item?.adapter ?? '', model_pattern: item?.model_pattern ?? '' }); resetValidity(advancedFieldValidity); advancedIntervalsValid.value = true; advancedFormError.value = '' }
-function openAdvancedCreate() { editingRule.value = null; resetAdvancedDraft(); advancedEditorOpen.value = true }
-function openAdvancedEdit(item: ModelPricingOverride) { editingRule.value = item; resetAdvancedDraft(item); advancedEditorOpen.value = true }
-async function saveRule() { if (!advancedCanSave.value) { advancedFormError.value = t('admin.modelPricing.invalidIntervals'); return } if (!advancedDraft.adapter.trim() || !advancedDraft.model_pattern.trim()) { advancedFormError.value = t('admin.modelPricing.required'); return } const payload: ModelPricingOverrideInput = { ...advancedDraft, adapter: advancedDraft.adapter.trim(), model_pattern: advancedDraft.model_pattern.trim(), intervals: advancedDraft.intervals.map(interval => ({ ...interval })) }; savingRule.value = true; try { if (editingRule.value) await adminAPI.modelPricing.update(editingRule.value.id, payload); else await adminAPI.modelPricing.create(payload); appStore.showSuccess(t('admin.modelPricing.saved')); advancedEditorOpen.value = false; await Promise.all([loadRules(), loadCatalog()]) } catch (error) { appStore.showError(extractApiErrorMessage(error, t('admin.modelPricing.saveFailed'))) } finally { savingRule.value = false } }
+function closeAdvancedEditor() { if (!savingRule.value) advancedEditorOpen.value = false }
+function openAdvancedCreate() { if (savingRule.value) return; editingRule.value = null; resetAdvancedDraft(); advancedEditorOpen.value = true }
+function openAdvancedEdit(item: ModelPricingOverride) { if (savingRule.value) return; editingRule.value = item; resetAdvancedDraft(item); advancedEditorOpen.value = true }
+async function saveRule() { if (savingRule.value) return; if (!advancedCanSave.value) { advancedFormError.value = t('admin.modelPricing.invalidIntervals'); return } if (!advancedDraft.adapter.trim() || !advancedDraft.model_pattern.trim()) { advancedFormError.value = t('admin.modelPricing.required'); return } const payload: ModelPricingOverrideInput = { ...advancedDraft, adapter: advancedDraft.adapter.trim(), model_pattern: advancedDraft.model_pattern.trim(), intervals: advancedDraft.intervals.map(interval => ({ ...interval })) }; savingRule.value = true; try { if (editingRule.value) await adminAPI.modelPricing.update(editingRule.value.id, payload); else await adminAPI.modelPricing.create(payload); appStore.showSuccess(t('admin.modelPricing.saved')); advancedEditorOpen.value = false; await Promise.all([loadRules(), loadCatalog()]) } catch (error) { appStore.showError(extractApiErrorMessage(error, t('admin.modelPricing.saveFailed'))) } finally { savingRule.value = false } }
 async function removeRule(item: ModelPricingOverride) { if (!window.confirm(t('admin.modelPricing.confirmDelete'))) return; try { await adminAPI.modelPricing.remove(item.id); appStore.showSuccess(t('admin.modelPricing.deleted')); await Promise.all([loadRules(), loadCatalog()]) } catch (error) { appStore.showError(extractApiErrorMessage(error, t('admin.modelPricing.deleteFailed'))) } }
 onMounted(loadAll)
 </script>
