@@ -546,7 +546,8 @@ export default {
       perImage: '按图片',
       tiers: '阶梯',
       range: '范围',
-      unbounded: '不限'
+      rangeBounded: '{min}–{max} Tokens',
+      rangeUnbounded: '{min}+ Tokens'
     },
     nav: {
       login: '登录',

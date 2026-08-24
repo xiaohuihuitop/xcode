@@ -541,7 +541,8 @@ export default {
       perImage: 'Per image',
       tiers: 'Tiers',
       range: 'Range',
-      unbounded: 'No limit'
+      rangeBounded: '{min}–{max} Tokens',
+      rangeUnbounded: '{min}+ Tokens'
     },
     nav: {
       login: 'Sign In',

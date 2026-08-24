@@ -172,12 +172,22 @@ function pricingDisplay(pricing: PlatformPlazaPricing | null | undefined): Prici
   const mode = pricing.billing_mode || 'token'
   return {
     fields: displayFields(pricing, mode),
-    tiers: (pricing.intervals ?? []).map((interval) => ({
-      label: interval.tier_label || `${interval.min_tokens}+`,
-      range: `${interval.min_tokens}–${interval.max_tokens ?? t('modelPlaza.table.unbounded')}`,
-      fields: displayFields(interval, mode, true),
-    })),
+    tiers: (pricing.intervals ?? []).map((interval) => {
+      const range = formatIntervalRange(interval.min_tokens, interval.max_tokens)
+      return {
+        label: interval.tier_label || range,
+        range,
+        fields: displayFields(interval, mode, true),
+      }
+    }),
   }
+}
+
+function formatIntervalRange(minTokens: number, maxTokens: number | null): string {
+  const firstMatchingToken = minTokens + 1
+  return maxTokens == null
+    ? t('modelPlaza.table.rangeUnbounded', { min: firstMatchingToken })
+    : t('modelPlaza.table.rangeBounded', { min: firstMatchingToken, max: maxTokens })
 }
 
 function priceFieldNode(field: DisplayField): VNode {

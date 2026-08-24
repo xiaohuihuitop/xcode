@@ -23,11 +23,17 @@ const translations: Record<string, string> = {
   'modelPlaza.table.unitPerImage': 'USD/图片',
   'modelPlaza.table.tiers': '阶梯',
   'modelPlaza.table.range': '范围',
-  'modelPlaza.table.unbounded': '不限',
+  'modelPlaza.table.rangeBounded': '{min}–{max} Tokens',
+  'modelPlaza.table.rangeUnbounded': '{min}+ Tokens',
 }
 
 vi.mock('vue-i18n', () => ({
-  useI18n: () => ({ t: (key: string) => translations[key] ?? key }),
+  useI18n: () => ({
+    t: (key: string, values?: Record<string, number>) => (translations[key] ?? key).replace(
+      /\{(\w+)\}/g,
+      (_, name: string) => String(values?.[name] ?? `{${name}}`),
+    ),
+  }),
 }))
 
 import PlatformModelPricingTable from '../PlatformModelPricingTable.vue'
@@ -222,25 +228,48 @@ describe('PlatformModelPricingTable', () => {
   it('renders tier labels, ranges, and mode-correct interval prices for multiple tiers', () => {
     const wrapper = mountTable([fixtures[4], fixtures[5], fixtures[6]])
     const requestSale = wrapper.get('[data-testid="desktop-sale-request-model"]').text()
+    const requestMobile = wrapper.get('[data-testid="mobile-model-request-model"]').text()
     const imageSale = wrapper.get('[data-testid="desktop-sale-image-model"]').text()
     const tokenSale = wrapper.get('[data-testid="desktop-sale-token-tier-model"]').text()
 
     expect(requestSale).toContain('Regular calls')
-    expect(requestSale).toContain('范围 0–10')
+    expect(requestSale).toContain('范围 1–10 Tokens')
     expect(requestSale).toContain('按次$0.018 USD/次')
     expect(requestSale).toContain('Volume calls')
-    expect(requestSale).toContain('范围 11–不限')
+    expect(requestSale).toContain('范围 12+ Tokens')
+    expect(requestSale).not.toContain('范围 0–10')
+    expect(requestSale).not.toContain('范围 11–不限')
     expect(requestSale).not.toContain('USD/图片')
+    expect(requestMobile).toContain('范围 1–10 Tokens')
+    expect(requestMobile).toContain('范围 12+ Tokens')
     expect(imageSale).toContain('阶梯')
     expect(imageSale).toContain('Small batch')
-    expect(imageSale).toContain('范围 0–2')
+    expect(imageSale).toContain('范围 1–2 Tokens')
     expect(imageSale).toContain('按图片$0.07 USD/图片')
     expect(imageSale).toContain('Large batch')
-    expect(imageSale).toContain('范围 3–不限')
+    expect(imageSale).toContain('范围 4+ Tokens')
     expect(tokenSale).toContain('Standard context')
+    expect(tokenSale).toContain('范围 1–1000 Tokens')
     expect(tokenSale).toContain('输入$1.00 USD/1M Token')
     expect(tokenSale).toContain('Long context')
+    expect(tokenSale).toContain('范围 1002+ Tokens')
     expect(tokenSale).toContain('输出$4.00 USD/1M Token')
+  })
+
+  it('does not imply that an exclusive minimum is included when a tier has no label', () => {
+    const unlabeledModel: ModelFixture = {
+      pattern: 'unlabeled-tier-model',
+      endpoint_capabilities: [],
+      pricing: pricing('per_request', {
+        intervals: [
+          { min_tokens: 0, max_tokens: 10, input_price: null, output_price: null, cache_write_price: null, cache_read_price: null, per_request_price: 0.01 },
+        ],
+      }),
+    }
+    const sale = mountTable([unlabeledModel]).get('[data-testid="desktop-sale-unlabeled-tier-model"]').text()
+
+    expect(sale).toContain('范围 1–10 Tokens')
+    expect(sale).not.toContain('0+')
   })
 
   it('falls back to legacy pricing as the platform sale price', () => {
