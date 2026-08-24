@@ -50,7 +50,7 @@ func (s *OpenAIGatewayService) ForwardResponsesExchange(
 	customTools := apicompat.CustomToolNames(effectiveTools)
 	toolSearch := apicompat.HasToolSearchTool(effectiveTools)
 	namespaceTools := apicompat.NamespaceToolNames(effectiveTools)
-	chatReq, err := apicompat.ResponsesToChatCompletionsRequest(&responsesReq)
+	chatReq, err := s.responsesToChatCompletionsRequestWithReasoningCache(&responsesReq, account, reasoningCacheAPIKeyID(exchange))
 	if err != nil {
 		writeRuntimeOpenAIResponsesError(exchange, http.StatusBadRequest, "invalid_request_error", err.Error())
 		return nil, fmt.Errorf("convert responses to chat completions: %w", err)
@@ -104,14 +104,16 @@ func (s *OpenAIGatewayService) ForwardResponsesExchange(
 		return s.handleResponsesErrorResponseExchange(ctx, exchange, account, resp, respBody, originalModel)
 	}
 	if clientStream {
-		return s.streamChatCompletionsAsResponsesExchange(exchange, resp, originalModel, customTools, toolSearch, namespaceTools, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime)
+		return s.streamChatCompletionsAsResponsesExchange(exchange, resp, account, reasoningCacheAPIKeyID(exchange), originalModel, customTools, toolSearch, namespaceTools, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime)
 	}
-	return s.bufferChatCompletionsAsResponsesExchange(exchange, resp, originalModel, customTools, toolSearch, namespaceTools, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime)
+	return s.bufferChatCompletionsAsResponsesExchange(exchange, resp, account, reasoningCacheAPIKeyID(exchange), originalModel, customTools, toolSearch, namespaceTools, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime)
 }
 
 func (s *OpenAIGatewayService) bufferChatCompletionsAsResponsesExchange(
 	exchange gatewayruntime.HTTPExchange,
 	resp *http.Response,
+	account *Account,
+	apiKeyID int64,
 	originalModel string,
 	customTools map[string]bool,
 	toolSearch bool,
@@ -122,8 +124,7 @@ func (s *OpenAIGatewayService) bufferChatCompletionsAsResponsesExchange(
 ) (*OpenAIForwardResult, error) {
 	body, err := readUpstreamResponseBodyLimited(resp.Body, resolveUpstreamResponseReadLimit(s.cfg))
 	if err != nil {
-		writeRuntimeOpenAIResponsesError(exchange, http.StatusBadGateway, "api_error", "Failed to read upstream response")
-		return nil, fmt.Errorf("read chat response: %w", err)
+		return nil, newOpenAICompatBufferedReadFailoverError(err)
 	}
 	var ccResp apicompat.ChatCompletionsResponse
 	if err := json.Unmarshal(body, &ccResp); err != nil {
@@ -131,6 +132,7 @@ func (s *OpenAIGatewayService) bufferChatCompletionsAsResponsesExchange(
 		return nil, fmt.Errorf("parse chat response: %w", err)
 	}
 	responsesResp := apicompat.ChatCompletionsResponseToResponses(&ccResp, originalModel, customTools, toolSearch, namespaceTools)
+	s.cacheResponsesOutputReasoning(responsesResp, account, apiKeyID)
 	encoded, err := json.Marshal(responsesResp)
 	if err != nil {
 		return nil, fmt.Errorf("marshal responses response: %w", err)
@@ -151,6 +153,8 @@ func (s *OpenAIGatewayService) bufferChatCompletionsAsResponsesExchange(
 func (s *OpenAIGatewayService) streamChatCompletionsAsResponsesExchange(
 	exchange gatewayruntime.HTTPExchange,
 	resp *http.Response,
+	account *Account,
+	apiKeyID int64,
 	originalModel string,
 	customTools map[string]bool,
 	toolSearch bool,
@@ -196,6 +200,9 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsResponsesExchange(
 			Stream: true, Duration: time.Since(startTime), FirstTokenMs: scan.FirstTokenMs,
 			ClientDisconnect: clientDisconnected, UpstreamEndpoint: grokChatRawEndpoint,
 		}, fmt.Errorf("stream usage incomplete: %w", scan.Err)
+	}
+	if state.ReasoningItemID != "" {
+		s.cacheReasoningContent(account, apiKeyID, state.ReasoningItemID, state.Reasoning.String())
 	}
 	writeEvents(apicompat.FinalizeChatCompletionsResponsesStream(state))
 	if !clientDisconnected && exchange != nil && !headersWritten {
@@ -308,8 +315,7 @@ func (s *OpenAIGatewayService) bufferChatCompletionsAsAnthropicExchange(
 ) (*OpenAIForwardResult, error) {
 	body, err := readUpstreamResponseBodyLimited(resp.Body, resolveUpstreamResponseReadLimit(s.cfg))
 	if err != nil {
-		writeRuntimeAnthropicError(exchange, http.StatusBadGateway, "api_error", "Failed to read upstream response")
-		return nil, fmt.Errorf("read chat response: %w", err)
+		return nil, newOpenAICompatBufferedReadFailoverError(err)
 	}
 	var ccResp apicompat.ChatCompletionsResponse
 	if err := json.Unmarshal(body, &ccResp); err != nil {

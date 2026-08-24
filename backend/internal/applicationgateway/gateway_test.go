@@ -141,6 +141,7 @@ func TestGatewayDispatchRejectsMissingTerminalUsage(t *testing.T) {
 
 func TestGatewayUsesNonBillingSinkForCapabilityEndpoints(t *testing.T) {
 	require.True(t, isNonBillingEndpoint(gatewayruntime.EndpointCountTokens))
+	require.True(t, isNonBillingEndpoint(gatewayruntime.EndpointResponsesInputTokens))
 	require.True(t, isNonBillingEndpoint(gatewayruntime.EndpointLive))
 	require.True(t, isNonBillingEndpoint(gatewayruntime.EndpointWebSocket))
 	require.False(t, isNonBillingEndpoint(gatewayruntime.EndpointResponses))

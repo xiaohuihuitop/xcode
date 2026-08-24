@@ -73,3 +73,22 @@ func TestBuildOpenAIUpstreamRequestFromRuntimeRequest_MatchesLegacyAPIKeyBuilder
 		require.Equal(t, legacy.Header.Get(key), runtimeReq.Header.Get(key), key)
 	}
 }
+
+func TestBuildOpenAIUpstreamRequestFromRuntimeStateAppliesCodexFingerprint(t *testing.T) {
+	body := []byte(`{"model":"gpt-5.6-sol","input":[]}`)
+	inbound := httptest.NewRequest(http.MethodPost, "http://gateway.local/v1/responses", bytes.NewReader(body))
+	inbound.Header.Set("Content-Type", "application/json")
+	account := newTestOAuthAccount(77, map[string]any{codexFingerprintModeExtraKey: "session"})
+	ids := resolveCodexFingerprintIDs(account, "client-session", codexFingerprintSession)
+	require.NotNil(t, ids)
+
+	req, err := (&OpenAIGatewayService{}).buildOpenAIUpstreamRequestFromRuntimeRequestWithState(
+		context.Background(), inbound, account, body, "token", false, "", true,
+		openAIRequestBuildRuntimeState{CodexFingerprintIDs: ids},
+	)
+
+	require.NoError(t, err)
+	require.Equal(t, ids.installationID, req.Header.Get("x-codex-installation-id"))
+	require.Equal(t, ids.sessionID, req.Header.Get("session_id"))
+	require.Equal(t, ids.threadID, req.Header.Get("x-client-request-id"))
+}

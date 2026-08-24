@@ -274,7 +274,7 @@ func (s *OpenAIGatewayService) buildOpenAIAlphaSearchResponsesWebSearchRequestFr
 		req.Header.Set("Conversation_ID", isolated)
 	}
 	s.overrideBrowserUserAgent(ctx, account, req)
-	enforceCodexIdentityHeaders(req.Header)
+	enforceCodexIdentityHeadersWithUA(req.Header, account.GetOpenAIUserAgent())
 	account.ApplyHeaderOverrides(req.Header)
 	return req, nil
 }
@@ -424,7 +424,7 @@ func (s *OpenAIGatewayService) buildOpenAIAlphaSearchRequestFromHeaders(ctx cont
 			req.Header.Set("User-Agent", codexCLIUserAgent)
 		}
 		s.overrideBrowserUserAgent(ctx, account, req)
-		enforceCodexIdentityHeaders(req.Header)
+		enforceCodexIdentityHeadersWithUA(req.Header, account.GetOpenAIUserAgent())
 	}
 
 	account.ApplyHeaderOverrides(req.Header)

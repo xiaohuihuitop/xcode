@@ -565,6 +565,7 @@ type UpstreamFailoverError struct {
 	NextAccountAction        NextAccountAction
 	ClientStatusCode         int
 	ClientMessage            string
+	Cause                    error
 }
 
 func (e *UpstreamFailoverError) Error() string {
@@ -572,6 +573,13 @@ func (e *UpstreamFailoverError) Error() string {
 		return fmt.Sprintf("credential failure: %s (failover)", e.Reason)
 	}
 	return fmt.Sprintf("upstream error: %d (failover)", e.StatusCode)
+}
+
+func (e *UpstreamFailoverError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Cause
 }
 
 func (e *UpstreamFailoverError) ShouldRetryNextAccount() bool {

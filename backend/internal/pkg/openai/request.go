@@ -255,6 +255,64 @@ func canonicalizeCodexOriginator(name string) string {
 	return name
 }
 
+const CodexCLIOriginator = "codex_cli_rs"
+
+const CodexDefaultOriginator = "codex-tui"
+
+func CodexUserAgentVersion(userAgent string) string {
+	userAgent = strings.TrimSpace(userAgent)
+	slash := strings.IndexByte(userAgent, '/')
+	if slash <= 0 {
+		return ""
+	}
+	version := userAgent[slash+1:]
+	if space := strings.IndexByte(version, ' '); space >= 0 {
+		version = version[:space]
+	}
+	return strings.TrimSpace(version)
+}
+
+func SetCodexUserAgentVersion(userAgent, version string) string {
+	userAgent = strings.TrimSpace(userAgent)
+	version = strings.TrimSpace(version)
+	if version == "" {
+		return ""
+	}
+	slash := strings.IndexByte(userAgent, '/')
+	if slash <= 0 || strings.TrimSpace(userAgent[:slash]) == "" {
+		return ""
+	}
+	rest := userAgent[slash+1:]
+	tail := ""
+	if space := strings.IndexByte(rest, ' '); space >= 0 {
+		tail = rest[space:]
+	} else if strings.TrimSpace(rest) == "" {
+		return ""
+	}
+	return rewriteCodexUATrailerVersion(strings.TrimSpace(userAgent[:slash])+"/"+version+tail, version)
+}
+
+func rewriteCodexUATrailerVersion(userAgent, version string) string {
+	open := strings.LastIndex(userAgent, "(")
+	if open < 0 {
+		return userAgent
+	}
+	closeIndex := strings.Index(userAgent[open+1:], ")")
+	if closeIndex < 0 {
+		return userAgent
+	}
+	inner := userAgent[open+1 : open+1+closeIndex]
+	semicolon := strings.Index(inner, ";")
+	if semicolon < 0 {
+		return userAgent
+	}
+	name := strings.TrimSpace(inner[:semicolon])
+	if name == "" || !IsCodexOfficialClientOriginator(name) {
+		return userAgent
+	}
+	return userAgent[:open+1] + name + "; " + version + userAgent[open+1+closeIndex:]
+}
+
 // codexEngineVersionPattern 提取版本段开头的三段数字 X.Y.Z（忽略 -alpha 等后缀）。
 var codexEngineVersionPattern = regexp.MustCompile(`^(\d+\.\d+\.\d+)`)
 

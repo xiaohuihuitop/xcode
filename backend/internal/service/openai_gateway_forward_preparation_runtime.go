@@ -51,6 +51,7 @@ func (s *OpenAIGatewayService) forwardOpenAIResponsesHTTPRuntime(
 	exchange.SetState(openAIResponsesNamespaceNamesContextKey, nil)
 	exchange.SetState(openAICompatMessagesBridgeContextKey, false)
 	exchange.SetState(openAIImageIntentHintContextKey, nil)
+	exchange.SetState(codexFingerprintIDsRuntimeStateKey, nil)
 	exchange.SetState("openai_ws_transport_decision", string(wsDecision.Transport))
 	exchange.SetState("openai_ws_transport_reason", wsDecision.Reason)
 
@@ -271,6 +272,11 @@ func (s *OpenAIGatewayService) forwardOpenAIResponsesHTTPRuntime(
 		if applyCodexClientMetadata(decoded, account) {
 			markDecodedModified()
 		}
+		fingerprintIDs := resolveCodexFingerprintIDsFromRequest(account, request.Header)
+		if applyCodexFingerprintClientMetadata(decoded, fingerprintIDs) {
+			markDecodedModified()
+		}
+		exchange.SetState(codexFingerprintIDsRuntimeStateKey, fingerprintIDs)
 		if codexResult.NormalizedModel != "" {
 			upstreamModel = codexResult.NormalizedModel
 		}

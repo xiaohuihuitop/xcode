@@ -15,9 +15,10 @@ import (
 // facts needed while constructing an upstream Responses request. It is
 // deliberately independent of Gin and product-side entities.
 type openAIRequestBuildRuntimeState struct {
-	APIKeyID         int64
-	MessagesBridge   bool
-	CompactSessionID string
+	APIKeyID            int64
+	MessagesBridge      bool
+	CompactSessionID    string
+	CodexFingerprintIDs *codexFingerprintIDs
 }
 
 // buildOpenAIUpstreamRequestFromExchange is the transport-neutral request
@@ -52,6 +53,9 @@ func (s *OpenAIGatewayService) buildOpenAIUpstreamRequestFromExchange(
 		if seed, ok := value.(string); ok {
 			state.CompactSessionID = strings.TrimSpace(seed)
 		}
+	}
+	if value, ok := exchange.State(codexFingerprintIDsRuntimeStateKey); ok {
+		state.CodexFingerprintIDs, _ = value.(*codexFingerprintIDs)
 	}
 	return s.buildOpenAIUpstreamRequestFromRuntimeRequestWithState(
 		ctx, inbound, account, body, token, isStream, promptCacheKey, isCodexCLI, state,
@@ -210,9 +214,10 @@ func (s *OpenAIGatewayService) buildOpenAIUpstreamRequestFromRuntimeRequestWithS
 	if s.cfg != nil && s.cfg.Gateway.ForceCodexCLI {
 		req.Header.Set("user-agent", codexCLIUserAgent)
 	}
+	applyCodexFingerprintHeaders(req.Header, state.CodexFingerprintIDs)
 	s.overrideBrowserUserAgent(ctx, account, req)
 	if account.Type == AccountTypeOAuth {
-		enforceCodexIdentityHeaders(req.Header)
+		enforceCodexIdentityHeadersWithUA(req.Header, account.GetOpenAIUserAgent())
 	}
 	if req.Header.Get("content-type") == "" {
 		req.Header.Set("content-type", "application/json")

@@ -5,17 +5,18 @@ import "net/http"
 type Endpoint string
 
 const (
-	EndpointMessages        Endpoint = "messages"
-	EndpointChatCompletions Endpoint = "chat_completions"
-	EndpointResponses       Endpoint = "responses"
-	EndpointGeminiNative    Endpoint = "gemini_native"
-	EndpointEmbeddings      Endpoint = "embeddings"
-	EndpointAlphaSearch     Endpoint = "alpha_search"
-	EndpointImages          Endpoint = "images"
-	EndpointVideos          Endpoint = "videos"
-	EndpointCountTokens     Endpoint = "count_tokens"
-	EndpointLive            Endpoint = "live"
-	EndpointWebSocket       Endpoint = "websocket"
+	EndpointMessages             Endpoint = "messages"
+	EndpointChatCompletions      Endpoint = "chat_completions"
+	EndpointResponses            Endpoint = "responses"
+	EndpointGeminiNative         Endpoint = "gemini_native"
+	EndpointEmbeddings           Endpoint = "embeddings"
+	EndpointAlphaSearch          Endpoint = "alpha_search"
+	EndpointImages               Endpoint = "images"
+	EndpointVideos               Endpoint = "videos"
+	EndpointCountTokens          Endpoint = "count_tokens"
+	EndpointResponsesInputTokens Endpoint = "responses_input_tokens"
+	EndpointLive                 Endpoint = "live"
+	EndpointWebSocket            Endpoint = "websocket"
 )
 
 type PlatformRoute struct {

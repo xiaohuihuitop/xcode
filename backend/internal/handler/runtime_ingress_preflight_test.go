@@ -105,6 +105,17 @@ func TestBuildRuntimeProductPreflightSpecClassifiesMigratedEndpoints(t *testing.
 			wantBilling: true,
 		},
 		{
+			name: "openai responses input tokens",
+			request: gatewayruntime.Request{
+				Endpoint:       gatewayruntime.EndpointResponsesInputTokens,
+				Adapter:        service.PlatformOpenAI,
+				RequestedModel: "gpt-5.6",
+				Payload:        []byte(`{"model":"gpt-5.6","input":"hello"}`),
+			},
+			wantProtocol: service.ContentModerationProtocolOpenAIResponses, wantAudit: true, wantBilling: true,
+			wantAuditBody: `{"model":"gpt-5.6","input":"hello"}`,
+		},
+		{
 			name: "gemini native",
 			request: gatewayruntime.Request{
 				Endpoint:       gatewayruntime.EndpointGeminiNative,

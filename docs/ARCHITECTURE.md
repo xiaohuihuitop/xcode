@@ -22,6 +22,8 @@ HTTP API / Admin UI
 
 `ProductCore` 只拥有产品和财产语义；`RuntimeBridge v1` 只拥有上游执行语义。当前通过本地端口保持单进程部署，未来可以替换为进程外 Bridge。适配器把两者连接起来，不能把 Gin context、公开 Handler 或 Sub2API 内部类型泄漏到 ProductCore。
 
+官方 Runtime 同步采用逻辑隔离的 Official Runtime zone：纯 Runtime 代码保持官方目录和测试语义，XCode 差异集中在 `backend/internal/runtime/sub2api` Adapter 与 `pkg/runtimebridge/v1`、`internal/gatewayruntime` 端口。官方同步不得覆盖 ProductCore、前端产品、计费、套餐、API Key、支付或生产 migration；单容器部署方式不变。
+
 ## 主要实体
 
 - `Platform`：平台、统一端点能力、模型白名单和账号池的唯一配置入口。
@@ -62,4 +64,4 @@ HTTP API / Admin UI
 
 ## 内核替换边界
 
-替换上游内核时，只实现同一组 RuntimeBridge 端口，不修改 ProductCore、前端、计费和业务 schema。Sub2API 的调度、OAuth 和协议算法位于 `internal/runtime/sub2api` Driver；后续内核必须通过 `pkg/runtimebridge/v1` 的纯 Go 请求、事件、交换和用量接口接入。
+替换或同步上游内核时，只实现同一组 RuntimeBridge 端口，不修改 ProductCore、前端、计费和业务 schema。Sub2API 的调度、OAuth 和协议算法位于 Official Runtime zone；XCode 的平台/AI 账号/usage 映射位于 Adapter；所有 Runtime 必须通过 `pkg/runtimebridge/v1` 的纯 Go 请求、事件、交换和用量接口接入。

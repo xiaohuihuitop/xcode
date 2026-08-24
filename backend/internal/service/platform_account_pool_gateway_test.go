@@ -107,6 +107,37 @@ func TestOpenAIGatewayServiceSelectsOnlyExplicitPlatformPool(t *testing.T) {
 	require.Zero(t, repo.legacyCalls)
 }
 
+func TestGLMPlatformUsesOpenAIAdapterWithinItsOwnPool(t *testing.T) {
+	platformID := int64(44)
+	repo := &platformPoolSchedulingRepoStub{
+		poolAccounts: []Account{{
+			ID:          440,
+			PlatformID:  &platformID,
+			Platform:    PlatformOpenAI,
+			Type:        AccountTypeAPIKey,
+			Status:      StatusActive,
+			Schedulable: true,
+		}},
+		legacyAccounts: map[string][]Account{
+			PlatformOpenAI: {{ID: 439, Platform: PlatformOpenAI, Status: StatusActive, Schedulable: true}},
+		},
+	}
+	ctx := WithPlatformSchedulingScope(context.Background(), PlatformSchedulingScope{
+		PlatformID:      platformID,
+		PlatformCode:    "glm",
+		AccountPlatform: PlatformOpenAI,
+	})
+
+	account, err := (&OpenAIGatewayService{accountRepo: repo}).SelectAccountForModelWithExclusions(ctx, nil, "glm-5.2", "", nil)
+
+	require.NoError(t, err)
+	require.NotNil(t, account)
+	require.Equal(t, int64(440), account.ID)
+	require.Equal(t, platformID, repo.poolID)
+	require.Equal(t, PlatformOpenAI, repo.poolPlatform)
+	require.Zero(t, repo.legacyCalls)
+}
+
 func TestPlatformScopedAccountIgnoresAccountAdminModelAndEndpointPolicy(t *testing.T) {
 	platformID := int64(7)
 	account := &Account{

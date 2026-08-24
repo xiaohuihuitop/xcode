@@ -22,13 +22,24 @@
 
 ## 官方同步
 
-```bash
-git fetch upstream
-git log --oneline --decorate main..upstream/main
-git diff --stat main...upstream/main
+```powershell
+$cache = Join-Path $env:TEMP 'xcode-sub2api-v0.1.179'
+python -B tools/sub2api_upstream_sync.py snapshot `
+  --repo Wei-Shaw/sub2api `
+  --base v0.1.169 `
+  --target v0.1.179 `
+  --expected-commit 75f88be5f75c27771836b586f7de1503afa0e3bc `
+  --cache-dir $cache
+python -B tools/sub2api_upstream_sync.py plan `
+  --snapshot-dir $cache `
+  --current-root . `
+  --output-dir docs/upstream/sub2api-v0.1.179
+python -B tools/sub2api_upstream_sync.py validate `
+  --inventory-dir docs/upstream/sub2api-v0.1.179 `
+  --current-root .
 ```
 
-只合并经过审查的官方提交。同步后重新检查平台/套餐/计费边界、适配器架构守卫和 UI 定制，不直接把 `upstream/main` 当作产品发布分支。
+先审查 `sync-plan.json` 中的 `source_path`、`target_path` 和 `approved`，将确认的纯 Runtime 候选人工标记为 `approved: true` 后再执行 `apply`。同步后重新检查平台/套餐/计费边界、适配器架构守卫和 UI 定制，不直接把 `upstream/main` 当作产品发布分支，不执行整体 merge 或官方 migration。
 
 ## 本地验证
 

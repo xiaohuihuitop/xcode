@@ -35,7 +35,8 @@ const (
 	// 涓庣湡瀹?Codex CLI 鐨?User-Agent 缁撴瀯瀵归綈锛?
 	// {originator}/{version} ({OS} {OS_version}; {arch}) {terminal}
 	// 鏃у€?"codex_cli_rs/0.125.0" 缂哄皯 OS/鏋舵瀯/缁堢鍚庣紑锛屾槗琚笂娓告寚绾硅瘑鍒负闈炲畼鏂瑰鎴风銆?
-	codexCLIUserAgent = "codex_cli_rs/0.144.1 (Ubuntu 22.4.0; x86_64) xterm-256color"
+	codexCLIUserAgentSuffix = " (Ubuntu 22.4.0; x86_64) xterm-256color"
+	codexCLIUserAgent       = openai.CodexDefaultOriginator + "/" + codexCLIVersion + codexCLIUserAgentSuffix
 	// codex_cli_only 鎷掔粷鏃跺崟涓姹傚ご鏃ュ織闀垮害涓婇檺锛堝瓧绗︼級
 	codexCLIOnlyHeaderValueMaxBytes = 256
 
@@ -50,7 +51,7 @@ const (
 	openAIWSRetryJitterRatioDefault    = 0.2
 	openAICompactSessionSeedKey        = "openai_compact_session_seed"
 	openAIUpstreamEndpointContextKey   = "openai_actual_upstream_endpoint"
-	codexCLIVersion                    = "0.144.1"
+	codexCLIVersion                    = "0.146.0"
 	// Codex 闄愰蹇収浠呯敤浜庡悗鍙板睍绀?璇婃柇锛屼笉闇€瑕佹瘡涓垚鍔熻姹傞兘绔嬪嵆钀藉簱銆?
 	openAICodexSnapshotPersistMinInterval = 30 * time.Second
 	// 閰嶉鑷姩鏆傚仠鏃讹紝瓒呰繃璇ユ椂闀夸粛鏈埛鏂扮殑 used% 蹇収瑙嗕负闄堟棫锛屼笉鍐嶆嵁姝ゆ殏鍋滆处鍙枫€?
@@ -264,8 +265,9 @@ type OpenAIForwardResult struct {
 	// 涓婃父涓嶈繑鍥?usage 瀛楁锛?0 鏃惰蛋鎸夋璁¤垂锛堝垎缁勫崟浠?脳 娆℃暟 脳 鍊嶇巼锛夈€?
 	WebSearchCalls int
 
-	wsReplayInput       []json.RawMessage
-	wsReplayInputExists bool
+	wsReplayInput                []json.RawMessage
+	wsReplayInputExists          bool
+	wsAccountFailoverReplayInput []json.RawMessage
 }
 
 // SucceededForScheduling reports whether this result is an upstream success
@@ -449,6 +451,7 @@ type OpenAIGatewayService struct {
 	codexSnapshotThrottle               *accountWriteThrottle
 	codexModelsManifestCache            codexModelsManifestCache
 	openaiCompatSessionResponses        sync.Map
+	openaiCompatReasoningCache          sync.Map // key: account/api-key/item id
 	openaiCompatAnthropicDigestSessions sync.Map
 }
 
@@ -475,6 +478,9 @@ func NewOpenAIGatewayService(
 	settingService *SettingService,
 	userPlatformQuotaRepo UserPlatformQuotaRepository,
 ) *OpenAIGatewayService {
+	if cfg != nil {
+		SetCodexIdentityEnforcementEnabled(!cfg.Gateway.DisableCodexIdentityEnforcement)
+	}
 	svc := &OpenAIGatewayService{
 		accountRepo:           accountRepo,
 		usageLogRepo:          usageLogRepo,

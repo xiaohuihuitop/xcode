@@ -119,17 +119,18 @@ type AdminAccountRepository interface{ AccountRepository }
 // AccountBulkUpdate describes the fields that can be updated in a bulk operation.
 // Nil pointers mean "do not change".
 type AccountBulkUpdate struct {
-	Name           *string
-	ProxyID        *int64
-	Concurrency    *int
-	Priority       *int
-	RateMultiplier *float64
-	LoadFactor     *int
-	Status         *string
-	Schedulable    *bool
-	Credentials    map[string]any
-	Extra          map[string]any
-	ProbeEnabled   *bool
+	Name                       *string
+	ProxyID                    *int64
+	Concurrency                *int
+	Priority                   *int
+	RateMultiplier             *float64
+	LoadFactor                 *int
+	Status                     *string
+	Schedulable                *bool
+	Credentials                map[string]any
+	Extra                      map[string]any
+	ProbeEnabled               *bool
+	EnsureCodexFingerprintSeed bool
 }
 
 // CreateAccountRequest 创建账号请求
@@ -185,7 +186,7 @@ func (s *AccountService) Create(ctx context.Context, req CreateAccountRequest) (
 		PlatformID:  req.PlatformID,
 		Type:        req.Type,
 		Credentials: req.Credentials,
-		Extra:       req.Extra,
+		Extra:       prepareCodexFingerprintExtraForCreate(req.Platform, req.Type, req.Extra),
 		ProxyID:     req.ProxyID,
 		Concurrency: req.Concurrency,
 		Priority:    req.Priority,
@@ -259,7 +260,9 @@ func (s *AccountService) Update(ctx context.Context, id int64, req UpdateAccount
 		delete(extra, OllamaCloudUsageSessionExtraKey)
 		delete(extra, OllamaCloudUsageAutoRefreshExtraKey)
 		delete(extra, OllamaCloudUsageSnapshotExtraKey)
-		account.Extra = extra
+		account.Extra = prepareCodexFingerprintExtraForUpdate(account, extra)
+	} else {
+		account.Extra = prepareCodexFingerprintExtraForUpdate(account, account.Extra)
 	}
 
 	if req.ProxyID != nil {

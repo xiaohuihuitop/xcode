@@ -193,7 +193,7 @@ func TestFetchCodexModelsManifestPassthrough(t *testing.T) {
 	if gotAccountID != "acc-123" {
 		t.Errorf("chatgpt-account-id header: got %q", gotAccountID)
 	}
-	if gotOriginator != "codex_cli_rs" {
+	if gotOriginator != "codex-tui" {
 		t.Errorf("originator header: got %q", gotOriginator)
 	}
 	if gotClientVersion != "0.137.0" {
@@ -333,8 +333,14 @@ func TestFetchCodexModelsManifestAgentIdentityRedactsUpstreamErrors(t *testing.T
 
 func TestFetchCodexModelsManifestDefaultClientVersion(t *testing.T) {
 	var gotClientVersion string
+	var gotHeaders http.Header
+	SetCodexCanonicalUserAgentResolver(func() string {
+		return "codex_cli_rs/0.200.1" + codexCLIUserAgentSuffix
+	})
+	t.Cleanup(func() { SetCodexCanonicalUserAgentResolver(nil) })
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotClientVersion = r.URL.Query().Get("client_version")
+		gotHeaders = r.Header.Clone()
 		_, _ = w.Write([]byte(`{"models":[]}`))
 	}))
 	defer server.Close()
@@ -347,9 +353,12 @@ func TestFetchCodexModelsManifestDefaultClientVersion(t *testing.T) {
 	if _, err := s.FetchCodexModelsManifest(context.Background(), newCodexModelsTestAccount(), "", ""); err != nil {
 		t.Fatalf("FetchCodexModelsManifest returned error: %v", err)
 	}
-	if gotClientVersion != openAICodexProbeVersion {
-		t.Errorf("default client_version: got %q, want %q", gotClientVersion, openAICodexProbeVersion)
+	if gotClientVersion != "0.200.1" {
+		t.Errorf("default client_version: got %q, want %q", gotClientVersion, "0.200.1")
 	}
+	require.Equal(t, "codex_cli_rs", gotHeaders.Get("originator"))
+	require.Equal(t, "codex_cli_rs/0.200.1"+codexCLIUserAgentSuffix, gotHeaders.Get("user-agent"))
+	require.Equal(t, "0.200.1", gotHeaders.Get("version"))
 }
 
 func TestFetchCodexModelsManifestNotModified(t *testing.T) {

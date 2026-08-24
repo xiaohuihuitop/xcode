@@ -81,6 +81,7 @@ func (g *Gateway) Dispatch(ctx context.Context, request DispatchRequest) (gatewa
 func isNonBillingEndpoint(endpoint gatewayruntime.Endpoint) bool {
 	switch endpoint {
 	case gatewayruntime.EndpointCountTokens,
+		gatewayruntime.EndpointResponsesInputTokens,
 		gatewayruntime.EndpointLive,
 		gatewayruntime.EndpointWebSocket:
 		return true

@@ -401,10 +401,24 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		if !isCompactRequest && applyCodexClientMetadata(decoded, account) {
 			markDecodedModified()
 		}
+		stageCodexFingerprintIDs(c, nil)
+		if !isCompactRequest {
+			var clientHeaders http.Header
+			if c != nil && c.Request != nil {
+				clientHeaders = c.Request.Header
+			}
+			fingerprintIDs := resolveCodexFingerprintIDsFromRequest(account, clientHeaders)
+			if applyCodexFingerprintClientMetadata(decoded, fingerprintIDs) {
+				markDecodedModified()
+			}
+			stageCodexFingerprintIDs(c, fingerprintIDs)
+		}
 		if codexResult.NormalizedModel != "" {
 			upstreamModel = codexResult.NormalizedModel
 		}
-		if codexResult.PromptCacheKey != "" {
+		if currentPromptCacheKey, ok := decoded["prompt_cache_key"].(string); ok && currentPromptCacheKey != "" {
+			promptCacheKey = currentPromptCacheKey
+		} else if codexResult.PromptCacheKey != "" {
 			promptCacheKey = codexResult.PromptCacheKey
 		}
 	}
@@ -1037,9 +1051,10 @@ func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.
 		promptCacheKey,
 		isCodexCLI,
 		openAIRequestBuildRuntimeState{
-			APIKeyID:         getAPIKeyIDFromContext(c),
-			MessagesBridge:   isOpenAICompatMessagesBridgeContext(c) || isOpenAICompatMessagesBridgeBody(body),
-			CompactSessionID: resolveOpenAICompactSessionID(c),
+			APIKeyID:            getAPIKeyIDFromContext(c),
+			MessagesBridge:      isOpenAICompatMessagesBridgeContext(c) || isOpenAICompatMessagesBridgeBody(body),
+			CompactSessionID:    resolveOpenAICompactSessionID(c),
+			CodexFingerprintIDs: stagedCodexFingerprintIDs(c, account),
 		},
 	)
 }
@@ -1156,6 +1171,7 @@ func (s *OpenAIGatewayService) buildUpstreamRequestLegacy(ctx context.Context, c
 	if s.cfg != nil && s.cfg.Gateway.ForceCodexCLI {
 		req.Header.Set("user-agent", codexCLIUserAgent)
 	}
+	applyStagedCodexFingerprintHeaders(c, account, req.Header)
 
 	// 浏览器型 UA 兜底：仅 OAuth（ChatGPT 内部接口）账号生效，若最终 user-agent 仍为浏览器
 	// （Chrome/Firefox/Safari/Edge 等），替换为后台配置的 Codex UA，避免 Cloudflare 触发 JS 质询。
@@ -1163,7 +1179,7 @@ func (s *OpenAIGatewayService) buildUpstreamRequestLegacy(ctx context.Context, c
 
 	// 终态收口：originator 必须与最终 User-Agent 首段配套且为官方身份，否则上游 404（issue #3901）。
 	if account.Type == AccountTypeOAuth {
-		enforceCodexIdentityHeaders(req.Header)
+		enforceCodexIdentityHeadersWithUA(req.Header, account.GetOpenAIUserAgent())
 	}
 
 	// Ensure required headers exist

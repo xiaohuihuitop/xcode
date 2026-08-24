@@ -12,6 +12,7 @@ type AdminHandlers struct {
 	Platform               *admin.PlatformHandler
 	ModelPricing           *admin.ModelPricingHandler
 	Account                *admin.AccountHandler
+	GLMQuota               *admin.GLMQuotaHandler
 	Announcement           *admin.AnnouncementHandler
 	DataManagement         *admin.DataManagementHandler
 	Backup                 *admin.BackupHandler

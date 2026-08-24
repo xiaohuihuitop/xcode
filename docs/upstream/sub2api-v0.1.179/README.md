@@ -43,6 +43,7 @@ python -B tools/sub2api_upstream_inventory.py validate `
 - `metadata.json`：官方 Tag、commit、Release、归档哈希和生成时间。
 - `commits.csv`：594 个提交的稳定顺序和自动分类。
 - `files.csv`：官方与 XCode 文件存在性、哈希状态、类别和 migration 编号。
+- `sync-plan.json`：官方来源路径、XCode Runtime 目标路径、候选动作和人工批准状态。
 
 人工审阅文件：
 
@@ -71,6 +72,12 @@ python -B tools/sub2api_upstream_inventory.py validate `
 - 阶段一没有修改 Runtime、schema、migration、前端、依赖或部署文件。
 
 XCode 与官方已经分叉，禁止执行 `merge upstream/main`、整体文件覆盖或直接执行官方 migration。阶段二至阶段六必须按矩阵逐批同步，ProductCore 继续唯一拥有用户账号、平台、模型价格、套餐、余额、API Key、支付、用量和扣费。
+
+## 当前同步状态
+
+- P0 GPT/Codex（F019、F022、R002-R005）已完成代码接入、本地回归和香港隔离副本验收。
+- Official Runtime 区仍保持纯 Runtime 边界；ProductCore、migration、Ent schema、前端产品和香港生产均未被本阶段改动。
+- 下一阶段只先处理 OpenAI/Codex 的 AI 账号状态映射；GLM 缺少可用上游凭据时仅允许代码和模拟测试，Gemini 不在当前范围。
 
 ## 后续正式版
 

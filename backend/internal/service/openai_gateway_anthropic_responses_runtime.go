@@ -29,8 +29,7 @@ func (s *OpenAIGatewayService) handleOpenAIAnthropicNonStreamingResponseExchange
 	requestID := runtimeHeaderValue(resp.Header, "x-request-id")
 	finalResponse, usage, accumulator, err := s.readOpenAICompatBufferedTerminal(resp, "openai messages runtime", requestID)
 	if err != nil {
-		writeRuntimeAnthropicError(exchange, http.StatusBadGateway, "api_error", "Failed to read upstream response")
-		return nil, err
+		return nil, newOpenAICompatBufferedReadFailoverError(err)
 	}
 	if finalResponse == nil {
 		writeRuntimeAnthropicError(exchange, http.StatusBadGateway, "api_error", "Upstream stream ended without a terminal response event")

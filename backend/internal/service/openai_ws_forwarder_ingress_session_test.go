@@ -169,6 +169,117 @@ func TestOpenAIGatewayService_ProxyResponsesWebSocketFromClient_KeepLeaseAcrossT
 	require.Len(t, captureConn.writes, 2, "应向同一上游连接发送两轮 response.create")
 }
 
+func TestOpenAIGatewayService_ProxyResponsesWebSocketFromClientAppliesCodexFingerprint(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	cfg := &config.Config{}
+	cfg.Security.URLAllowlist.Enabled = false
+	cfg.Security.URLAllowlist.AllowInsecureHTTP = true
+	cfg.Gateway.OpenAIWS.Enabled = true
+	cfg.Gateway.OpenAIWS.OAuthEnabled = true
+	cfg.Gateway.OpenAIWS.ResponsesWebsocketsV2 = true
+	cfg.Gateway.OpenAIWS.MaxConnsPerAccount = 1
+	cfg.Gateway.OpenAIWS.MaxIdlePerAccount = 1
+	cfg.Gateway.OpenAIWS.QueueLimitPerConn = 8
+	cfg.Gateway.OpenAIWS.DialTimeoutSeconds = 3
+	cfg.Gateway.OpenAIWS.ReadTimeoutSeconds = 3
+	cfg.Gateway.OpenAIWS.WriteTimeoutSeconds = 3
+
+	captureConn := &openAIWSCaptureConn{events: [][]byte{
+		[]byte(`{"type":"response.completed","response":{"id":"resp_ingress_fingerprint","model":"gpt-5.5","usage":{"input_tokens":1,"output_tokens":1}}}`),
+	}}
+	captureDialer := &openAIWSCaptureDialer{conn: captureConn}
+	pool := newOpenAIWSConnPool(cfg)
+	pool.setClientDialerForTest(captureDialer)
+	defer pool.Close()
+	svc := &OpenAIGatewayService{
+		cfg:              cfg,
+		httpUpstream:     &httpUpstreamRecorder{},
+		cache:            &stubGatewayCache{},
+		openaiWSResolver: NewOpenAIWSProtocolResolver(cfg),
+		toolCorrector:    NewCodexToolCorrector(),
+		openaiWSPool:     pool,
+	}
+	account := newTestOAuthAccount(4406, map[string]any{
+		codexFingerprintModeExtraKey:      "session",
+		"responses_websockets_v2_enabled": true,
+	})
+	account.Status = StatusActive
+	account.Schedulable = true
+	account.Concurrency = 1
+	account.Credentials = map[string]any{"access_token": "oauth-token", "chatgpt_account_id": "chatgpt-acc"}
+
+	serverErrCh := make(chan error, 1)
+	wsServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := coderws.Accept(w, r, nil)
+		if err != nil {
+			serverErrCh <- err
+			return
+		}
+		defer func() { _ = conn.CloseNow() }()
+
+		rec := httptest.NewRecorder()
+		ginCtx, _ := gin.CreateTestContext(rec)
+		req := r.Clone(r.Context())
+		req.Header = req.Header.Clone()
+		req.Header.Set("User-Agent", "codex_cli_rs/0.144.1")
+		req.Header.Set("originator", "codex_cli_rs")
+		req.Header.Set("session-id", "ingress-client-session")
+		req.Header.Set("x-codex-installation-id", "ingress-client-installation")
+		req.Header.Set("x-codex-turn-metadata", `{"session_id":"ingress-client-session","sandbox":"seatbelt"}`)
+		ginCtx.Request = req
+
+		readCtx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+		_, firstMessage, readErr := conn.Read(readCtx)
+		cancel()
+		if readErr != nil {
+			serverErrCh <- readErr
+			return
+		}
+		serverErrCh <- svc.ProxyResponsesWebSocketFromClient(r.Context(), ginCtx, conn, account, "oauth-token", firstMessage, nil)
+	}))
+	defer wsServer.Close()
+
+	dialCtx, cancelDial := context.WithTimeout(context.Background(), 3*time.Second)
+	clientConn, _, err := coderws.Dial(dialCtx, "ws"+strings.TrimPrefix(wsServer.URL, "http"), nil)
+	cancelDial()
+	require.NoError(t, err)
+	writeCtx, cancelWrite := context.WithTimeout(context.Background(), 3*time.Second)
+	err = clientConn.Write(writeCtx, coderws.MessageText, []byte(`{"type":"response.create","model":"gpt-5.5","stream":false,"prompt_cache_key":"body-session","client_metadata":{"session_id":"body-session"}}`))
+	cancelWrite()
+	require.NoError(t, err)
+	readCtx, cancelRead := context.WithTimeout(context.Background(), 3*time.Second)
+	_, _, err = clientConn.Read(readCtx)
+	cancelRead()
+	require.NoError(t, err)
+	require.NoError(t, clientConn.Close(coderws.StatusNormalClosure, "done"))
+
+	select {
+	case serverErr := <-serverErrCh:
+		require.NoError(t, serverErr)
+	case <-time.After(5 * time.Second):
+		t.Fatal("等待 ingress websocket 结束超时")
+	}
+	require.Len(t, captureConn.writes, 1)
+	seed, ok := codexFingerprintSeed(account.Extra)
+	require.True(t, ok)
+	wantInstallationID := resolveConvergedInstallationID(account, seed)
+	wantSessionID := resolveConvergedSessionID(seed)
+	wantThreadID := resolveConvergedThreadID(seed, "ingress-client-session")
+	payloadJSON := requestToJSONString(captureConn.writes[0])
+	require.Equal(t, wantInstallationID, captureDialer.lastHeaders.Get("x-codex-installation-id"))
+	require.Equal(t, wantSessionID, captureDialer.lastHeaders.Get("session-id"))
+	require.Equal(t, wantThreadID, captureDialer.lastHeaders.Get("thread-id"))
+	require.Equal(t, wantSessionID, gjson.Get(payloadJSON, "prompt_cache_key").String())
+	require.Equal(t, wantInstallationID, gjson.Get(payloadJSON, "client_metadata.x-codex-installation-id").String())
+	require.Equal(t, wantSessionID, gjson.Get(payloadJSON, "client_metadata.session_id").String())
+	require.Equal(t, wantThreadID, gjson.Get(payloadJSON, "client_metadata.thread_id").String())
+	require.Equal(t,
+		gjson.Get(captureDialer.lastHeaders.Get("x-codex-turn-metadata"), "turn_id").String(),
+		gjson.Get(payloadJSON, "client_metadata.turn_id").String(),
+	)
+}
+
 func TestOpenAIGatewayService_ProxyResponsesWebSocketFromClient_IdleTimeoutReleasesStoreDisabledSession(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -933,6 +1044,8 @@ func TestOpenAIGatewayService_ProxyResponsesWebSocketFromClient_PassthroughHeade
 		},
 		Extra: map[string]any{
 			"openai_oauth_responses_websockets_v2_mode": OpenAIWSIngressModePassthrough,
+			codexFingerprintModeExtraKey:                "session",
+			codexFingerprintSeedExtraKey:                testCodexFingerprintSeed,
 		},
 	}
 
@@ -954,8 +1067,10 @@ func TestOpenAIGatewayService_ProxyResponsesWebSocketFromClient_PassthroughHeade
 		req := r.Clone(r.Context())
 		req.Header = req.Header.Clone()
 		req.Header.Set("User-Agent", "codex_cli_rs/0.98.0")
+		req.Header.Set("originator", "codex_cli_rs")
+		req.Header.Set("session-id", "passthrough-client-session")
 		req.Header.Set(openAIWSTurnStateHeader, "turn-state-1")
-		req.Header.Set(openAIWSTurnMetadataHeader, "turn-meta-1")
+		req.Header.Set(openAIWSTurnMetadataHeader, `{"session_id":"passthrough-client-session","sandbox":"seatbelt"}`)
 		ginCtx.Request = req
 
 		readCtx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
@@ -989,7 +1104,7 @@ func TestOpenAIGatewayService_ProxyResponsesWebSocketFromClient_PassthroughHeade
 		"stream":false,
 		"prompt_cache_key":"pcache_passthrough",
 		"reasoning":{"effort":"medium","context":"current_turn"},
-		"client_metadata":{"ws_request_header_x_openai_internal_codex_responses_lite":"true"},
+		"client_metadata":{"session_id":"pcache_passthrough","ws_request_header_x_openai_internal_codex_responses_lite":"true"},
 		"tools":[{"type":"namespace","name":"collaboration","tools":[{"type":"function","name":"spawn_agent"}]}],
 		"input":[{"type":"message","role":"user","content":"hello"}],
 		"tool_choice":{"type":"namespace","name":"collaboration"}
@@ -1013,11 +1128,25 @@ func TestOpenAIGatewayService_ProxyResponsesWebSocketFromClient_PassthroughHeade
 		t.Fatal("等待 passthrough websocket 结束超时")
 	}
 
-	require.Equal(t, isolateOpenAISessionID(0, "pcache_passthrough"), captureDialer.lastHeaders.Get("session_id"))
+	seed, ok := codexFingerprintSeed(account.Extra)
+	require.True(t, ok)
+	wantInstallationID := resolveConvergedInstallationID(account, seed)
+	wantSessionID := resolveConvergedSessionID(seed)
+	wantThreadID := resolveConvergedThreadID(seed, "passthrough-client-session")
+	require.Equal(t, wantInstallationID, captureDialer.lastHeaders.Get("x-codex-installation-id"))
+	require.Equal(t, wantSessionID, captureDialer.lastHeaders.Get("session-id"))
+	require.Equal(t, wantThreadID, captureDialer.lastHeaders.Get("thread-id"))
 	require.Equal(t, "turn-state-1", captureDialer.lastHeaders.Get(openAIWSTurnStateHeader))
-	require.Equal(t, "turn-meta-1", captureDialer.lastHeaders.Get(openAIWSTurnMetadataHeader))
 	require.Len(t, upstreamConn.writes, 1)
 	forwarded := requestToJSONString(upstreamConn.writes[0])
+	require.Equal(t, wantSessionID, gjson.Get(forwarded, "prompt_cache_key").String())
+	require.Equal(t, wantInstallationID, gjson.Get(forwarded, "client_metadata.x-codex-installation-id").String())
+	require.Equal(t, wantSessionID, gjson.Get(forwarded, "client_metadata.session_id").String())
+	require.Equal(t, wantThreadID, gjson.Get(forwarded, "client_metadata.thread_id").String())
+	require.Equal(t,
+		gjson.Get(captureDialer.lastHeaders.Get(openAIWSTurnMetadataHeader), "turn_id").String(),
+		gjson.Get(forwarded, "client_metadata.turn_id").String(),
+	)
 	require.False(t, gjson.Get(forwarded, `tools.#(type=="namespace")`).Exists())
 	require.Equal(t, "collaboration", gjson.Get(forwarded, `input.#(type=="additional_tools").tools.0.name`).String())
 	require.Equal(t, "namespace", gjson.Get(forwarded, "tool_choice.type").String())

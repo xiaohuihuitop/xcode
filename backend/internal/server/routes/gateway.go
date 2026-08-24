@@ -29,6 +29,7 @@ func RegisterGatewayRoutes(
 	opsErrorLogger := handler.OpsErrorLoggerMiddleware(opsService)
 	endpointNorm := handler.InboundEndpointMiddleware()
 	platformAssetAuthorizer := service.NewPlatformAssetProductCoreAdapter(apiKeyService, subscriptionService, platformResolver)
+	h.OpenAIGateway.SetPlatformAssetAuthorizer(platformAssetAuthorizer)
 	platformAssetAuth := middleware.NewPlatformAssetAuthorizationMiddleware(platformAssetAuthorizer, cfg)
 	platformAssetGoogleAuth := middleware.NewPlatformAssetAuthorizationGoogleMiddleware(platformAssetAuthorizer, cfg)
 
@@ -143,6 +144,10 @@ func RegisterGatewayRoutes(
 	// service.IsForwardableOpenAIResponsesRequestPath 及 upstream_path_guard.go。
 	guardResponsesSubpath := func(next gin.HandlerFunc) gin.HandlerFunc {
 		return func(c *gin.Context) {
+			if service.IsOpenAIResponsesInputTokensRequestPath(c) && isOpenAIResponsesCompatibleGatewayPlatform(c) {
+				h.OpenAIGateway.ResponsesInputTokens(c)
+				return
+			}
 			if !service.IsForwardableOpenAIResponsesRequestPath(c) {
 				service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalPolicyDenied)
 				c.AbortWithStatusJSON(http.StatusNotFound, gin.H{

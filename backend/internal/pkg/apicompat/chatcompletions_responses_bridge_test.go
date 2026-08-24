@@ -199,6 +199,35 @@ func TestResponsesToChatCompletionsRequest_ParallelToolCalls(t *testing.T) {
 	assert.Contains(t, string(payload), `"parallel_tool_calls":false`)
 }
 
+func TestResponsesToChatCompletionsRequest_RestoresEncryptedReasoningAcrossChainedTools(t *testing.T) {
+	req := &ResponsesRequest{
+		Model: "glm-5.2",
+		Input: json.RawMessage(`[
+			{"role":"user","content":"inspect"},
+			{"type":"reasoning","id":"rs_turn_1","encrypted_content":"opaque"},
+			{"type":"function_call","call_id":"call_a","name":"inspect","arguments":"{}"},
+			{"type":"function_call_output","call_id":"call_a","output":"done"},
+			{"type":"function_call","call_id":"call_b","name":"summarize","arguments":"{}"},
+			{"type":"function_call_output","call_id":"call_b","output":"summary"}
+		]`),
+	}
+
+	out, err := ResponsesToChatCompletionsRequestWithOptions(req, &ResponsesToChatOptions{
+		ReasoningContentByID: func(itemID string) string {
+			if itemID == "rs_turn_1" {
+				return "check the repository state"
+			}
+			return ""
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, out.Messages, 5)
+	require.Len(t, out.Messages[1].ToolCalls, 1)
+	require.Len(t, out.Messages[3].ToolCalls, 1)
+	assert.Equal(t, "check the repository state", out.Messages[1].ReasoningContent)
+	assert.Equal(t, "check the repository state", out.Messages[3].ReasoningContent)
+}
+
 func chatMessageRoles(messages []ChatMessage) []string {
 	roles := make([]string, 0, len(messages))
 	for _, message := range messages {

@@ -10,6 +10,11 @@ import (
 )
 
 func TestOpenAIOAuthService_ValidateCodexPersonalAccessToken(t *testing.T) {
+	SetCodexCanonicalUserAgentResolver(func() string {
+		return "codex_cli_rs/0.200.1" + codexCLIUserAgentSuffix
+	})
+	t.Cleanup(func() { SetCodexCanonicalUserAgentResolver(nil) })
+
 	var gotAuthorization string
 	var gotOriginator string
 	var gotUserAgent string
@@ -39,7 +44,7 @@ func TestOpenAIOAuthService_ValidateCodexPersonalAccessToken(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "Bearer at-test-token", gotAuthorization)
 	require.Equal(t, "codex_cli_rs", gotOriginator)
-	require.Equal(t, codexCLIUserAgent, gotUserAgent)
+	require.Equal(t, "codex_cli_rs/0.200.1"+codexCLIUserAgentSuffix, gotUserAgent)
 	require.Equal(t, OpenAIAuthModePersonalAccessToken, info.AuthMode)
 	require.Equal(t, "user@example.com", info.Email)
 	require.Equal(t, "user-123", info.ChatGPTUserID)

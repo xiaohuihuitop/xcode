@@ -66,6 +66,18 @@ func buildRuntimeProductPreflightSpec(request gatewayruntime.Request, images *se
 			}
 		}
 		return spec, nil
+	case gatewayruntime.EndpointResponsesInputTokens:
+		model, err := validateRuntimeJSONModel(request.Payload)
+		if err != nil {
+			return runtimeProductPreflightSpec{}, err
+		}
+		if model != "" {
+			spec.Model = model
+		}
+		spec.Protocol = service.ContentModerationProtocolOpenAIResponses
+		spec.Audit, spec.Billing = true, true
+		spec.AuditBody = append([]byte(nil), request.Payload...)
+		return spec, nil
 	case gatewayruntime.EndpointEmbeddings:
 		spec.Protocol, spec.Audit, spec.UserSlot, spec.Billing = "openai_embeddings", true, true, true
 		model, err := validateRuntimeJSONModel(request.Payload)

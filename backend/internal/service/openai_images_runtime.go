@@ -668,7 +668,7 @@ func (s *OpenAIGatewayService) buildOpenAIImagesOAuthRequestFromHeaders(
 		req.Header.Set("user-agent", codexCLIUserAgent)
 	}
 	s.overrideBrowserUserAgent(ctx, account, req)
-	enforceCodexIdentityHeaders(req.Header)
+	enforceCodexIdentityHeadersWithUA(req.Header, account.GetOpenAIUserAgent())
 	req.Header.Set("content-type", "application/json")
 	account.ApplyHeaderOverrides(req.Header)
 	return req, nil

@@ -45,6 +45,7 @@ type OpenAIGatewayHandler struct {
 	maxAccountSwitches         int
 	cfg                        *config.Config
 	applicationGateway         *applicationgateway.Gateway
+	platformAssetAuthorizer    middleware2.PlatformAssetRequestAuthorizer
 }
 
 type openAIWSTurnModelMappingSnapshot struct {
@@ -57,6 +58,51 @@ func (h *OpenAIGatewayHandler) SetApplicationGateway(gateway *applicationgateway
 	if h != nil {
 		h.applicationGateway = gateway
 	}
+}
+
+// SetPlatformAssetAuthorizer installs the ProductCore resolver used after a
+// Responses WebSocket client sends its first response.create message.
+func (h *OpenAIGatewayHandler) SetPlatformAssetAuthorizer(authorizer middleware2.PlatformAssetRequestAuthorizer) {
+	if h != nil {
+		h.platformAssetAuthorizer = authorizer
+	}
+}
+
+func (h *OpenAIGatewayHandler) resolveResponsesWebSocketPlatformAsset(
+	c *gin.Context,
+	apiKey *service.APIKey,
+	model string,
+) error {
+	if c == nil || c.Request == nil {
+		return fmt.Errorf("%w: websocket request context is required", service.ErrPlatformInvalid)
+	}
+	if service.PlatformSchedulingID(c.Request.Context()) != nil {
+		return nil
+	}
+	if h == nil || h.platformAssetAuthorizer == nil {
+		return fmt.Errorf("%w: websocket platform asset authorizer is required", service.ErrPlatformInvalid)
+	}
+	resolution, err := h.platformAssetAuthorizer.Resolve(
+		c.Request.Context(),
+		apiKey,
+		model,
+		c.Request.URL.Path,
+		h.cfg != nil && h.cfg.RunMode == config.RunModeSimple,
+	)
+	if err != nil {
+		return err
+	}
+	if resolution == nil || resolution.Decision == nil {
+		return fmt.Errorf("%w: websocket platform asset resolution is empty", service.ErrPlatformInvalid)
+	}
+	c.Request = c.Request.WithContext(service.AttachPlatformAssetResolution(c.Request.Context(), resolution))
+	if service.PlatformSchedulingID(c.Request.Context()) == nil {
+		return fmt.Errorf("%w: websocket platform scheduling scope is missing", service.ErrPlatformInvalid)
+	}
+	if resolution.Subscription != nil {
+		c.Set(string(middleware2.ContextKeySubscription), resolution.Subscription)
+	}
+	return nil
 }
 
 var errOpenAIWSUnsupportedModelSwitch = errors.New("selected account does not support websocket model switch")
@@ -721,6 +767,11 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 		closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, "model is required in first response.create payload")
 		return
 	}
+	if err := h.resolveResponsesWebSocketPlatformAsset(c, apiKey, reqModel); err != nil {
+		reqLog.Warn("openai.websocket_platform_asset_resolution_failed", zap.Error(err))
+		closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, "model platform authorization failed")
+		return
+	}
 	ensureModelTargetPlatform(c, reqModel)
 	ctx = c.Request.Context()
 	previousResponseID := strings.TrimSpace(gjson.GetBytes(firstMessage, "previous_response_id").String())
@@ -831,6 +882,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 	failedAccountIDs := make(map[int64]struct{})
 	var lastFailoverErr *service.UpstreamFailoverError
 	var oauth429FailoverState service.OpenAIOAuth429FailoverState
+	wsAttemptMessage := append([]byte(nil), firstMessage...)
 	handleWSFailover := func(account *service.Account, failoverErr *service.UpstreamFailoverError) bool {
 		if ctx.Err() != nil {
 			return false
@@ -1153,7 +1205,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 			},
 		}
 
-		wsFirstMessage := firstMessage
+		wsFirstMessage := wsAttemptMessage
 		// 切组/会话失配防护：previous_response_id 未在当前分组命中粘连账号（StickyPreviousHit=false），
 		// 说明该会话链不属于本次调度到的账号，原样转发会触发上游会话链鉴权失败（“鉴权失败，请检查 API Key”）。
 		// 故剥离首包里的 previous_response_id，改用首包内 input 重建上下文；带 function_call_output 的
@@ -1172,6 +1224,21 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 		if err := h.gatewayService.ProxyResponsesWebSocketFromClient(ctx, c, wsConn, account, token, wsFirstMessage, hooks); err != nil {
 			var failoverErr *service.UpstreamFailoverError
 			if errors.As(err, &failoverErr) {
+				retryPayload, retryCurrentTurn := service.OpenAIWSCurrentTurnRetryPayload(err)
+				nextAttemptMessage, retrySafe := openAIWSNextAttemptMessage(wsAttemptMessage, retryPayload, retryCurrentTurn)
+				if !retrySafe {
+					closeOpenAIWSFailoverExhausted(wsConn, failoverErr)
+					return
+				}
+				wsAttemptMessage = nextAttemptMessage
+				if retryCurrentTurn {
+					previousResponseID = ""
+					reqLog.Warn("openai.websocket_current_turn_failover_retry",
+						zap.Int64("account_id", account.ID),
+						zap.Int("upstream_status", failoverErr.StatusCode),
+						zap.Int("retry_payload_bytes", len(retryPayload)),
+					)
+				}
 				if handleWSFailover(account, failoverErr) {
 					continue
 				}
@@ -1819,6 +1886,16 @@ func closeOpenAIClientWS(conn *coderws.Conn, status coderws.StatusCode, reason s
 	}
 	_ = conn.Close(status, reason)
 	_ = conn.CloseNow()
+}
+
+func openAIWSNextAttemptMessage(current, retryPayload []byte, retryCurrentTurn bool) ([]byte, bool) {
+	if !retryCurrentTurn {
+		return append([]byte(nil), current...), true
+	}
+	if len(retryPayload) == 0 {
+		return nil, false
+	}
+	return append([]byte(nil), retryPayload...), true
 }
 
 func closeOpenAIWSFailoverExhausted(conn *coderws.Conn, failoverErr *service.UpstreamFailoverError) {

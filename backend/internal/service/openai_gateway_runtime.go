@@ -53,6 +53,9 @@ func (s *OpenAIGatewayService) ForwardRuntime(
 	apiKeyID int64,
 ) (*OpenAIForwardResult, error) {
 	SetOpenAIClientTransportExchange(exchange, OpenAIClientTransportHTTP)
+	if exchange != nil {
+		exchange.SetState(openAICompatReasoningAPIKeyIDStateKey, apiKeyID)
+	}
 	if account != nil && account.Platform == PlatformOpenAI && account.Type == AccountTypeAPIKey &&
 		!openai_compat.ShouldUseResponsesAPI(account.Extra) {
 		return s.ForwardResponsesExchange(ctx, exchange, account, body)

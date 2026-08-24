@@ -518,7 +518,10 @@ const (
 	// SettingKeyOpenAICodexUserAgent OpenAI Codex 完整 User-Agent（空值使用内置默认）
 	// 当客户端 UA 被识别为浏览器（Chrome/Firefox/Safari/Edge 等）时，转发给 OpenAI 上游前会替换为此值，
 	// 用于避免 Cloudflare 对浏览器型 UA 的质询拦截。
-	SettingKeyOpenAICodexUserAgent = "openai_codex_user_agent"
+	SettingKeyOpenAICodexUserAgent              = "openai_codex_user_agent"
+	SettingKeyOpenAICodexClientVersion          = "openai_codex_client_version"
+	SettingKeyOpenAICodexClientVersionSynced    = "openai_codex_client_version_synced"
+	SettingKeyOpenAICodexVersionAutoSyncEnabled = "openai_codex_version_auto_sync_enabled"
 	// SettingKeyOpenAIAllowClaudeCodeCodexPlugin 已废弃：历史全局开关只作为升级迁移输入读取。
 	// 迁移后等价规则写入 SettingKeyCodexCLIOnlyWhitelist，不再参与运行时判定。
 	SettingKeyOpenAIAllowClaudeCodeCodexPlugin = "openai_allow_claude_code_codex_plugin"

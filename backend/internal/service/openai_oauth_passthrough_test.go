@@ -418,7 +418,7 @@ func TestOpenAIGatewayService_OAuthPassthrough_StreamKeepsToolNameAndBodyNormali
 
 	// 2) only auth is replaced; inbound auth/cookie are not forwarded
 	require.Equal(t, "Bearer oauth-token", upstream.lastReq.Header.Get("Authorization"))
-	require.Equal(t, "codex_cli_rs/0.1.0", upstream.lastReq.Header.Get("User-Agent"))
+	require.Equal(t, codexCLIUserAgent, upstream.lastReq.Header.Get("User-Agent"))
 	require.Empty(t, upstream.lastReq.Header.Get("Cookie"))
 	require.Empty(t, upstream.lastReq.Header.Get("X-Api-Key"))
 	require.Empty(t, upstream.lastReq.Header.Get("X-Goog-Api-Key"))
@@ -1787,9 +1787,7 @@ func TestOpenAIGatewayService_OAuthPassthrough_NonCodexUAFallbackToCodexUA(t *te
 	require.Equal(t, codexCLIUserAgent, upstream.lastReq.Header.Get("User-Agent"))
 }
 
-// 回归（issue #3901）：codex-tui 等官方 UA 在透传模式下必须逐字保留，且 originator
-// 由最终 UA 推导配套——历史实现会把 codex-tui UA 强改为 codex_cli_rs，而 originator
-// 保留客户端原值，造成 originator/UA 首段错配被上游 404。
+// 透传模式也必须强制统一为网关规范身份，客户端自报身份不参与构造。
 func TestOpenAIGatewayService_OAuthPassthrough_CodexTuiIdentityPreservedAndPaired(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -1832,8 +1830,9 @@ func TestOpenAIGatewayService_OAuthPassthrough_CodexTuiIdentityPreservedAndPaire
 	_, err := svc.Forward(context.Background(), c, account, inputBody)
 	require.NoError(t, err)
 	require.NotNil(t, upstream.lastReq)
-	require.Equal(t, tuiUA, upstream.lastReq.Header.Get("User-Agent"))
+	require.Equal(t, codexCLIUserAgent, upstream.lastReq.Header.Get("User-Agent"))
 	require.Equal(t, "codex-tui", upstream.lastReq.Header.Get("originator"))
+	require.Equal(t, codexCLIVersion, upstream.lastReq.Header.Get("version"))
 }
 
 func TestOpenAIGatewayService_CodexCLIOnly_RejectsNonCodexClient(t *testing.T) {
@@ -2091,6 +2090,109 @@ func TestOpenAIGatewayService_APIKeyPassthrough_PreservesBodyAndUsesResponsesEnd
 	require.Equal(t, "window-passthrough", upstream.lastReq.Header.Get("X-Codex-Window-ID"))
 	require.Equal(t, "installation-passthrough", upstream.lastReq.Header.Get("X-Codex-Installation-ID"))
 	require.Empty(t, upstream.lastReq.Header.Get("X-Test"))
+}
+
+func TestOpenAIGatewayService_OAuthPassthroughAppliesCodexFingerprintToHeaderAndBody(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", bytes.NewReader(nil))
+	c.Request.Header.Set("User-Agent", "codex_cli_rs/0.144.1")
+	c.Request.Header.Set("originator", "codex_cli_rs")
+	c.Request.Header.Set("session-id", "header-session")
+	c.Request.Header.Set("x-codex-installation-id", "header-install")
+	c.Request.Header.Set("x-codex-turn-metadata", `{"installation_id":"header-install","session_id":"header-session","sandbox":"seatbelt"}`)
+
+	body := []byte(`{"model":"gpt-5.6-sol","stream":false,"prompt_cache_key":"body-session","client_metadata":{"session_id":"body-session","x-codex-turn-metadata":"{\"installation_id\":\"body-install\",\"session_id\":\"body-session\",\"sandbox\":\"seatbelt\"}"},"input":[{"type":"message","role":"user","content":"hi"}]}`)
+	upstream := &httpUpstreamRecorder{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}, "x-request-id": []string{"rid-fingerprint"}},
+		Body:       io.NopCloser(strings.NewReader("data: [DONE]\n\n")),
+	}}
+	svc := &OpenAIGatewayService{cfg: &config.Config{}, httpUpstream: upstream}
+	account := newTestOAuthAccount(4402, map[string]any{
+		codexFingerprintModeExtraKey: "session",
+		"openai_passthrough":         true,
+	})
+	account.Name = "oauth-raw"
+	account.Status = StatusActive
+	account.Schedulable = true
+	account.Concurrency = 1
+	account.Credentials = map[string]any{"access_token": "oauth-token", "chatgpt_account_id": "chatgpt-acc"}
+
+	_, err := svc.Forward(context.Background(), c, account, body)
+
+	require.NoError(t, err)
+	require.NotNil(t, upstream.lastReq)
+	seed, ok := codexFingerprintSeed(account.Extra)
+	require.True(t, ok)
+	wantInstallationID := resolveConvergedInstallationID(account, seed)
+	wantSessionID := resolveConvergedSessionID(seed)
+	wantThreadID := resolveConvergedThreadID(seed, "header-session")
+	require.Equal(t, wantInstallationID, upstream.lastReq.Header.Get("x-codex-installation-id"))
+	require.Equal(t, wantSessionID, upstream.lastReq.Header.Get("session-id"))
+	require.Equal(t, wantThreadID, upstream.lastReq.Header.Get("thread-id"))
+	require.Equal(t, wantSessionID, gjson.GetBytes(upstream.lastBody, "prompt_cache_key").String())
+	require.Equal(t, wantInstallationID, gjson.GetBytes(upstream.lastBody, "client_metadata.x-codex-installation-id").String())
+	require.Equal(t, wantSessionID, gjson.GetBytes(upstream.lastBody, "client_metadata.session_id").String())
+	require.Equal(t, wantThreadID, gjson.GetBytes(upstream.lastBody, "client_metadata.thread_id").String())
+	require.Equal(t,
+		gjson.Get(upstream.lastReq.Header.Get("x-codex-turn-metadata"), "turn_id").String(),
+		gjson.GetBytes(upstream.lastBody, "client_metadata.turn_id").String(),
+	)
+}
+
+func TestOpenAIGatewayService_OAuthTransformedAppliesCodexFingerprintToHeaderAndBody(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", bytes.NewReader(nil))
+	c.Request.Header.Set("User-Agent", "codex_cli_rs/0.144.1")
+	c.Request.Header.Set("originator", "codex_cli_rs")
+	c.Request.Header.Set("session-id", "header-session")
+	c.Request.Header.Set("x-codex-installation-id", "header-install")
+	c.Request.Header.Set("x-codex-turn-metadata", `{"installation_id":"header-install","session_id":"header-session","sandbox":"seatbelt"}`)
+
+	body := []byte(`{"model":"gpt-5.5","stream":false,"prompt_cache_key":"body-session","client_metadata":{"session_id":"body-session","x-codex-turn-metadata":"{\"installation_id\":\"body-install\",\"session_id\":\"body-session\",\"sandbox\":\"seatbelt\"}"},"input":[{"type":"message","role":"user","content":"hi"}]}`)
+	upstream := &httpUpstreamRecorder{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}, "x-request-id": []string{"rid-fingerprint-transform"}},
+		Body:       io.NopCloser(strings.NewReader("data: [DONE]\n\n")),
+	}}
+	svc := &OpenAIGatewayService{
+		cfg:           &config.Config{},
+		httpUpstream:  upstream,
+		toolCorrector: NewCodexToolCorrector(),
+	}
+	account := newTestOAuthAccount(4401, map[string]any{codexFingerprintModeExtraKey: "session"})
+	account.Name = "oauth-transformed"
+	account.Status = StatusActive
+	account.Schedulable = true
+	account.Concurrency = 1
+	account.Credentials = map[string]any{"access_token": "oauth-token", "chatgpt_account_id": "chatgpt-acc"}
+
+	_, err := svc.Forward(context.Background(), c, account, body)
+
+	require.NoError(t, err)
+	require.NotNil(t, upstream.lastReq)
+	seed, ok := codexFingerprintSeed(account.Extra)
+	require.True(t, ok)
+	wantInstallationID := resolveConvergedInstallationID(account, seed)
+	wantSessionID := resolveConvergedSessionID(seed)
+	wantThreadID := resolveConvergedThreadID(seed, "header-session")
+	require.Equal(t, wantInstallationID, upstream.lastReq.Header.Get("x-codex-installation-id"))
+	require.Equal(t, wantSessionID, upstream.lastReq.Header.Get("session-id"))
+	require.Equal(t, wantThreadID, upstream.lastReq.Header.Get("thread-id"))
+	require.Equal(t, wantSessionID, gjson.GetBytes(upstream.lastBody, "prompt_cache_key").String())
+	require.Equal(t, wantInstallationID, gjson.GetBytes(upstream.lastBody, "client_metadata.x-codex-installation-id").String())
+	require.Equal(t, wantSessionID, gjson.GetBytes(upstream.lastBody, "client_metadata.session_id").String())
+	require.Equal(t, wantThreadID, gjson.GetBytes(upstream.lastBody, "client_metadata.thread_id").String())
+	require.Equal(t,
+		gjson.Get(upstream.lastReq.Header.Get("x-codex-turn-metadata"), "turn_id").String(),
+		gjson.GetBytes(upstream.lastBody, "client_metadata.turn_id").String(),
+	)
 }
 
 func TestOpenAIGatewayService_OAuthPassthrough_WarnOnTimeoutHeadersForStream(t *testing.T) {

@@ -68,6 +68,7 @@ func isRegisteredRuntimeEndpoint(endpoint gatewayruntime.Endpoint) bool {
 		gatewayruntime.EndpointImages,
 		gatewayruntime.EndpointVideos,
 		gatewayruntime.EndpointCountTokens,
+		gatewayruntime.EndpointResponsesInputTokens,
 		gatewayruntime.EndpointLive,
 		gatewayruntime.EndpointWebSocket:
 		return true

@@ -30,6 +30,7 @@ func TestAccountTestService_TestAccountConnection_OpenAICompactOAuthSuccessPersi
 			"access_token":               "oauth-token",
 			"chatgpt_account_id":         "chatgpt-acc",
 			"chatgpt_account_is_fedramp": true,
+			"user_agent":                 "codex_vscode/0.125.0 (Mac OS X 15.1.0; arm64) vscode",
 		},
 	}
 	repo := &snapshotUpdateAccountRepo{
@@ -59,7 +60,7 @@ func TestAccountTestService_TestAccountConnection_OpenAICompactOAuthSuccessPersi
 	require.Equal(t, codexCLIVersion, upstream.lastReq.Header.Get("Version"))
 	require.NotEmpty(t, upstream.lastReq.Header.Get("Session_Id"))
 	require.Equal(t, HTTPUpstreamProfileOpenAI, HTTPUpstreamProfileFromContext(upstream.lastReq.Context()))
-	require.Equal(t, codexCLIUserAgent, upstream.lastReq.Header.Get("User-Agent"))
+	requireOpenAICodexAccountCustomIdentity(t, upstream.lastReq.Header)
 	require.Equal(t, "chatgpt-acc", upstream.lastReq.Header.Get("chatgpt-account-id"))
 	require.Equal(t, "true", upstream.lastReq.Header.Get("x-openai-fedramp"))
 	require.Equal(t, "gpt-5.4", gjson.GetBytes(upstream.lastBody, "model").String())

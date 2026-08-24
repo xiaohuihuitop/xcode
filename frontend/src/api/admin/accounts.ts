@@ -832,6 +832,30 @@ export async function resetOpenAIQuota(id: number): Promise<OpenAIQuotaResetResu
   return data
 }
 
+export interface GLMQuotaTier {
+  window: '5h' | 'weekly' | string
+  used_percent: number
+  reset_at?: string
+}
+
+export interface GLMQuotaResult {
+  success: boolean
+  credential_valid: boolean
+  tiers?: GLMQuotaTier[]
+  plan_level?: string
+  status_code?: number
+  fetched_at: number
+  persisted: boolean
+  error_category?: string
+  error?: string
+}
+
+/** Query the read-only GLM Coding Plan quota snapshot for an account. */
+export async function queryGLMQuota(id: number): Promise<GLMQuotaResult> {
+  const { data } = await apiClient.get<GLMQuotaResult>(`/admin/accounts/${id}/glm-quota`)
+  return data
+}
+
 export interface SparkShadowCreatePayload {
   name?: string
   priority?: number
@@ -965,6 +989,7 @@ export const accountsAPI = {
   revertProxyFallback,
   queryOpenAIQuota,
   resetOpenAIQuota,
+  queryGLMQuota,
   createSparkShadow,
   getUpstreamBillingProbeSettings,
   updateUpstreamBillingProbeSettings,

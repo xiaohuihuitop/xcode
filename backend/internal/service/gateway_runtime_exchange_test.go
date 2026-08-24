@@ -5,6 +5,7 @@ package service
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"mime"
@@ -175,6 +176,148 @@ func TestOpenAIRuntimeChatCompletionsAPIKeyUsesPureExchangePipeline(t *testing.T
 	require.JSONEq(t, `{"id":"chatcmpl_runtime","model":"gpt-5.4","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":3,"completion_tokens":2,"total_tokens":5}}`, string(exchange.body))
 }
 
+func TestOpenAIRuntimeResponsesAPIKeyBufferedReadFailureIsRetryable(t *testing.T) {
+	body := []byte(`{"model":"gpt-5.4","input":"hello","stream":false}`)
+	exchange := newRuntimeExchangeTestDouble(t, bytes.NewReader(body))
+	exchange.request.URL.Path = "/v1/responses"
+	partial := `{"id":"chatcmpl_partial","model":"gpt-5.4","choices":[]}`
+	upstream := &httpUpstreamRecorder{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}, "x-request-id": []string{"runtime-responses-buffered-read"}},
+		Body:       &errTailReader{data: []byte(partial), err: errors.New("simulated responses buffered read failure")},
+	}}
+	svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
+	account := rawChatCompletionsTestAccount()
+
+	result, err := svc.ForwardResponsesExchange(context.Background(), exchange, account, body)
+
+	var failoverErr *UpstreamFailoverError
+	require.ErrorAs(t, err, &failoverErr)
+	require.Nil(t, result)
+	require.True(t, failoverErr.ShouldRetryNextAccount())
+	require.False(t, exchange.Written(), "buffered read failures must not commit a partial Responses response")
+}
+
+func TestOpenAIRuntimeMessagesAPIKeyBufferedReadFailureIsRetryable(t *testing.T) {
+	body := []byte(`{"model":"gpt-4o","max_tokens":32,"messages":[{"role":"user","content":"hello"}],"stream":false}`)
+	exchange := newRuntimeExchangeTestDouble(t, bytes.NewReader(body))
+	exchange.request.URL.Path = "/v1/messages"
+	partial := `{"id":"chatcmpl_partial","model":"gpt-4o","choices":[]}`
+	upstream := &httpUpstreamRecorder{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}, "x-request-id": []string{"runtime-messages-buffered-read"}},
+		Body:       &errTailReader{data: []byte(partial), err: errors.New("simulated messages buffered read failure")},
+	}}
+	svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
+	account := rawChatCompletionsTestAccount()
+
+	result, err := svc.ForwardAsAnthropicExchange(context.Background(), exchange, account, body, "")
+
+	var failoverErr *UpstreamFailoverError
+	require.ErrorAs(t, err, &failoverErr)
+	require.Nil(t, result)
+	require.True(t, failoverErr.ShouldRetryNextAccount())
+	require.False(t, exchange.Written(), "buffered read failures must not commit a partial Messages response")
+}
+
+func TestOpenAIRuntimeResponsesFallbackRestoresEncryptedReasoningFromCache(t *testing.T) {
+	firstBody := []byte(`{"model":"glm-5.2","input":[{"role":"user","content":"inspect"}],"stream":false}`)
+	secondExchangeBody := []byte(`{"model":"glm-5.2","input":[{"role":"user","content":"inspect"},{"type":"reasoning","id":"`)
+	upstream := &httpUpstreamRecorder{responses: []*http.Response{
+		{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}, "x-request-id": []string{"reasoning-cache-first"}},
+			Body:       io.NopCloser(strings.NewReader(`{"id":"chatcmpl_reasoning_cache","model":"glm-5.2","choices":[{"index":0,"message":{"role":"assistant","content":"","reasoning_content":"inspect the repository","tool_calls":[{"id":"call_a","type":"function","function":{"name":"lookup","arguments":"{}"}}]},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":3,"completion_tokens":4,"total_tokens":7}}`)),
+		},
+		{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}, "x-request-id": []string{"reasoning-cache-second"}},
+			Body:       io.NopCloser(strings.NewReader(`{"id":"chatcmpl_reasoning_cache_2","model":"glm-5.2","choices":[{"index":0,"message":{"role":"assistant","content":"done"},"finish_reason":"stop"}],"usage":{"prompt_tokens":4,"completion_tokens":1,"total_tokens":5}}`)),
+		},
+	}}
+	svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
+	account := rawChatCompletionsTestAccount()
+	firstExchange := newRuntimeExchangeTestDouble(t, bytes.NewReader(firstBody))
+	firstExchange.request.URL.Path = "/v1/responses"
+	firstExchange.SetState(openAICompatReasoningAPIKeyIDStateKey, int64(123))
+
+	firstResult, err := svc.ForwardResponsesExchange(context.Background(), firstExchange, account, firstBody)
+	require.NoError(t, err)
+	require.NotNil(t, firstResult)
+	reasoningID := gjson.GetBytes(firstExchange.body, "output.#(type==reasoning).id").String()
+	require.NotEmpty(t, reasoningID)
+
+	secondBody := append(secondExchangeBody, []byte(reasoningID+`","encrypted_content":"opaque"},{"type":"function_call","call_id":"call_a","name":"lookup","arguments":"{}"},{"type":"function_call_output","call_id":"call_a","output":"done"}],"stream":false}`)...)
+	secondExchange := newRuntimeExchangeTestDouble(t, bytes.NewReader(secondBody))
+	secondExchange.request.URL.Path = "/v1/responses"
+	secondExchange.SetState(openAICompatReasoningAPIKeyIDStateKey, int64(123))
+
+	secondResult, err := svc.ForwardResponsesExchange(context.Background(), secondExchange, account, secondBody)
+	require.NoError(t, err)
+	require.NotNil(t, secondResult)
+	require.Equal(t, "inspect the repository", gjson.GetBytes(upstream.bodies[1], "messages.1.reasoning_content").String())
+}
+
+func TestOpenAIRuntimeResponsesFallbackStreamingCachesReasoningForLaterTurn(t *testing.T) {
+	firstBody := []byte(`{"model":"glm-5.2","input":[{"role":"user","content":"inspect"}],"stream":true}`)
+	upstream := &httpUpstreamRecorder{responses: []*http.Response{
+		{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"text/event-stream"}, "x-request-id": []string{"reasoning-cache-stream"}},
+			Body: io.NopCloser(strings.NewReader(strings.Join([]string{
+				`data: {"id":"chatcmpl_reasoning_stream","object":"chat.completion.chunk","model":"glm-5.2","choices":[{"index":0,"delta":{"reasoning_content":"inspect the repository"},"finish_reason":null}]}`,
+				"",
+				`data: {"id":"chatcmpl_reasoning_stream","object":"chat.completion.chunk","model":"glm-5.2","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_stream","type":"function","function":{"name":"lookup","arguments":"{}"}}]},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":3,"completion_tokens":4,"total_tokens":7}}`,
+				"",
+				"data: [DONE]",
+				"",
+			}, "\n"))),
+		},
+		{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}, "x-request-id": []string{"reasoning-cache-stream-second"}},
+			Body:       io.NopCloser(strings.NewReader(`{"id":"chatcmpl_reasoning_stream_2","model":"glm-5.2","choices":[{"index":0,"message":{"role":"assistant","content":"done"},"finish_reason":"stop"}],"usage":{"prompt_tokens":4,"completion_tokens":1,"total_tokens":5}}`)),
+		},
+	}}
+	svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
+	account := rawChatCompletionsTestAccount()
+	firstExchange := newRuntimeExchangeTestDouble(t, bytes.NewReader(firstBody))
+	firstExchange.request.URL.Path = "/v1/responses"
+	firstExchange.SetState(openAICompatReasoningAPIKeyIDStateKey, int64(456))
+
+	firstResult, err := svc.ForwardResponsesExchange(context.Background(), firstExchange, account, firstBody)
+	require.NoError(t, err)
+	require.NotNil(t, firstResult)
+	var reasoningID string
+	for _, line := range strings.Split(string(firstExchange.body), "\n") {
+		if !strings.HasPrefix(line, "data: ") {
+			continue
+		}
+		var event struct {
+			Type string `json:"type"`
+			Item struct {
+				Type string `json:"type"`
+				ID   string `json:"id"`
+			} `json:"item"`
+		}
+		if json.Unmarshal([]byte(strings.TrimPrefix(line, "data: ")), &event) == nil && event.Type == "response.output_item.added" && event.Item.Type == "reasoning" {
+			reasoningID = event.Item.ID
+			break
+		}
+	}
+	require.NotEmpty(t, reasoningID)
+
+	secondBody := []byte(`{"model":"glm-5.2","input":[{"role":"user","content":"inspect"},{"type":"reasoning","id":"` + reasoningID + `","encrypted_content":"opaque"},{"type":"function_call","call_id":"call_stream","name":"lookup","arguments":"{}"},{"type":"function_call_output","call_id":"call_stream","output":"done"}],"stream":false}`)
+	secondExchange := newRuntimeExchangeTestDouble(t, bytes.NewReader(secondBody))
+	secondExchange.request.URL.Path = "/v1/responses"
+	secondExchange.SetState(openAICompatReasoningAPIKeyIDStateKey, int64(456))
+
+	secondResult, err := svc.ForwardResponsesExchange(context.Background(), secondExchange, account, secondBody)
+	require.NoError(t, err)
+	require.NotNil(t, secondResult)
+	require.Equal(t, "inspect the repository", gjson.GetBytes(upstream.bodies[1], "messages.1.reasoning_content").String())
+}
+
 func TestOpenAIRuntimeChatCompletionsOAuthUsesPureExchangePipeline(t *testing.T) {
 	body := []byte(`{"model":"gpt-5.4","messages":[{"role":"user","content":"hello"}],"stream":false}`)
 	exchange := newRuntimeExchangeTestDouble(t, bytes.NewReader(body))
@@ -304,6 +447,35 @@ func TestOpenAIRuntimeChatCompletionsOAuthReturnsFailoverWithoutWritingResponse(
 	require.False(t, exchange.Written())
 	require.Equal(t, "/v1/responses", ActualOpenAIUpstreamEndpointFromExchange(exchange))
 	require.Contains(t, string(failoverErr.ResponseBody), "upstream unavailable")
+}
+
+func TestOpenAIRuntimeChatCompletionsOAuthBufferedReadFailureIsRetryable(t *testing.T) {
+	body := []byte(`{"model":"gpt-5.4","messages":[{"role":"user","content":"hello"}],"stream":false}`)
+	exchange := newRuntimeExchangeTestDouble(t, bytes.NewReader(body))
+	exchange.request.URL.Path = "/v1/chat/completions"
+	partial := strings.Join([]string{
+		`data: {"type":"response.created","response":{"id":"resp_buffered_read","model":"gpt-5.4","status":"in_progress","output":[]}}`,
+		"",
+	}, "\n")
+	upstream := &httpUpstreamRecorder{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}, "x-request-id": []string{"runtime-buffered-read"}},
+		Body:       &errTailReader{data: []byte(partial), err: errors.New("simulated buffered read failure")},
+	}}
+	svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
+	account := &Account{
+		ID: 56, Platform: PlatformOpenAI, Type: AccountTypeOAuth, Concurrency: 1,
+		Credentials: map[string]any{"access_token": "oauth-token", "chatgpt_account_id": "chatgpt-acc"},
+	}
+
+	result, err := svc.ForwardAsChatCompletionsRuntime(context.Background(), exchange, account, body, "", "", 82)
+
+	var failoverErr *UpstreamFailoverError
+	require.ErrorAs(t, err, &failoverErr)
+	require.Nil(t, result)
+	require.Equal(t, http.StatusBadGateway, failoverErr.StatusCode)
+	require.True(t, failoverErr.ShouldRetryNextAccount())
+	require.False(t, exchange.Written(), "buffered read failures must not commit a partial client response")
 }
 
 func TestOpenAIRuntimeMessagesOAuthUsesPureResponsesExchangePipeline(t *testing.T) {

@@ -11,6 +11,12 @@ import (
 	"go.uber.org/zap"
 )
 
+// ResponsesInputTokens handles the non-billing OpenAI Responses input-token
+// preflight through the shared Runtime dispatch path.
+func (h *OpenAIGatewayHandler) ResponsesInputTokens(c *gin.Context) {
+	h.dispatchRuntimeEndpoint(c, gatewayruntime.EndpointResponsesInputTokens)
+}
+
 // GrokCountTokens handles Anthropic-compatible count_tokens requests locally.
 // The route middleware already authenticates the API key and resolves the
 // group; this handler intentionally does not select an account or check billing.

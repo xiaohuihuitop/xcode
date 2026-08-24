@@ -399,6 +399,12 @@ func IsForwardableOpenAIResponsesRequestPath(c *gin.Context) bool {
 	return ok
 }
 
+// IsOpenAIResponsesInputTokensRequestPath reports the native Responses token
+// preflight subpath.
+func IsOpenAIResponsesInputTokensRequestPath(c *gin.Context) bool {
+	return openAIResponsesRequestPathSuffix(c) == "/input_tokens"
+}
+
 // rawOpenAIResponsesRequestPathSuffix 仅做提取，不做任何安全判断。
 func rawOpenAIResponsesRequestPathSuffix(c *gin.Context) string {
 	if c == nil || c.Request == nil || c.Request.URL == nil {

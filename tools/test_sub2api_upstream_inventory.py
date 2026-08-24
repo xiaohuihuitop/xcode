@@ -21,6 +21,8 @@ from tools.sub2api_upstream_inventory import (
     snapshot_upstream,
     validate_matrix,
     validate_database_impact,
+    validate_sync_path,
+    translate_migration_number,
     verify_target_commit,
     write_csv,
 )
@@ -131,6 +133,24 @@ class InventoryTests(unittest.TestCase):
         self.assertEqual(migration_number("backend/migrations/228_channel.sql"), 228)
         self.assertEqual(migration_number("backend/migrations/225a_index.sql"), 225)
         self.assertIsNone(migration_number("backend/internal/service/openai.go"))
+
+    def test_translate_migration_number_uses_reserved_runtime_range(self):
+        self.assertEqual(translate_migration_number(217), 8017)
+        self.assertEqual(translate_migration_number(228), 8028)
+
+    def test_validate_sync_path_rejects_productcore_direct_sync(self):
+        with self.assertRaisesRegex(ValueError, "ProductCore path cannot use direct_sync"):
+            validate_sync_path("backend/internal/service/subscription.go", "direct_sync")
+
+    def test_validate_sync_path_rejects_direct_sql_and_contract_overwrite(self):
+        with self.assertRaisesRegex(ValueError, "direct_sql is forbidden"):
+            validate_sync_path(
+                "backend/migrations/217_provider_quota.sql",
+                "adapter_port",
+                migration_handling="direct_sql",
+            )
+        with self.assertRaisesRegex(ValueError, "RuntimeBridge contract requires explicit review"):
+            validate_sync_path("backend/pkg/runtimebridge/v1/contract.go", "direct_sync")
 
     def test_resolve_tag_commit_accepts_lightweight_and_annotated_tags(self):
         self.assertEqual(resolve_tag_commit({"object": {"type": "commit", "sha": "abc"}}), "abc")
@@ -450,6 +470,8 @@ class InventoryTests(unittest.TestCase):
             output = current / "docs" / "upstream" / "fixture"
             (current / "backend" / "internal" / "pkg" / "apicompat").mkdir(parents=True)
             (current / "backend" / "internal" / "pkg" / "apicompat" / "a.go").write_text("current\n", encoding="utf-8")
+            (current / "backend" / "internal" / "runtime" / "sub2api" / "upstream" / "apicompat").mkdir(parents=True)
+            (current / "backend" / "internal" / "runtime" / "sub2api" / "upstream" / "apicompat" / "a.go").write_text("synced\n", encoding="utf-8")
             (current / ".git").write_text("gitdir: elsewhere", encoding="utf-8")
             (current / "tools" / "__pycache__").mkdir(parents=True)
             (current / "tools" / "__pycache__" / "cache.pyc").write_bytes(b"ignored")
@@ -492,6 +514,7 @@ class InventoryTests(unittest.TestCase):
             self.assertNotIn(".git", paths)
             self.assertNotIn("tools/__pycache__/cache.pyc", paths)
             self.assertNotIn("frontend/dist/generated.js", paths)
+            self.assertNotIn("backend/internal/runtime/sub2api/upstream/apicompat/a.go", paths)
             self.assertFalse(any(path.startswith("docs/upstream/fixture/") for path in paths))
 
 

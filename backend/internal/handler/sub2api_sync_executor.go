@@ -43,7 +43,7 @@ func (e sub2APISyncExecutor) Execute(ctx context.Context, request gatewayruntime
 	if sink == nil {
 		return gatewayruntime.Result{}, gatewayruntime.ErrUsageSinkUnavailable
 	}
-	if e.syncDriver != nil && strings.EqualFold(strings.TrimSpace(request.Adapter), service.PlatformOpenAI) {
+	if e.syncDriver != nil && strings.EqualFold(strings.TrimSpace(request.Adapter), service.PlatformOpenAI) && request.Endpoint != gatewayruntime.EndpointResponsesInputTokens {
 		return runtimebridge.NewLocalRuntime(e.syncDriver).Dispatch(ctx, request, sink)
 	}
 	trackingSink := &messagesExecutorTerminalSink{sink: sink}
@@ -62,6 +62,8 @@ func (e sub2APISyncExecutor) Execute(ctx context.Context, request gatewayruntime
 		} else {
 			result, err = e.executeCountTokensRuntime(ctx, request, trackingSink)
 		}
+	case gatewayruntime.EndpointResponsesInputTokens:
+		result, err = e.executeResponsesInputTokensRuntime(ctx, request, trackingSink)
 	case gatewayruntime.EndpointEmbeddings:
 		if e.executeEmbeddings != nil {
 			result, err = e.executeEmbeddings(ctx, request, trackingSink)
@@ -117,6 +119,85 @@ func (e sub2APISyncExecutor) Execute(ctx context.Context, request gatewayruntime
 		return result, recordErr
 	}
 	return result, err
+}
+
+func (e sub2APISyncExecutor) executeResponsesInputTokensRuntime(ctx context.Context, request gatewayruntime.Request, sink gatewayruntime.UsageSink) (gatewayruntime.Result, error) {
+	if request.Exchange == nil || len(request.Payload) == 0 {
+		if request.Exchange != nil {
+			_ = writeSyncJSONError(request.Exchange, http.StatusBadRequest, "invalid_request_error", "Request body is empty")
+		}
+		return gatewayruntime.Result{}, errors.New("responses input_tokens request body is empty")
+	}
+	var parsed struct {
+		Model string `json:"model"`
+	}
+	if err := json.Unmarshal(request.Payload, &parsed); err != nil || strings.TrimSpace(parsed.Model) == "" {
+		_ = writeSyncJSONError(request.Exchange, http.StatusBadRequest, "invalid_request_error", "model is required")
+		if err == nil {
+			err = errors.New("responses input_tokens model is required")
+		}
+		return gatewayruntime.Result{}, err
+	}
+	if e.openAIHandler == nil || e.openAIHandler.gatewayService == nil {
+		return gatewayruntime.Result{}, ErrSub2APIRuntimeEndpointUnavailable
+	}
+	svc := e.openAIHandler.gatewayService
+	excluded := make(map[int64]struct{})
+	for switchCount := 0; switchCount <= e.syncMaxSwitches(); switchCount++ {
+		selection, _, err := svc.SelectAccountWithSchedulerForCapability(
+			ctx,
+			service.PlatformSchedulingID(ctx),
+			"",
+			request.Metadata.SessionID,
+			strings.TrimSpace(parsed.Model),
+			excluded,
+			service.OpenAIUpstreamTransportAny,
+			service.OpenAIEndpointCapabilityChatCompletions,
+			false,
+			false,
+			false,
+			request.Adapter,
+		)
+		if err != nil || selection == nil || selection.Account == nil {
+			if err == nil {
+				err = service.ErrNoAvailableAccounts
+			}
+			_ = writeSyncJSONError(request.Exchange, http.StatusBadGateway, "api_error", "No available accounts")
+			return gatewayruntime.Result{}, err
+		}
+		account := selection.Account
+		release := selection.ReleaseFunc
+		err = svc.ForwardResponsesInputTokensExchange(ctx, request.Exchange, account, request.Payload)
+		if release != nil {
+			release()
+		}
+		status := runtimeExchangeStatus(request.Exchange)
+		if err == nil && status >= http.StatusOK && status < http.StatusMultipleChoices {
+			event := gatewayruntime.UsageEvent{
+				RequestID: request.RequestID,
+				Success:   true,
+				Facts: gatewayruntime.UsageFacts{
+					Adapter: request.Adapter, Model: parsed.Model, RequestedModel: request.RequestedModel,
+					UpstreamModel: request.UpstreamModel, AccountID: account.ID,
+					InboundEndpoint: request.InboundEndpoint, TerminalStatus: http.StatusText(status),
+				},
+			}
+			if recordErr := sink.RecordFinal(ctx, event); recordErr != nil {
+				return gatewayruntime.Result{}, recordErr
+			}
+			return gatewayruntime.Result{StatusCode: status, AccountID: account.ID, UpstreamModel: request.UpstreamModel}, nil
+		}
+		var failoverErr *service.UpstreamFailoverError
+		if !errors.As(err, &failoverErr) || request.Exchange.Size() > 0 || !failoverErr.ShouldRetryNextAccount() {
+			if err == nil {
+				err = fmt.Errorf("responses input_tokens upstream returned status %d", status)
+			}
+			return gatewayruntime.Result{StatusCode: status, AccountID: account.ID}, err
+		}
+		excluded[account.ID] = struct{}{}
+		svc.RecordOpenAIAccountSwitch()
+	}
+	return gatewayruntime.Result{StatusCode: http.StatusBadGateway}, service.ErrNoAvailableAccounts
 }
 
 func (e sub2APISyncExecutor) executeCountTokensRuntime(ctx context.Context, request gatewayruntime.Request, sink gatewayruntime.UsageSink) (gatewayruntime.Result, error) {

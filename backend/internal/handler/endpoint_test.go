@@ -29,6 +29,7 @@ func TestNormalizeInboundEndpoint(t *testing.T) {
 		{"/v1/alpha/search", EndpointAlphaSearch},
 		{"/v1/responses", EndpointResponses},
 		{"/v1/responses/compact", EndpointResponsesCompact},
+		{"/v1/responses/input_tokens", EndpointResponsesInputTokens},
 		{"/v1/responses/compact/detail", EndpointResponsesCompact},
 		{"/v1/images/generations", EndpointImagesGenerations},
 		{"/v1/images/edits", EndpointImagesEdits},
@@ -53,6 +54,7 @@ func TestNormalizeInboundEndpoint(t *testing.T) {
 		{"/responses", EndpointResponses},
 		{"/responses/compact", EndpointResponsesCompact},
 		{"/responses/compact/detail", EndpointResponsesCompact},
+		{"/responses/input_tokens", EndpointResponsesInputTokens},
 		{"/alpha/search", EndpointAlphaSearch},
 		{"/images/tasks/imgtask_123", EndpointImageTasks},
 
@@ -60,6 +62,7 @@ func TestNormalizeInboundEndpoint(t *testing.T) {
 		{"/backend-api/codex/responses", EndpointResponses},
 		{"/backend-api/codex/responses/compact", EndpointResponsesCompact},
 		{"/backend-api/codex/responses/compact/detail", EndpointResponsesCompact},
+		{"/backend-api/codex/responses/input_tokens", EndpointResponsesInputTokens},
 		{"/backend-api/codex/alpha/search", EndpointAlphaSearch},
 
 		// Must NOT generalize to arbitrary paths merely ending in
@@ -101,6 +104,7 @@ func TestDeriveUpstreamEndpoint(t *testing.T) {
 
 		// OpenAI — root Responses.
 		{"openai responses root", EndpointResponses, "/v1/responses", service.PlatformOpenAI, EndpointResponses},
+		{"openai responses input tokens", EndpointResponsesInputTokens, "/v1/responses/input_tokens", service.PlatformOpenAI, EndpointResponsesInputTokens},
 
 		// OpenAI — compact, raw path carries the derivable "/compact"
 		// (or nested) suffix, which must be preserved on the upstream

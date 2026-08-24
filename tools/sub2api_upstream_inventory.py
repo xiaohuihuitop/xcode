@@ -34,6 +34,7 @@ COMMIT_CATEGORIES = {
 }
 FILE_CATEGORIES = COMMIT_CATEGORIES | {"needs_review"}
 FILE_STATES = {"same", "different", "official_only", "current_only"}
+OFFICIAL_RUNTIME_ZONE_PREFIX = "backend/internal/runtime/sub2api/upstream"
 BASELINE_IDENTITIES = {
     "v0.1.179": {
         "repo": "Wei-Shaw/sub2api",
@@ -663,6 +664,46 @@ def migration_number(path: str):
     return int(match.group(1)) if match else None
 
 
+def translate_migration_number(official_number: int) -> int:
+    """Map an official migration number into XCode's reserved Runtime range."""
+    if isinstance(official_number, bool) or not isinstance(official_number, int):
+        raise ValueError("official migration number must be an integer")
+    translated = 8000 + (official_number - 200)
+    if not 8000 <= translated <= 8999:
+        raise ValueError(
+            f"official migration {official_number} cannot be mapped into 8000-8999"
+        )
+    return translated
+
+
+def validate_sync_path(
+    path: str,
+    disposition: str,
+    *,
+    migration_handling: str | None = None,
+) -> None:
+    """Reject automatic sync operations that can overwrite XCode ownership."""
+    normalized = path.replace("\\", "/")
+    if disposition not in DISPOSITIONS:
+        raise ValueError(f"invalid sync disposition: {disposition}")
+    if migration_handling == "direct_sql":
+        raise ValueError(f"direct_sql is forbidden: {normalized}")
+    if migration_number(normalized) is not None and disposition in {"direct_sync", "adapter_port"}:
+        raise ValueError(f"migration requires explicit XCode translation: {normalized}")
+    if normalized.startswith("backend/pkg/runtimebridge/v1/") and disposition == "direct_sync":
+        raise ValueError(
+            f"RuntimeBridge contract requires explicit review: {normalized}"
+        )
+    category = classify_path(normalized)
+    if disposition == "direct_sync" and category in {
+        "productcore",
+        "frontend_product",
+        "database",
+        "infrastructure",
+    }:
+        raise ValueError(f"ProductCore path cannot use direct_sync: {normalized}")
+
+
 def sha256_file(path: Path) -> str:
     content = path.read_bytes()
     if b"\0" not in content:
@@ -929,10 +970,10 @@ def generate_inventory(snapshot_dir: Path, current_root: Path, output_dir: Path)
         )
 
     source_root = snapshot_dir / manifest["source_root"]
-    excluded_prefixes = ()
+    excluded_prefixes = (OFFICIAL_RUNTIME_ZONE_PREFIX,)
     try:
         output_relative = output_dir.resolve().relative_to(current_root.resolve()).as_posix()
-        excluded_prefixes = (output_relative,)
+        excluded_prefixes = (OFFICIAL_RUNTIME_ZONE_PREFIX, output_relative)
     except ValueError:
         pass
     file_rows = compare_trees(source_root, current_root, excluded_prefixes)
@@ -1178,7 +1219,7 @@ def validate_inventory(inventory_dir: Path, current_root: Path | None = None) ->
     validate_database_impact(files, mappings)
     if current_root is not None:
         inventory_prefix = f"docs/upstream/{inventory_dir.name}"
-        validate_current_tree(files, current_root, (inventory_prefix,))
+        validate_current_tree(files, current_root, (inventory_prefix, OFFICIAL_RUNTIME_ZONE_PREFIX))
 
 
 def build_parser() -> argparse.ArgumentParser:

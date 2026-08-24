@@ -10,6 +10,7 @@ import (
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
+	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -25,9 +26,13 @@ type OpenAIOAuthServiceSuite struct {
 func (s *OpenAIOAuthServiceSuite) SetupTest() {
 	s.ctx = context.Background()
 	s.received = make(chan url.Values, 1)
+	service.SetCodexCanonicalUserAgentResolver(func() string {
+		return "codex_cli_rs/0.200.1 (Ubuntu 22.4.0; x86_64) xterm-256color"
+	})
 }
 
 func (s *OpenAIOAuthServiceSuite) TearDownTest() {
+	service.SetCodexCanonicalUserAgentResolver(nil)
 	if s.srv != nil {
 		s.srv.Close()
 		s.srv = nil
@@ -42,6 +47,11 @@ func (s *OpenAIOAuthServiceSuite) setupServer(handler http.HandlerFunc) {
 func (s *OpenAIOAuthServiceSuite) TestExchangeCode_DefaultRedirectURI() {
 	errCh := make(chan string, 1)
 	s.setupServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("originator") != "codex_cli_rs" || r.Header.Get("User-Agent") != "codex_cli_rs/0.200.1 (Ubuntu 22.4.0; x86_64) xterm-256color" {
+			errCh <- "Codex auth identity mismatch"
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 		if r.Method != http.MethodPost {
 			errCh <- "method mismatch"
 			w.WriteHeader(http.StatusBadRequest)
@@ -96,6 +106,11 @@ func (s *OpenAIOAuthServiceSuite) TestExchangeCode_DefaultRedirectURI() {
 func (s *OpenAIOAuthServiceSuite) TestRefreshToken_FormFields() {
 	errCh := make(chan string, 1)
 	s.setupServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("originator") != "codex_cli_rs" || r.Header.Get("User-Agent") != "codex_cli_rs/0.200.1 (Ubuntu 22.4.0; x86_64) xterm-256color" {
+			errCh <- "Codex auth identity mismatch"
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 		if err := r.ParseForm(); err != nil {
 			errCh <- "ParseForm failed"
 			w.WriteHeader(http.StatusBadRequest)

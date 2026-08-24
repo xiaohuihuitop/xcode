@@ -11,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
 )
 
 func TestCodexRestrictionDetectRequestMatchesGinSurface(t *testing.T) {
@@ -72,7 +73,11 @@ func TestForwardOpenAIResponsesHTTPRuntimeUsesPurePreparation(t *testing.T) {
 	svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
 	account := &Account{
 		ID: 101, Name: "pure-prep", Platform: PlatformOpenAI, Type: AccountTypeOAuth,
-		Concurrency: 1, Credentials: map[string]any{"access_token": "oauth-token", "chatgpt_account_id": "chatgpt-account"},
+		Concurrency: 1, Credentials: map[string]any{
+			"access_token":       "oauth-token",
+			"chatgpt_account_id": "chatgpt-account",
+			"user_agent":         "codex_vscode/0.125.0 (Mac OS X 15.1.0; arm64) vscode",
+		},
 	}
 
 	result, err := svc.forwardOpenAIResponsesHTTPRuntime(context.Background(), exchange, account, body, 7)
@@ -82,4 +87,49 @@ func TestForwardOpenAIResponsesHTTPRuntimeUsesPurePreparation(t *testing.T) {
 	require.Equal(t, "pure-prep-rid", result.RequestID)
 	require.Equal(t, openAIResponsesEndpoint, ActualOpenAIUpstreamEndpointFromExchange(exchange))
 	require.Equal(t, "/backend-api/codex/responses", upstream.lastReq.URL.Path)
+	requireOpenAICodexAccountCustomIdentity(t, upstream.lastReq.Header)
+}
+
+func TestForwardOpenAIResponsesHTTPRuntimeAppliesCodexFingerprint(t *testing.T) {
+	body := []byte(`{"model":"gpt-5.5","input":"hello","stream":false,"client_metadata":{"session_id":"client-body-session","x-codex-turn-metadata":"{\"session_id\":\"client-body-session\",\"sandbox\":\"seccomp\"}"}}`)
+	exchange := newRuntimeExchangeTestDouble(t, bytes.NewReader(body))
+	exchange.request.URL.Path = "/v1/responses"
+	exchange.request.Header.Set("session-id", "client-header-session")
+	exchange.request.Header.Set("x-codex-installation-id", "client-installation")
+	exchange.request.Header.Set("x-codex-turn-metadata", `{"session_id":"client-header-session","sandbox":"seccomp"}`)
+	upstream := &httpUpstreamRecorder{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(bytes.NewBufferString(`{"id":"resp_fingerprint","model":"gpt-5.5","output":[],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}`)),
+	}}
+	svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
+	account := &Account{
+		ID: 102, Name: "fingerprint-prep", Platform: PlatformOpenAI, Type: AccountTypeOAuth,
+		Concurrency: 1,
+		Credentials: map[string]any{"access_token": "oauth-token", "chatgpt_account_id": "chatgpt-account"},
+		Extra: map[string]any{
+			codexFingerprintModeExtraKey: "session",
+			codexFingerprintSeedExtraKey: testCodexFingerprintSeed,
+		},
+	}
+
+	_, err := svc.forwardOpenAIResponsesHTTPRuntime(context.Background(), exchange, account, body, 7)
+
+	require.NoError(t, err)
+	require.NotNil(t, upstream.lastReq)
+	seed, ok := codexFingerprintSeed(account.Extra)
+	require.True(t, ok)
+	wantInstallationID := resolveConvergedInstallationID(account, seed)
+	wantSessionID := resolveConvergedSessionID(seed)
+	wantThreadID := resolveConvergedThreadID(seed, "client-header-session")
+	require.Equal(t, wantInstallationID, upstream.lastReq.Header.Get("x-codex-installation-id"))
+	require.Equal(t, wantSessionID, upstream.lastReq.Header.Get("session-id"))
+	require.Equal(t, wantThreadID, upstream.lastReq.Header.Get("thread-id"))
+	require.Equal(t, wantInstallationID, gjson.GetBytes(upstream.lastBody, "client_metadata.x-codex-installation-id").String())
+	require.Equal(t, wantSessionID, gjson.GetBytes(upstream.lastBody, "client_metadata.session_id").String())
+	require.Equal(t, wantThreadID, gjson.GetBytes(upstream.lastBody, "client_metadata.thread_id").String())
+	require.Equal(t,
+		gjson.Get(upstream.lastReq.Header.Get("x-codex-turn-metadata"), "turn_id").String(),
+		gjson.GetBytes(upstream.lastBody, "client_metadata.turn_id").String(),
+	)
 }

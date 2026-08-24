@@ -77,6 +77,7 @@ func NewSub2APIProductionApplicationGateway(gatewayHandler *GatewayHandler, open
 	}
 	for _, endpoint := range []gatewayruntime.Endpoint{
 		gatewayruntime.EndpointCountTokens,
+		gatewayruntime.EndpointResponsesInputTokens,
 		gatewayruntime.EndpointEmbeddings,
 		gatewayruntime.EndpointAlphaSearch,
 	} {
@@ -146,6 +147,8 @@ func endpointCapabilityForRuntime(endpoint gatewayruntime.Endpoint) string {
 	case gatewayruntime.EndpointChatCompletions:
 		return "chat_completions"
 	case gatewayruntime.EndpointResponses:
+		return "responses"
+	case gatewayruntime.EndpointResponsesInputTokens:
 		return "responses"
 	case gatewayruntime.EndpointMessages:
 		return "messages"
