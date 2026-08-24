@@ -1,7 +1,9 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
+import { nextTick } from 'vue'
 
 import PricingIntervalsEditor from '../PricingIntervalsEditor.vue'
+import PricingIntervalsEditorParentHarness from './PricingIntervalsEditorParentHarness.vue'
 
 describe('PricingIntervalsEditor', () => {
   it('sorts rows by min_tokens and emits normalized sort_order values', async () => {
@@ -40,6 +42,20 @@ describe('PricingIntervalsEditor', () => {
 
     expect(wrapper.find('[data-price-field="input_price"]').exists()).toBe(false)
     expect(wrapper.find('[data-price-field="per_request_price"]').exists()).toBe(true)
+  })
+
+  it('uses fieldset groups without labels wrapping interactive price editors', () => {
+    const wrapper = mount(PricingIntervalsEditor, {
+      props: { billingMode: 'token', modelValue: [{ min_tokens: 0, max_tokens: null }] },
+    })
+
+    const priceGroups = wrapper.findAll('[data-price-field]')
+    expect(priceGroups).toHaveLength(4)
+    for (const group of priceGroups) {
+      expect(group.element.tagName).toBe('FIELDSET')
+      expect(group.get('legend').text()).not.toBe('')
+    }
+    expect(wrapper.find('label [data-mode]').exists()).toBe(false)
   })
 
   it('uses per-request pricing for image intervals and emits edited values', async () => {
@@ -130,6 +146,54 @@ describe('PricingIntervalsEditor', () => {
 
     expect(wrapper.get('[role="alert"]').text()).toContain('overlap')
     expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+    expect(wrapper.emitted('update:valid')).toEqual([[false]])
+  })
+
+  it('lets a parent v-model disable saving while a draft is invalid and recover when fixed', async () => {
+    const initialValue = [{ min_tokens: 0, max_tokens: 100, tier_label: 'Initial' }]
+    const wrapper = mount(PricingIntervalsEditorParentHarness, {
+      props: { initialValue },
+    })
+    await nextTick()
+
+    const editor = wrapper.getComponent(PricingIntervalsEditor)
+    const saveButton = wrapper.get<HTMLButtonElement>('[data-testid="save-button"]')
+
+    expect(wrapper.get('[data-testid="valid-status"]').text()).toBe('true')
+    expect(saveButton.element.disabled).toBe(false)
+    expect(editor.emitted('update:valid')).toEqual([[true]])
+
+    await wrapper.get('[data-testid="min-tokens-0"]').setValue('-1')
+
+    expect(wrapper.get('[data-testid="valid-status"]').text()).toBe('false')
+    expect(saveButton.element.disabled).toBe(true)
+    expect(JSON.parse(wrapper.get('[data-testid="parent-model"]').text())).toEqual(initialValue)
+    await saveButton.trigger('click')
+    expect(wrapper.get('[data-testid="save-count"]').text()).toBe('0')
+
+    await wrapper.get('[data-testid="min-tokens-0"]').setValue('0')
+
+    expect(wrapper.get('[data-testid="valid-status"]').text()).toBe('true')
+    expect(saveButton.element.disabled).toBe(false)
+    expect(editor.emitted('update:valid')).toEqual([[true], [false], [true]])
+    await saveButton.trigger('click')
+    expect(wrapper.get('[data-testid="save-count"]').text()).toBe('1')
+  })
+
+  it('disables parent saving for an initially invalid model', async () => {
+    const wrapper = mount(PricingIntervalsEditorParentHarness, {
+      props: {
+        initialValue: [
+          { min_tokens: 0, max_tokens: 100 },
+          { min_tokens: 50, max_tokens: null },
+        ],
+      },
+    })
+    await nextTick()
+
+    expect(wrapper.get('[data-testid="valid-status"]').text()).toBe('false')
+    expect(wrapper.get<HTMLButtonElement>('[data-testid="save-button"]').element.disabled).toBe(true)
+    expect(wrapper.getComponent(PricingIntervalsEditor).emitted('update:valid')).toEqual([[false]])
   })
 
   it('keeps bound errors visible when the billing mode changes', async () => {

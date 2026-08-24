@@ -84,8 +84,8 @@
       </div>
 
       <div v-if="priceFields.length" class="mt-3 grid min-w-0 grid-cols-1 gap-3 lg:grid-cols-2">
-        <label v-for="field in priceFields" :key="field.key" class="min-w-0 text-sm" :data-price-field="field.key">
-          <span class="input-label break-words">{{ field.label }}</span>
+        <fieldset v-for="field in priceFields" :key="field.key" class="m-0 min-w-0 border-0 p-0 text-sm" :data-price-field="field.key">
+          <legend class="input-label break-words">{{ field.label }}</legend>
           <PricingValueEditor
             :model-value="row[field.key]"
             :scale="field.scale"
@@ -94,7 +94,7 @@
             @update:model-value="updatePrice(row, field.key, $event)"
             @validity-change="setPriceValidity(row, field.key, $event)"
           />
-        </label>
+        </fieldset>
       </div>
     </div>
 
@@ -103,7 +103,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 
 import type { ModelPricingBillingMode, ModelPricingInterval } from '@/api/admin/modelPricing'
 import Icon from '@/components/icons/Icon.vue'
@@ -128,6 +128,7 @@ interface DraftInterval {
 const props = withDefaults(defineProps<{
   modelValue: ModelPricingInterval[]
   billingMode: ModelPricingBillingMode
+  valid?: boolean | null
   labels?: Partial<{
     title: string
     interval: string
@@ -152,6 +153,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   'update:modelValue': [value: ModelPricingInterval[]]
+  'update:valid': [valid: boolean]
 }>()
 
 const text = computed(() => ({
@@ -199,6 +201,10 @@ const rows = ref<DraftInterval[]>(props.modelValue.map(toDraftInterval))
 const validationError = ref('')
 const invalidPrices = new Set<string>()
 
+onMounted(() => {
+  validateAndReport()
+})
+
 watch(() => props.modelValue, value => {
   const signature = JSON.stringify(value)
   if (signature === lastEmittedSignature) {
@@ -208,13 +214,13 @@ watch(() => props.modelValue, value => {
   rows.value = value.map(toDraftInterval)
   invalidPrices.clear()
   validationError.value = ''
-  validateAndNormalize()
+  validateAndReport()
 }, { deep: true })
 
 watch(() => props.billingMode, () => {
   invalidPrices.clear()
   validationError.value = ''
-  validateAndNormalize()
+  validateAndReport()
 })
 
 function toDraftInterval(interval: ModelPricingInterval): DraftInterval {
@@ -255,8 +261,10 @@ function setPriceValidity(row: DraftInterval, key: PriceKey, valid: boolean) {
   const wasInvalid = invalidPrices.has(validityKey)
   if (valid) invalidPrices.delete(validityKey)
   else invalidPrices.add(validityKey)
-  if (!valid) validationError.value = 'Resolve invalid price values before continuing.'
-  else if (wasInvalid) emitIfValid()
+  if (!valid) {
+    validationError.value = 'Resolve invalid price values before continuing.'
+    emit('update:valid', false)
+  } else if (wasInvalid) emitIfValid()
 }
 
 function addRow() {
@@ -279,15 +287,21 @@ function deleteRow(index: number) {
 }
 
 function normalizeRows() {
-  const normalized = validateAndNormalize()
+  const normalized = validateAndReport()
   if (!normalized) return
   rows.value.sort((left, right) => Number(left.min_tokens) - Number(right.min_tokens))
   emitNormalized(normalized)
 }
 
 function emitIfValid() {
-  const normalized = validateAndNormalize()
+  const normalized = validateAndReport()
   if (normalized) emitNormalized(normalized)
+}
+
+function validateAndReport(): ModelPricingInterval[] | null {
+  const normalized = validateAndNormalize()
+  emit('update:valid', normalized !== null)
+  return normalized
 }
 
 function emitNormalized(normalized: ModelPricingInterval[]) {
