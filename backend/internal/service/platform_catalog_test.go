@@ -29,7 +29,7 @@ type platformCatalogPricingResolverStub struct {
 	seen []PricingInput
 }
 
-func (s *platformCatalogPricingResolverStub) Resolve(_ context.Context, input PricingInput) *ResolvedPricing {
+func (s *platformCatalogPricingResolverStub) Resolve(_ context.Context, input PricingInput) (*ResolvedPricing, error) {
 	s.seen = append(s.seen, input)
 	price := 0.000001
 	return &ResolvedPricing{
@@ -39,7 +39,7 @@ func (s *platformCatalogPricingResolverStub) Resolve(_ context.Context, input Pr
 			OutputPricePerToken: price * 2,
 		},
 		Source: PricingSourceLiteLLM,
-	}
+	}, nil
 }
 
 func TestPlatformCatalogListsOnlyActivePlatformsAndEnabledRules(t *testing.T) {

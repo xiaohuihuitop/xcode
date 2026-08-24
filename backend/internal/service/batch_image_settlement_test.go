@@ -12,6 +12,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestBatchImagePricingResolverPropagatesPricingRepositoryError(t *testing.T) {
+	repoErr := errors.New("database unavailable")
+	resolver := &BatchImageModelPricingResolver{Resolver: NewModelPricingResolverWithCatalog(
+		newTestBillingService(),
+		NewModelPricingCatalog(&modelPricingOverrideRepoStub{err: repoErr}),
+	)}
+
+	price, err := resolver.BatchImageUnitPrice(context.Background(), &BatchImageJob{Model: "gpt-5.6-sol"})
+
+	require.Zero(t, price)
+	require.ErrorContains(t, err, "database unavailable")
+}
+
 func TestBatchImageSettlementService_SettlesAndChargesSuccessfulImagesOnly(t *testing.T) {
 	repo := newFakeBatchImageRepository()
 	job := testSettlingBatchImageJob("imgbatch_settle")

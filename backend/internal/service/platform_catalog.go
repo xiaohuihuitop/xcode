@@ -31,7 +31,7 @@ type PlatformCatalogPlatform struct {
 
 // PlatformPricingResolver supplies reference prices from model identity only.
 type PlatformPricingResolver interface {
-	Resolve(ctx context.Context, input PricingInput) *ResolvedPricing
+	Resolve(ctx context.Context, input PricingInput) (*ResolvedPricing, error)
 }
 
 type PlatformCatalogRepository interface {
@@ -103,12 +103,15 @@ func (s *PlatformCatalogService) list(ctx context.Context, withPricing bool) ([]
 				if pricingModel == "" {
 					pricingModel = model.Pattern
 				}
-				model.Pricing = s.pricing.Resolve(ctx, PricingInput{
+				model.Pricing, err = s.pricing.Resolve(ctx, PricingInput{
 					Model:        pricingModel,
 					Adapter:      platform.AccountPlatform,
 					PlatformCode: platform.Code,
 					PublicModel:  model.Pattern,
 				})
+				if err != nil {
+					return nil, fmt.Errorf("resolve pricing for platform %s model %s: %w", platform.Code, model.Pattern, err)
+				}
 			}
 			item.Models = append(item.Models, model)
 		}

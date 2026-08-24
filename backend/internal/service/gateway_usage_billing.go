@@ -679,7 +679,10 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 	}
 
 	// 计算费用
-	cost := s.calculateRecordUsageCost(ctx, result, apiKey, billingModel, multiplier, imageMultiplier, opts)
+	cost, err := s.calculateRecordUsageCost(ctx, result, apiKey, billingModel, multiplier, imageMultiplier, opts)
+	if err != nil {
+		return err
+	}
 
 	// 判断计费方式：订阅模式 vs 余额模式
 	isSubscriptionBilling := subscription != nil
@@ -742,10 +745,14 @@ func (s *GatewayService) calculateRecordUsageCost(
 	multiplier float64,
 	imageMultiplier float64,
 	opts *recordUsageOpts,
-) *CostBreakdown {
+) (*CostBreakdown, error) {
 	// 图片生成：模型覆盖价为 token 计费时走 token 路径，否则走图片计费。
 	if result.ImageCount > 0 {
-		if resolved := s.resolveModelPricingOverride(ctx, billingModel, apiKey); resolved != nil && resolved.Mode == BillingModeToken {
+		resolved, err := s.resolveModelPricingOverride(ctx, billingModel, apiKey)
+		if err != nil {
+			return nil, err
+		}
+		if resolved != nil && resolved.Mode == BillingModeToken {
 			return s.calculateTokenCost(ctx, result, apiKey, billingModel, multiplier, opts)
 		}
 		return s.calculateImageCost(ctx, result, apiKey, billingModel, imageMultiplier)
@@ -780,26 +787,30 @@ func (s *GatewayService) hasResolvableTokenPricing(ctx context.Context, model st
 	if strings.TrimSpace(model) == "" {
 		return false
 	}
-	if s.resolveModelPricingOverride(ctx, model, apiKey) != nil {
+	resolved, err := s.resolveModelPricingOverride(ctx, model, apiKey)
+	if err == nil && resolved != nil {
 		return true
 	}
 	if s.billingService == nil {
 		return false
 	}
-	_, err := s.billingService.GetModelPricing(model)
+	_, err = s.billingService.GetModelPricing(model)
 	return err == nil
 }
 
 // resolveModelPricingOverride 检查指定模型是否存在管理员价格覆盖。
-func (s *GatewayService) resolveModelPricingOverride(ctx context.Context, billingModel string, apiKey *APIKey) *ResolvedPricing {
+func (s *GatewayService) resolveModelPricingOverride(ctx context.Context, billingModel string, apiKey *APIKey) (*ResolvedPricing, error) {
 	if s.resolver == nil {
-		return nil
+		return nil, nil
 	}
-	resolved := s.resolver.Resolve(ctx, pricingInputForRequest(ctx, apiKey, billingModel))
+	resolved, err := s.resolver.Resolve(ctx, pricingInputForRequest(ctx, apiKey, billingModel))
+	if err != nil {
+		return nil, err
+	}
 	if resolved.Source == PricingSourceOverride {
-		return resolved
+		return resolved, nil
 	}
-	return nil
+	return nil, nil
 }
 
 // calculateImageCost 计算图片生成费用：渠道级别定价优先，否则走按次计费。
@@ -809,9 +820,13 @@ func (s *GatewayService) calculateImageCost(
 	apiKey *APIKey,
 	billingModel string,
 	multiplier float64,
-) *CostBreakdown {
+) (*CostBreakdown, error) {
 	sizeTier := NormalizeImageBillingTierOrDefault(result.ImageSize)
-	if resolved := s.resolveModelPricingOverride(ctx, billingModel, apiKey); resolved != nil {
+	resolved, err := s.resolveModelPricingOverride(ctx, billingModel, apiKey)
+	if err != nil {
+		return nil, err
+	}
+	if resolved != nil {
 		tokens := UsageTokens{
 			InputTokens:       result.Usage.InputTokens,
 			OutputTokens:      result.Usage.OutputTokens,
@@ -832,13 +847,12 @@ func (s *GatewayService) calculateImageCost(
 			Resolved:       resolved,
 		})
 		if err != nil {
-			logger.LegacyPrintf("service.gateway", "Calculate image token cost failed: %v", err)
-			return &CostBreakdown{ActualCost: 0}
+			return nil, err
 		}
-		return cost
+		return cost, nil
 	}
 
-	return s.billingService.CalculateImageCost(billingModel, sizeTier, result.ImageCount, nil, multiplier)
+	return s.billingService.CalculateImageCost(billingModel, sizeTier, result.ImageCount, nil, multiplier), nil
 }
 
 // calculateTokenCost 计算 Token 计费：根据 opts 决定走普通/长上下文/渠道统一计费。
@@ -849,7 +863,7 @@ func (s *GatewayService) calculateTokenCost(
 	billingModel string,
 	multiplier float64,
 	opts *recordUsageOpts,
-) *CostBreakdown {
+) (*CostBreakdown, error) {
 	tokens := UsageTokens{
 		InputTokens:           result.Usage.InputTokens,
 		OutputTokens:          result.Usage.OutputTokens,
@@ -864,7 +878,11 @@ func (s *GatewayService) calculateTokenCost(
 	var err error
 
 	// 优先尝试渠道定价 → CalculateCostUnified
-	if resolved := s.resolveModelPricingOverride(ctx, billingModel, apiKey); resolved != nil {
+	resolved, resolveErr := s.resolveModelPricingOverride(ctx, billingModel, apiKey)
+	if resolveErr != nil {
+		return nil, resolveErr
+	}
+	if resolved != nil {
 		pricingInput := pricingInputForRequest(ctx, apiKey, billingModel)
 		cost, err = s.billingService.CalculateCostUnified(CostInput{
 			Ctx:            ctx,
@@ -885,10 +903,9 @@ func (s *GatewayService) calculateTokenCost(
 		cost, err = s.billingService.CalculateCost(billingModel, tokens, multiplier)
 	}
 	if err != nil {
-		logger.LegacyPrintf("service.gateway", "Calculate cost failed: %v", err)
-		return &CostBreakdown{ActualCost: 0}
+		return nil, err
 	}
-	return cost
+	return cost, nil
 }
 
 // buildRecordUsageLog 构建使用日志并设置计费模式。

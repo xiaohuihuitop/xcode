@@ -384,14 +384,22 @@ func (s *OpenAIGatewayService) calculateOpenAIRecordUsageCost(
 		return s.billingService.CalculateWebSearchCost(result.WebSearchCalls, nil, webSearchMultiplier), nil
 	}
 	if isGrokVideoUsageResult(result, billingModels) {
-		if resolved := s.resolveOpenAIModelPricingOverride(ctx, billingModel, apiKey); resolved == nil || resolved.Mode != BillingModeToken {
-			return s.calculateOpenAIVideoCost(ctx, billingModel, apiKey, result, videoMultiplier), nil
+		resolved, err := s.resolveOpenAIModelPricingOverride(ctx, billingModel, apiKey)
+		if err != nil {
+			return nil, err
+		}
+		if resolved == nil || resolved.Mode != BillingModeToken {
+			return s.calculateOpenAIVideoCost(ctx, billingModel, apiKey, result, videoMultiplier)
 		}
 	}
 	if result != nil && result.ImageCount > 0 {
 		// 渠道定价为 token 计费时走 token 路径，否则走图片计费
-		if resolved := s.resolveOpenAIModelPricingOverride(ctx, billingModel, apiKey); resolved == nil || resolved.Mode != BillingModeToken {
-			return s.calculateOpenAIImageCost(ctx, billingModel, apiKey, result, imageMultiplier), nil
+		resolved, err := s.resolveOpenAIModelPricingOverride(ctx, billingModel, apiKey)
+		if err != nil {
+			return nil, err
+		}
+		if resolved == nil || resolved.Mode != BillingModeToken {
+			return s.calculateOpenAIImageCost(ctx, billingModel, apiKey, result, imageMultiplier)
 		}
 	}
 	if len(billingModels) == 0 || billingModel == "" {
@@ -492,9 +500,13 @@ func (s *OpenAIGatewayService) calculateOpenAIImageCost(
 	apiKey *APIKey,
 	result *OpenAIForwardResult,
 	multiplier float64,
-) *CostBreakdown {
+) (*CostBreakdown, error) {
 	sizeTier := NormalizeImageBillingTierOrDefault(result.ImageSize)
-	if resolved := s.resolveOpenAIModelPricingOverride(ctx, billingModel, apiKey); resolved != nil &&
+	resolved, err := s.resolveOpenAIModelPricingOverride(ctx, billingModel, apiKey)
+	if err != nil {
+		return nil, err
+	}
+	if resolved != nil &&
 		(resolved.Mode == BillingModePerRequest || resolved.Mode == BillingModeImage) {
 		pricingInput := pricingInputForRequest(ctx, apiKey, billingModel)
 		cost, err := s.billingService.CalculateCostUnified(CostInput{
@@ -510,12 +522,12 @@ func (s *OpenAIGatewayService) calculateOpenAIImageCost(
 			Resolved:       resolved,
 		})
 		if err == nil {
-			return cost
+			return cost, nil
 		}
-		logger.LegacyPrintf("service.openai_gateway", "Calculate image override cost failed: %v", err)
+		return nil, err
 	}
 
-	return s.billingService.CalculateImageCost(billingModel, sizeTier, result.ImageCount, nil, multiplier)
+	return s.billingService.CalculateImageCost(billingModel, sizeTier, result.ImageCount, nil, multiplier), nil
 }
 
 func (s *OpenAIGatewayService) calculateOpenAIVideoCost(
@@ -524,14 +536,18 @@ func (s *OpenAIGatewayService) calculateOpenAIVideoCost(
 	apiKey *APIKey,
 	result *OpenAIForwardResult,
 	multiplier float64,
-) *CostBreakdown {
+) (*CostBreakdown, error) {
 	videoCount := result.VideoCount
 	if videoCount <= 0 {
 		videoCount = 1
 	}
 	resolution := NormalizeVideoBillingResolutionOrDefault(result.VideoResolution)
 	durationSeconds := NormalizeVideoBillingDurationSecondsOrDefault(result.VideoDurationSeconds)
-	if resolved := s.resolveOpenAIModelPricingOverride(ctx, billingModel, apiKey); resolved != nil &&
+	resolved, err := s.resolveOpenAIModelPricingOverride(ctx, billingModel, apiKey)
+	if err != nil {
+		return nil, err
+	}
+	if resolved != nil &&
 		(resolved.Mode == BillingModePerRequest || resolved.Mode == BillingModeImage) {
 		// per_request/image 覆盖价保持“按请求次数”口径，不乘视频时长。
 		pricingInput := pricingInputForRequest(ctx, apiKey, billingModel)
@@ -549,23 +565,26 @@ func (s *OpenAIGatewayService) calculateOpenAIVideoCost(
 		})
 		if err == nil {
 			cost.BillingMode = string(BillingModeVideo)
-			return cost
+			return cost, nil
 		}
-		logger.LegacyPrintf("service.openai_gateway", "Calculate video override cost failed: %v", err)
+		return nil, err
 	}
 
-	return s.billingService.CalculateVideoCost(billingModel, resolution, videoCount, durationSeconds, nil, multiplier)
+	return s.billingService.CalculateVideoCost(billingModel, resolution, videoCount, durationSeconds, nil, multiplier), nil
 }
 
-func (s *OpenAIGatewayService) resolveOpenAIModelPricingOverride(ctx context.Context, billingModel string, apiKey *APIKey) *ResolvedPricing {
+func (s *OpenAIGatewayService) resolveOpenAIModelPricingOverride(ctx context.Context, billingModel string, apiKey *APIKey) (*ResolvedPricing, error) {
 	if s.resolver == nil {
-		return nil
+		return nil, nil
 	}
-	resolved := s.resolver.Resolve(ctx, pricingInputForRequest(ctx, apiKey, billingModel))
+	resolved, err := s.resolver.Resolve(ctx, pricingInputForRequest(ctx, apiKey, billingModel))
+	if err != nil {
+		return nil, err
+	}
 	if resolved.Source == PricingSourceOverride {
-		return resolved
+		return resolved, nil
 	}
-	return nil
+	return nil, nil
 }
 
 // ParseCodexRateLimitHeaders extracts Codex usage limits from response headers.

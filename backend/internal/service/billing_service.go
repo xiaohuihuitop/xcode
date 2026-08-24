@@ -1060,12 +1060,19 @@ func (s *BillingService) CalculateCostUnified(input CostInput) (*CostBreakdown, 
 	// 优先使用预解析结果，避免重复 Resolve 调用
 	resolved := input.Resolved
 	if resolved == nil {
-		resolved = input.Resolver.Resolve(input.Ctx, PricingInput{
+		var err error
+		resolved, err = input.Resolver.Resolve(input.Ctx, PricingInput{
 			Model:        input.Model,
 			Adapter:      input.Adapter,
 			PlatformCode: input.PlatformCode,
 			PublicModel:  input.PublicModel,
 		})
+		if err != nil {
+			return nil, err
+		}
+	}
+	if err := validateResolvedPricingAvailable(resolved); err != nil {
+		return nil, err
 	}
 
 	// 保存时强制 > 0；若仍有负数泄漏（缓存/迁移残留），按 0 处理避免按 1x 误扣。
@@ -1088,6 +1095,33 @@ func (s *BillingService) CalculateCostUnified(input CostInput) (*CostBreakdown, 
 		}
 	}
 	return breakdown, err
+}
+
+func validateResolvedPricingAvailable(resolved *ResolvedPricing) error {
+	if resolved == nil {
+		return ErrModelPricingUnavailable
+	}
+	if resolved.OfficialPricing != nil || resolved.MatchedOverride == nil {
+		return nil
+	}
+	override := resolved.MatchedOverride
+	switch resolved.Mode {
+	case BillingModePerRequest, BillingModeImage:
+		if override.PerRequestPrice != nil {
+			return nil
+		}
+		for _, interval := range override.Intervals {
+			if interval.PerRequestPrice != nil {
+				return nil
+			}
+		}
+	default:
+		if override.InputPrice != nil && override.OutputPrice != nil &&
+			override.CacheWritePrice != nil && override.CacheReadPrice != nil {
+			return nil
+		}
+	}
+	return ErrModelPricingUnavailable
 }
 
 // calculateTokenCost 按 token 区间计费

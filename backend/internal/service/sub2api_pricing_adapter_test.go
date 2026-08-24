@@ -4,6 +4,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
@@ -26,4 +27,23 @@ func TestSub2APIPricingAdapterQuotesBasePriceWithoutProductMultiplier(t *testing
 	require.NoError(t, err)
 	require.Greater(t, quote.TotalCost, 0.0)
 	require.Equal(t, quote.TotalCost, quote.InputCost+quote.OutputCost)
+}
+
+func TestSub2APIPricingAdapterPropagatesPricingRepositoryError(t *testing.T) {
+	repoErr := errors.New("database unavailable")
+	billing := NewBillingService(&config.Config{}, nil)
+	resolver := NewModelPricingResolverWithCatalog(
+		billing,
+		NewModelPricingCatalog(&modelPricingOverrideRepoStub{err: repoErr}),
+	)
+	adapter := NewSub2APIPricingAdapter(billing, resolver)
+
+	quote, err := adapter.Quote(context.Background(), gatewayruntime.PricingRequest{
+		Model:   "gpt-5.6-sol",
+		Adapter: "openai",
+		Tokens:  gatewayruntime.UsageFacts{InputTokens: 100},
+	})
+
+	require.Empty(t, quote)
+	require.ErrorContains(t, err, "database unavailable")
 }

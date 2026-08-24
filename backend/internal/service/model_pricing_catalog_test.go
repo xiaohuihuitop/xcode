@@ -4,6 +4,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/domain"
@@ -13,10 +14,14 @@ import (
 type modelPricingOverrideRepoStub struct {
 	rules []ModelPricingOverride
 	calls int
+	err   error
 }
 
 func (s *modelPricingOverrideRepoStub) List(context.Context, string) ([]ModelPricingOverride, error) {
 	s.calls++
+	if s.err != nil {
+		return nil, s.err
+	}
 	return append([]ModelPricingOverride(nil), s.rules...), nil
 }
 func (s *modelPricingOverrideRepoStub) Get(context.Context, int64) (*ModelPricingOverride, error) {
@@ -169,6 +174,21 @@ func TestModelPricingCatalogSnapshotLoadsRulesOnce(t *testing.T) {
 	require.NotNil(t, first)
 	require.NotNil(t, second)
 	require.Equal(t, 1, repo.calls)
+}
+
+func TestResolverReturnsPricingRepositoryError(t *testing.T) {
+	repoErr := errors.New("database unavailable")
+	resolver := NewModelPricingResolverWithCatalog(
+		newTestBillingService(),
+		NewModelPricingCatalog(&modelPricingOverrideRepoStub{err: repoErr}),
+	)
+
+	resolved, err := resolver.Resolve(context.Background(), PricingInput{
+		Adapter: "openai", PlatformCode: "codex", PublicModel: "gpt-5.6-sol", Model: "gpt-5.6-sol",
+	})
+
+	require.Nil(t, resolved)
+	require.ErrorContains(t, err, "database unavailable")
 }
 
 func floatPtr(value float64) *float64 { return &value }

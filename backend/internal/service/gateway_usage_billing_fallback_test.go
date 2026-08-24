@@ -4,6 +4,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
@@ -50,4 +51,28 @@ func TestHasResolvableTokenPricing(t *testing.T) {
 	// billingService 缺失时 fail-closed（不误判有价）
 	empty := &GatewayService{}
 	require.False(t, empty.hasResolvableTokenPricing(ctx, "claude-sonnet-4", apiKey))
+}
+
+func TestGatewayPricingRepositoryErrorFailsClosed(t *testing.T) {
+	repoErr := errors.New("database unavailable")
+	billing := NewBillingService(&config.Config{}, nil)
+	resolver := NewModelPricingResolverWithCatalog(
+		billing,
+		NewModelPricingCatalog(&modelPricingOverrideRepoStub{err: repoErr}),
+	)
+	svc := &GatewayService{billingService: billing, resolver: resolver}
+	ctx := WithResolvedTargetPlatform(context.Background(), PlatformOpenAI)
+
+	cost, err := svc.calculateRecordUsageCost(
+		ctx,
+		&ForwardResult{Usage: ClaudeUsage{InputTokens: 100}},
+		&APIKey{},
+		"gpt-5.6-sol",
+		1,
+		1,
+		&recordUsageOpts{},
+	)
+
+	require.Nil(t, cost)
+	require.ErrorContains(t, err, "database unavailable")
 }

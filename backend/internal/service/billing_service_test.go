@@ -66,7 +66,12 @@ func TestBillingLookupPreservesImageOnlyCatalogMode(t *testing.T) {
 
 func TestCalculateCostUnifiedUsesPlatformPricingIdentity(t *testing.T) {
 	catalog := NewModelPricingCatalog(&modelPricingOverrideRepoStub{rules: []ModelPricingOverride{
-		{Adapter: "codex", ModelPattern: "gpt-5.6-sol", InputPrice: floatPtr(4e-6), OutputPrice: floatPtr(8e-6), Status: ModelPricingStatusActive},
+		{
+			Adapter: "codex", ModelPattern: "gpt-5.6-sol",
+			InputPrice: floatPtr(4e-6), OutputPrice: floatPtr(8e-6),
+			CacheWritePrice: floatPtr(5e-6), CacheReadPrice: floatPtr(1e-6),
+			Status: ModelPricingStatusActive,
+		},
 	}})
 	resolver := NewModelPricingResolverWithCatalog(newTestBillingService(), catalog)
 
@@ -83,6 +88,47 @@ func TestCalculateCostUnifiedUsesPlatformPricingIdentity(t *testing.T) {
 	require.NoError(t, err)
 	require.InDelta(t, 0.004, cost.InputCost, 1e-12)
 	require.InDelta(t, 0.004, cost.OutputCost, 1e-12)
+}
+
+func TestCalculateCostUnifiedAllowsCompleteSaleWithoutOfficialPricing(t *testing.T) {
+	inputPrice := 1e-6
+	outputPrice := 2e-6
+	cacheWritePrice := 1.25e-6
+	cacheReadPrice := 0.1e-6
+	catalog := NewModelPricingCatalog(&modelPricingOverrideRepoStub{rules: []ModelPricingOverride{{
+		Adapter: "custom", ModelPattern: "private-model", BillingMode: BillingModeToken,
+		InputPrice: &inputPrice, OutputPrice: &outputPrice,
+		CacheWritePrice: &cacheWritePrice, CacheReadPrice: &cacheReadPrice,
+		Status: ModelPricingStatusActive,
+	}}})
+	billing := newTestBillingService()
+	resolver := NewModelPricingResolverWithCatalog(billing, catalog)
+
+	cost, err := billing.CalculateCostUnified(CostInput{
+		Ctx: context.Background(), Model: "private-model", Adapter: "custom",
+		Tokens: UsageTokens{InputTokens: 100, OutputTokens: 100}, RateMultiplier: 1, Resolver: resolver,
+	})
+
+	require.NoError(t, err)
+	require.InDelta(t, 0.0003, cost.ActualCost, 1e-12)
+}
+
+func TestCalculateCostUnifiedRejectsIncompleteSaleWithoutOfficialPricing(t *testing.T) {
+	inputPrice := 1e-6
+	catalog := NewModelPricingCatalog(&modelPricingOverrideRepoStub{rules: []ModelPricingOverride{{
+		Adapter: "custom", ModelPattern: "private-model", BillingMode: BillingModeToken,
+		InputPrice: &inputPrice, Status: ModelPricingStatusActive,
+	}}})
+	billing := newTestBillingService()
+	resolver := NewModelPricingResolverWithCatalog(billing, catalog)
+
+	cost, err := billing.CalculateCostUnified(CostInput{
+		Ctx: context.Background(), Model: "private-model", Adapter: "custom",
+		Tokens: UsageTokens{InputTokens: 100}, RateMultiplier: 1, Resolver: resolver,
+	})
+
+	require.Nil(t, cost)
+	require.ErrorIs(t, err, ErrModelPricingUnavailable)
 }
 
 func TestCalculateCost_BasicComputation(t *testing.T) {
