@@ -32,6 +32,63 @@ export interface ModelPricingOverride {
 
 export type ModelPricingOverrideInput = Omit<ModelPricingOverride, 'id'>
 
+export interface ModelPricingValues {
+  input_price?: number | null
+  output_price?: number | null
+  cache_write_price?: number | null
+  cache_read_price?: number | null
+  image_input_price?: number | null
+  image_output_price?: number | null
+  per_request_price?: number | null
+  intervals: ModelPricingInterval[]
+}
+
+export type ModelPricingOfficialSourceType =
+  | ''
+  | 'remote_catalog'
+  | 'cached_remote_catalog'
+  | 'bundled_catalog'
+  | 'code_fallback'
+  | 'unavailable'
+
+export interface ModelPricingOfficialSource {
+  source_type: ModelPricingOfficialSourceType
+  source_name: string
+  source_url?: string
+  matched_model: string
+  updated_at?: string | null
+}
+
+export type ModelPricingSaleSource = 'official' | 'custom' | 'unavailable'
+
+export interface ModelPricingCatalogRow {
+  platform_id: number
+  platform_code: string
+  platform_name: string
+  account_platform: string
+  model_pattern: string
+  upstream_model: string
+  billing_mode: ModelPricingBillingMode
+  official_pricing: ModelPricingValues | null
+  official_source: ModelPricingOfficialSource
+  sale_pricing: ModelPricingValues | null
+  sale_source: ModelPricingSaleSource
+  override: ModelPricingOverride | null
+  intervals: ModelPricingInterval[]
+}
+
+export interface ModelPricingCatalogQuery {
+  platform_id?: number
+  query?: string
+}
+
+export interface PlatformSalePricingInput extends ModelPricingValues {
+  platform_id: number
+  model_pattern: string
+  billing_mode: ModelPricingBillingMode
+  status: ModelPricingOverride['status']
+}
+
 export async function list(adapter?: string): Promise<ModelPricingOverride[]> {
   const { data } = await apiClient.get<ModelPricingOverride[]>('/admin/model-pricing', {
     params: adapter ? { adapter } : undefined,
@@ -58,6 +115,22 @@ export async function remove(id: number): Promise<void> {
   await apiClient.delete(`/admin/model-pricing/${id}`)
 }
 
-const modelPricingAPI = { list, getById, create, update, remove }
+export async function catalog(query: ModelPricingCatalogQuery = {}): Promise<ModelPricingCatalogRow[]> {
+  const params: Record<string, string | number> = {}
+  if (query.platform_id != null) params.platform_id = query.platform_id
+  const model = query.query?.trim()
+  if (model) params.model = model
+  const { data } = await apiClient.get<ModelPricingCatalogRow[]>('/admin/model-pricing/catalog', {
+    params: Object.keys(params).length ? params : undefined,
+  })
+  return data
+}
+
+export async function upsertPlatformSale(input: PlatformSalePricingInput): Promise<ModelPricingOverride> {
+  const { data } = await apiClient.put<ModelPricingOverride>('/admin/model-pricing/platform-sale', input)
+  return data
+}
+
+const modelPricingAPI = { list, getById, create, update, remove, catalog, upsertPlatformSale }
 
 export default modelPricingAPI
