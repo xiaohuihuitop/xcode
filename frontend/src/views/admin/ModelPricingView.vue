@@ -38,7 +38,7 @@
         <div v-else-if="!catalogError && catalogRows.length === 0" class="py-10 text-center text-sm text-gray-500 dark:text-gray-400">{{ t('admin.modelPricing.noData') }}</div>
 
         <div v-else-if="!catalogError" class="mt-3 hidden min-w-0 overflow-x-auto rounded-md border border-gray-200 dark:border-dark-700 md:block">
-          <table class="w-full min-w-[1180px] table-fixed border-collapse text-left text-sm">
+          <table class="w-full min-w-[1080px] table-fixed border-collapse text-left text-sm">
             <colgroup><col class="w-[13%]" /><col class="w-[18%]" /><col class="w-[9%]" /><col class="w-[16%]" /><col class="w-[16%]" /><col class="w-[12%]" /><col class="w-[10%]" /><col class="w-[6%]" /></colgroup>
             <thead class="bg-gray-50 text-xs font-medium uppercase text-gray-500 dark:bg-dark-800 dark:text-gray-400">
               <tr><th class="px-3 py-2.5">{{ t('admin.modelPricing.platform') }}</th><th class="px-3 py-2.5">{{ t('admin.modelPricing.publicModel') }} / {{ t('admin.modelPricing.upstreamModel') }}</th><th class="px-3 py-2.5">{{ t('admin.modelPricing.billingMode') }}</th><th class="px-3 py-2.5">{{ t('admin.modelPricing.officialPrice') }}</th><th class="px-3 py-2.5">{{ t('admin.modelPricing.salePrice') }}</th><th class="px-3 py-2.5">{{ t('admin.modelPricing.priceDifference') }}</th><th class="px-3 py-2.5">{{ t('admin.modelPricing.saleStatus') }}</th><th class="px-3 py-2.5 text-right">{{ t('common.actions') }}</th></tr>

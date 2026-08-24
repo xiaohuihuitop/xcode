@@ -337,6 +337,19 @@ describe('ModelPricingView', () => {
     expect(wrapper.text()).toContain('自定义')
   })
 
+  it('keeps the desktop catalog table within the expanded-sidebar content width', async () => {
+    const wrapper = mountView()
+    await flushPromises()
+
+    const catalogTable = wrapper.get('[data-testid="catalog-row"]').element.closest('table')
+    expect(catalogTable).not.toBeNull()
+
+    const minWidthClass = [...catalogTable!.classList].find(className => /^min-w-\[\d+px\]$/.test(className))
+    const minWidth = Number(minWidthClass?.match(/\d+/)?.[0])
+
+    expect(minWidth).toBeLessThanOrEqual(1118)
+  })
+
   it('opens the platform sale editor and saves token values in per-token units', async () => {
     const wrapper = mountView()
     await flushPromises()
