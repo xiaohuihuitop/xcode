@@ -27,8 +27,10 @@ func (s platformCatalogPlatformRepoStub) ListModelRules(context.Context) ([]Plat
 }
 
 type platformCatalogPricingResolverStub struct {
-	seen []PricingInput
-	err  error
+	seen       []PricingInput
+	err        error
+	batchCalls int
+	batchErr   error
 }
 
 func (s *platformCatalogPricingResolverStub) Resolve(_ context.Context, input PricingInput) (*ResolvedPricing, error) {
@@ -48,6 +50,10 @@ func (s *platformCatalogPricingResolverStub) Resolve(_ context.Context, input Pr
 }
 
 func (s *platformCatalogPricingResolverStub) ResolveBatch(ctx context.Context, inputs []PricingInput) ([]*ResolvedPricing, error) {
+	s.batchCalls++
+	if s.batchErr != nil {
+		return nil, s.batchErr
+	}
 	resolved := make([]*ResolvedPricing, len(inputs))
 	for i := range inputs {
 		item, err := s.Resolve(ctx, inputs[i])
@@ -64,6 +70,20 @@ func (s *platformCatalogPricingResolverStub) ResolveBatch(ctx context.Context, i
 		resolved[i] = item
 	}
 	return resolved, nil
+}
+
+func TestPlatformCatalogEmptyPricingCatalogSkipsResolver(t *testing.T) {
+	pricing := &platformCatalogPricingResolverStub{batchErr: errors.New("resolver must not be called")}
+	service := NewPlatformCatalogService(platformCatalogPlatformRepoStub{platforms: []Platform{{
+		ID: 7, Code: "codex", Name: "Codex", AccountPlatform: PlatformOpenAI, Status: PlatformStatusActive,
+		ModelRules: []PlatformModelRule{{ModelPattern: "disabled-model", Enabled: false}},
+	}}}, pricing)
+
+	items, err := service.ListPlaza(context.Background())
+
+	require.NoError(t, err)
+	require.Empty(t, items)
+	require.Zero(t, pricing.batchCalls)
 }
 
 func TestPlatformCatalogBatchPricingLoadsRuleSnapshotOnce(t *testing.T) {

@@ -136,6 +136,9 @@ func (s *PlatformCatalogService) list(ctx context.Context, withPricing bool) ([]
 				})
 			}
 		}
+		if len(inputs) == 0 {
+			return out, nil
+		}
 		resolved, resolveErr := s.pricing.ResolveBatch(ctx, inputs)
 		if resolveErr != nil {
 			return nil, fmt.Errorf("resolve platform catalog pricing: %w", resolveErr)
