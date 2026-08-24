@@ -197,6 +197,7 @@ const priceFields = computed<Array<{ key: PriceKey; label: string; scale: number
 
 let nextRowId = 1
 let lastEmittedSignature = ''
+let lastReportedValidity: boolean | null = null
 const rows = ref<DraftInterval[]>(props.modelValue.map(toDraftInterval))
 const validationError = ref('')
 const invalidPrices = new Set<string>()
@@ -263,7 +264,7 @@ function setPriceValidity(row: DraftInterval, key: PriceKey, valid: boolean) {
   else invalidPrices.add(validityKey)
   if (!valid) {
     validationError.value = 'Resolve invalid price values before continuing.'
-    emit('update:valid', false)
+    reportValidity(false)
   } else if (wasInvalid) emitIfValid()
 }
 
@@ -300,8 +301,14 @@ function emitIfValid() {
 
 function validateAndReport(): ModelPricingInterval[] | null {
   const normalized = validateAndNormalize()
-  emit('update:valid', normalized !== null)
+  reportValidity(normalized !== null)
   return normalized
+}
+
+function reportValidity(valid: boolean) {
+  if (lastReportedValidity === valid) return
+  lastReportedValidity = valid
+  emit('update:valid', valid)
 }
 
 function emitNormalized(normalized: ModelPricingInterval[]) {

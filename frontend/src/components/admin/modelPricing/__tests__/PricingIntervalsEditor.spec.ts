@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { nextTick } from 'vue'
 
 import PricingIntervalsEditor from '../PricingIntervalsEditor.vue'
+import PricingValueEditor from '../PricingValueEditor.vue'
 import PricingIntervalsEditorParentHarness from './PricingIntervalsEditorParentHarness.vue'
 
 describe('PricingIntervalsEditor', () => {
@@ -223,6 +224,28 @@ describe('PricingIntervalsEditor', () => {
 
     expect(wrapper.findAll('[role="alert"]').some(alert => alert.text().includes('required'))).toBe(true)
     expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+  })
+
+  it('reports validity once per state while a negative child price is corrected', async () => {
+    const wrapper = mount(PricingIntervalsEditor, {
+      props: {
+        billingMode: 'token',
+        modelValue: [{ min_tokens: 0, max_tokens: null, input_price: -0.000005 }],
+      },
+    })
+    const priceEditor = wrapper.getComponent(PricingValueEditor)
+
+    expect(priceEditor.emitted('validity-change')).toEqual([[false]])
+    expect(wrapper.emitted('update:valid')).toEqual([[false]])
+
+    await priceEditor.get('[data-testid="custom-price-input"]').setValue('5')
+
+    expect(priceEditor.emitted('update:modelValue')).toEqual([[0.000005]])
+    expect(priceEditor.emitted('validity-change')?.slice(-1)).toEqual([[true]])
+    expect(wrapper.emitted('update:valid')).toEqual([[false], [true]])
+    expect(wrapper.emitted('update:modelValue')).toEqual([[
+      [expect.objectContaining({ input_price: 0.000005, sort_order: 0 })],
+    ]])
   })
 
   it.each([

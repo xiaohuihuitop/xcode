@@ -53,4 +53,19 @@ describe('PricingValueEditor', () => {
     expect(wrapper.emitted('validity-change')).toEqual([[false]])
     expect(wrapper.emitted('update:modelValue')).toBeUndefined()
   })
+
+  it('emits the corrected model value before reporting that it is valid', async () => {
+    const events: string[] = []
+    const wrapper = mount(PricingValueEditor, {
+      props: {
+        modelValue: -0.000005,
+        'onUpdate:modelValue': value => events.push(`model:${value}`),
+        'onValidity-change': valid => events.push(`valid:${valid}`),
+      },
+    })
+
+    await wrapper.get('[data-testid="custom-price-input"]').setValue('5')
+
+    expect(events).toEqual(['valid:false', 'model:0.000005', 'valid:true'])
+  })
 })
