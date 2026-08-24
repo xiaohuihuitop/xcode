@@ -14,7 +14,11 @@ func (s *SubscriptionService) ListActiveSubscriptions(
 	ctx context.Context,
 	userID int64,
 ) ([]UserSubscription, error) {
-	return s.ListActiveUserSubscriptions(ctx, userID)
+	subscriptions, err := s.userSubRepo.ListActiveByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return cloneUserSubscriptions(subscriptions), nil
 }
 
 // ListActiveSubscriptionsByPlanIDs returns all active candidates for the

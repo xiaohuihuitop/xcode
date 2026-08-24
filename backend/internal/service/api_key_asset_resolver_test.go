@@ -97,6 +97,27 @@ func TestResolveBillingAssetSkipsExhaustedSubscriptionAndHonorsBalanceFlag(t *te
 	require.Equal(t, []int64{1}, resolver.checked)
 }
 
+func TestResolveBillingAssetSkipsSameDayExhaustedSubscriptionForNextCandidate(t *testing.T) {
+	now := time.Date(2026, 8, 24, 12, 0, 0, 0, time.UTC)
+	firstPlanID := int64(10)
+	secondPlanID := int64(20)
+	resolver := &assetSubscriptionResolverStub{
+		candidates: []UserSubscription{
+			{ID: 20, UserID: 7, SubscriptionPlanID: &secondPlanID, ExpiresAt: now.Add(21 * 24 * time.Hour)},
+			{ID: 18, UserID: 7, SubscriptionPlanID: &firstPlanID, ExpiresAt: now.Add(13 * 24 * time.Hour)},
+		},
+		validateErrs: map[int64]error{18: ErrDailyLimitExceeded},
+	}
+	apiKey := &APIKey{UserID: 7, AllowAllSubscriptions: true, AllowBalance: false}
+
+	asset, err := (&APIKeyService{}).ResolveBillingAssetForRequest(context.Background(), apiKey, resolver, false)
+
+	require.NoError(t, err)
+	require.NotNil(t, asset)
+	require.Equal(t, int64(20), *asset.SubscriptionID)
+	require.Equal(t, []int64{18, 20}, resolver.checked)
+}
+
 func TestResolveBillingAssetUsesGlobalBalanceRateWithoutPlanMultiplier(t *testing.T) {
 	apiKey := &APIKey{
 		UserID:       7,
