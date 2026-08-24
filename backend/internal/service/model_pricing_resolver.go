@@ -83,6 +83,47 @@ func (r *ModelPricingResolver) Resolve(ctx context.Context, input PricingInput) 
 			return nil, err
 		}
 	}
+	return r.resolveWithOverride(input, override)
+}
+
+// ResolveBatch resolves a request-scoped set of pricing inputs against one
+// rule snapshot. Repository or base-pricing errors fail the entire batch.
+func (r *ModelPricingResolver) ResolveBatch(ctx context.Context, inputs []PricingInput) ([]*ResolvedPricing, error) {
+	var snapshot *ModelPricingRuleSnapshot
+	if r.pricingCatalog != nil {
+		var err error
+		snapshot, err = r.pricingCatalog.LoadSnapshot(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	resolved := make([]*ResolvedPricing, len(inputs))
+	for i := range inputs {
+		var override *ModelPricingOverride
+		if snapshot != nil {
+			override = snapshot.ResolveForPricingInput(inputs[i])
+		}
+		item, err := r.resolveWithOverride(inputs[i], override)
+		if errors.Is(err, ErrModelPricingUnavailable) {
+			pricingModel := pricingModelForInput(inputs[i])
+			resolved[i] = &ResolvedPricing{
+				OfficialSource: PricingSourceInfo{
+					Type: PricingSourceUnavailable, Name: "Unavailable", MatchedModel: pricingModel,
+				},
+				Source: string(PricingSourceUnavailable),
+			}
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		resolved[i] = item
+	}
+	return resolved, nil
+}
+
+func (r *ModelPricingResolver) resolveWithOverride(input PricingInput, override *ModelPricingOverride) (*ResolvedPricing, error) {
 
 	pricingModel := pricingModelForInput(input)
 	lookup, source, lookupErr := r.resolveBasePricing(pricingModel)

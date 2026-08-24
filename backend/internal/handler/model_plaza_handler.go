@@ -52,6 +52,9 @@ type modelPlazaModel struct {
 	UpstreamModel        string             `json:"upstream_model,omitempty"`
 	EndpointCapabilities []string           `json:"endpoint_capabilities"`
 	Pricing              *modelPlazaPricing `json:"pricing"`
+	OfficialPricing      *modelPlazaPricing `json:"official_pricing"`
+	SalePricing          *modelPlazaPricing `json:"sale_pricing"`
+	SalePricingSource    string             `json:"sale_pricing_source"`
 }
 
 type modelPlazaPlatform struct {
@@ -98,6 +101,9 @@ func (h *ModelPlazaHandler) Get(c *gin.Context) {
 				UpstreamModel:        model.UpstreamModel,
 				EndpointCapabilities: append([]string(nil), model.EndpointCapabilities...),
 				Pricing:              platformPricingResponse(model.Pricing),
+				OfficialPricing:      officialPlatformPricingResponse(model.Pricing),
+				SalePricing:          platformPricingResponse(model.Pricing),
+				SalePricingSource:    platformSalePricingSource(model.Pricing),
 			})
 		}
 		out = append(out, modelPlazaPlatform{
@@ -121,26 +127,62 @@ func hasAuthenticatedSubject(c *gin.Context) bool {
 }
 
 func platformPricingResponse(pricing *service.ResolvedPricing) *modelPlazaPricing {
-	if pricing == nil {
+	if pricing == nil || pricing.BasePricing == nil || !service.IsResolvedPricingAvailable(pricing) {
 		return nil
 	}
-	result := &modelPlazaPricing{BillingMode: string(pricing.Mode), Intervals: []modelPlazaPricingTier{}}
+	result := modelPlazaPricingFromValues(pricing.Mode, pricing.BasePricing)
+	if override := pricing.MatchedOverride; override != nil {
+		result.InputPrice = effectivePricePointer(result.InputPrice, override.InputPrice)
+		result.OutputPrice = effectivePricePointer(result.OutputPrice, override.OutputPrice)
+		result.CacheWritePrice = effectivePricePointer(result.CacheWritePrice, override.CacheWritePrice)
+		result.CacheReadPrice = effectivePricePointer(result.CacheReadPrice, override.CacheReadPrice)
+		result.ImageInputPrice = effectivePricePointer(result.ImageInputPrice, override.ImageInputPrice)
+		result.ImageOutputPrice = effectivePricePointer(result.ImageOutputPrice, override.ImageOutputPrice)
+		result.PerRequestPrice = effectivePricePointer(
+			pricingFloatPointer(pricing.DefaultPerRequestPrice, pricing.DefaultPerRequestPriceExplicit),
+			override.PerRequestPrice,
+		)
+	} else {
+		result.PerRequestPrice = pricingFloatPointer(pricing.DefaultPerRequestPrice, pricing.DefaultPerRequestPriceExplicit)
+	}
+	intervals := pricing.Intervals
+	if (pricing.Mode == service.BillingModePerRequest || pricing.Mode == service.BillingModeImage) && len(pricing.RequestTiers) > 0 {
+		intervals = pricing.RequestTiers
+	}
+	result.Intervals = modelPlazaPricingTiers(intervals)
+	return result
+}
+
+func officialPlatformPricingResponse(pricing *service.ResolvedPricing) *modelPlazaPricing {
+	if pricing == nil || pricing.OfficialPricing == nil {
+		return nil
+	}
+	result := modelPlazaPricingFromValues(pricing.Mode, pricing.OfficialPricing)
+	result.PerRequestPrice = pricingFloatPointer(
+		pricing.OfficialDefaultPerRequestPrice,
+		pricing.OfficialDefaultPerRequestPriceExplicit,
+	)
+	return result
+}
+
+func modelPlazaPricingFromValues(mode service.BillingMode, pricing *service.ModelPricing) *modelPlazaPricing {
+	result := &modelPlazaPricing{BillingMode: string(mode), Intervals: []modelPlazaPricingTier{}}
 	if result.BillingMode == "" {
 		result.BillingMode = string(service.BillingModeToken)
 	}
-	if base := pricing.BasePricing; base != nil {
-		result.InputPrice = nonZeroFloatPointer(base.InputPricePerToken)
-		result.OutputPrice = nonZeroFloatPointer(base.OutputPricePerToken)
-		result.CacheWritePrice = nonZeroFloatPointer(base.CacheCreationPricePerToken)
-		result.CacheReadPrice = nonZeroFloatPointer(base.CacheReadPricePerToken)
-		result.ImageInputPrice = nonZeroFloatPointer(base.ImageInputPricePerToken)
-		result.ImageOutputPrice = nonZeroFloatPointer(base.ImageOutputPricePerToken)
-	}
-	if pricing.DefaultPerRequestPrice > 0 {
-		result.PerRequestPrice = &pricing.DefaultPerRequestPrice
-	}
-	for _, interval := range pricing.Intervals {
-		result.Intervals = append(result.Intervals, modelPlazaPricingTier{
+	result.InputPrice = pricingFloatPointer(pricing.InputPricePerToken, pricing.InputPriceExplicit)
+	result.OutputPrice = pricingFloatPointer(pricing.OutputPricePerToken, pricing.OutputPriceExplicit)
+	result.CacheWritePrice = pricingFloatPointer(pricing.CacheCreationPricePerToken, pricing.CacheCreationPriceExplicit)
+	result.CacheReadPrice = pricingFloatPointer(pricing.CacheReadPricePerToken, pricing.CacheReadPriceExplicit)
+	result.ImageInputPrice = pricingFloatPointer(pricing.ImageInputPricePerToken, pricing.ImageInputPriceExplicit)
+	result.ImageOutputPrice = pricingFloatPointer(pricing.ImageOutputPricePerToken, pricing.ImageOutputPriceExplicit)
+	return result
+}
+
+func modelPlazaPricingTiers(intervals []service.PricingInterval) []modelPlazaPricingTier {
+	result := make([]modelPlazaPricingTier, 0, len(intervals))
+	for _, interval := range intervals {
+		result = append(result, modelPlazaPricingTier{
 			MinTokens: interval.MinTokens, MaxTokens: interval.MaxTokens, TierLabel: interval.TierLabel,
 			InputPrice: interval.InputPrice, OutputPrice: interval.OutputPrice,
 			CacheWritePrice: interval.CacheWritePrice, CacheReadPrice: interval.CacheReadPrice,
@@ -150,9 +192,31 @@ func platformPricingResponse(pricing *service.ResolvedPricing) *modelPlazaPricin
 	return result
 }
 
-func nonZeroFloatPointer(value float64) *float64 {
-	if value == 0 {
+func pricingFloatPointer(value float64, explicit bool) *float64 {
+	if value == 0 && !explicit {
 		return nil
 	}
-	return &value
+	result := value
+	return &result
+}
+
+func effectivePricePointer(inherited, override *float64) *float64 {
+	if override == nil {
+		return inherited
+	}
+	result := *override
+	return &result
+}
+
+func platformSalePricingSource(pricing *service.ResolvedPricing) string {
+	if pricing == nil || !service.IsResolvedPricingAvailable(pricing) {
+		return "unavailable"
+	}
+	if pricing.MatchedOverride != nil {
+		return "custom"
+	}
+	if pricing.OfficialPricing != nil {
+		return "official"
+	}
+	return "unavailable"
 }

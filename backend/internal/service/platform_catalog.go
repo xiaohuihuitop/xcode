@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -30,9 +29,10 @@ type PlatformCatalogPlatform struct {
 	Models               []PlatformCatalogModel `json:"models"`
 }
 
-// PlatformPricingResolver supplies reference prices from model identity only.
+// PlatformPricingResolver resolves one request-scoped catalog against a
+// single pricing-rule snapshot.
 type PlatformPricingResolver interface {
-	Resolve(ctx context.Context, input PricingInput) (*ResolvedPricing, error)
+	ResolveBatch(ctx context.Context, inputs []PricingInput) ([]*ResolvedPricing, error)
 }
 
 type PlatformCatalogRepository interface {
@@ -103,30 +103,6 @@ func (s *PlatformCatalogService) list(ctx context.Context, withPricing bool) ([]
 			if model.EndpointCapabilities == nil {
 				model.EndpointCapabilities = []string{}
 			}
-			if withPricing && s.pricing != nil {
-				pricingModel := model.UpstreamModel
-				if pricingModel == "" {
-					pricingModel = model.Pattern
-				}
-				model.Pricing, err = s.pricing.Resolve(ctx, PricingInput{
-					Model:        pricingModel,
-					Adapter:      platform.AccountPlatform,
-					PlatformCode: platform.Code,
-					PublicModel:  model.Pattern,
-				})
-				if err != nil {
-					if errors.Is(err, ErrModelPricingUnavailable) {
-						model.Pricing = &ResolvedPricing{
-							OfficialSource: PricingSourceInfo{
-								Type: PricingSourceUnavailable, Name: "Unavailable", MatchedModel: pricingModel,
-							},
-							Source: string(PricingSourceUnavailable),
-						}
-					} else {
-						return nil, fmt.Errorf("resolve pricing for platform %s model %s: %w", platform.Code, model.Pattern, err)
-					}
-				}
-			}
 			item.Models = append(item.Models, model)
 		}
 		sort.SliceStable(item.Models, func(a, b int) bool {
@@ -143,5 +119,37 @@ func (s *PlatformCatalogService) list(ctx context.Context, withPricing bool) ([]
 		}
 		return strings.ToLower(out[a].Name) < strings.ToLower(out[b].Name)
 	})
+	if withPricing && s.pricing != nil {
+		inputs := make([]PricingInput, 0)
+		for i := range out {
+			for j := range out[i].Models {
+				model := &out[i].Models[j]
+				pricingModel := model.UpstreamModel
+				if pricingModel == "" {
+					pricingModel = model.Pattern
+				}
+				inputs = append(inputs, PricingInput{
+					Model:        pricingModel,
+					Adapter:      out[i].AccountPlatform,
+					PlatformCode: out[i].Code,
+					PublicModel:  model.Pattern,
+				})
+			}
+		}
+		resolved, resolveErr := s.pricing.ResolveBatch(ctx, inputs)
+		if resolveErr != nil {
+			return nil, fmt.Errorf("resolve platform catalog pricing: %w", resolveErr)
+		}
+		if len(resolved) != len(inputs) {
+			return nil, fmt.Errorf("resolve platform catalog pricing: got %d results for %d inputs", len(resolved), len(inputs))
+		}
+		index := 0
+		for i := range out {
+			for j := range out[i].Models {
+				out[i].Models[j].Pricing = resolved[index]
+				index++
+			}
+		}
+	}
 	return out, nil
 }

@@ -47,6 +47,73 @@ func (s *platformCatalogPricingResolverStub) Resolve(_ context.Context, input Pr
 	}, nil
 }
 
+func (s *platformCatalogPricingResolverStub) ResolveBatch(ctx context.Context, inputs []PricingInput) ([]*ResolvedPricing, error) {
+	resolved := make([]*ResolvedPricing, len(inputs))
+	for i := range inputs {
+		item, err := s.Resolve(ctx, inputs[i])
+		if errors.Is(err, ErrModelPricingUnavailable) {
+			resolved[i] = &ResolvedPricing{
+				OfficialSource: PricingSourceInfo{Type: PricingSourceUnavailable, MatchedModel: inputs[i].Model},
+				Source:         string(PricingSourceUnavailable),
+			}
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		resolved[i] = item
+	}
+	return resolved, nil
+}
+
+func TestPlatformCatalogBatchPricingLoadsRuleSnapshotOnce(t *testing.T) {
+	salePrice := 6e-6
+	repo := &modelPricingOverrideRepoStub{rules: []ModelPricingOverride{
+		{Adapter: "codex", ModelPattern: "gpt-5.6-sol", BillingMode: BillingModeToken, InputPrice: &salePrice, Status: ModelPricingStatusActive},
+		{Adapter: "codex", ModelPattern: "gpt-5.6-terra", BillingMode: BillingModeToken, InputPrice: &salePrice, Status: ModelPricingStatusActive},
+	}}
+	resolver := NewModelPricingResolverWithCatalog(newTestBillingService(), NewModelPricingCatalog(repo))
+	service := NewPlatformCatalogService(platformCatalogPlatformRepoStub{platforms: []Platform{{
+		ID: 7, Code: "codex", Name: "Codex", AccountPlatform: PlatformOpenAI, Status: PlatformStatusActive,
+		ModelRules: []PlatformModelRule{
+			{ModelPattern: "gpt-5.6-sol", Enabled: true},
+			{ModelPattern: "gpt-5.6-terra", Enabled: true},
+		},
+	}}}, resolver)
+
+	items, err := service.ListPlaza(context.Background())
+
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	require.Len(t, items[0].Models, 2)
+	require.Equal(t, 1, repo.calls)
+	for i := range items[0].Models {
+		require.NotNil(t, items[0].Models[i].Pricing)
+		require.NotNil(t, items[0].Models[i].Pricing.MatchedOverride)
+		require.InDelta(t, salePrice, items[0].Models[i].Pricing.BasePricing.InputPricePerToken, 1e-12)
+	}
+}
+
+func TestPlatformCatalogBatchPricingRepositoryErrorReturnsNoPartialCatalog(t *testing.T) {
+	repoErr := errors.New("database unavailable")
+	resolver := NewModelPricingResolverWithCatalog(
+		newTestBillingService(),
+		NewModelPricingCatalog(&modelPricingOverrideRepoStub{err: repoErr}),
+	)
+	service := NewPlatformCatalogService(platformCatalogPlatformRepoStub{platforms: []Platform{{
+		ID: 7, Code: "codex", Name: "Codex", AccountPlatform: PlatformOpenAI, Status: PlatformStatusActive,
+		ModelRules: []PlatformModelRule{
+			{ModelPattern: "gpt-5.6-sol", Enabled: true},
+			{ModelPattern: "gpt-5.6-terra", Enabled: true},
+		},
+	}}}, resolver)
+
+	items, err := service.ListPlaza(context.Background())
+
+	require.Nil(t, items)
+	require.ErrorContains(t, err, repoErr.Error())
+}
+
 func TestPlatformPricingCatalogKeepsUnavailableModelsVisible(t *testing.T) {
 	pricing := &platformCatalogPricingResolverStub{err: ErrModelPricingUnavailable}
 	service := NewPlatformCatalogService(platformCatalogPlatformRepoStub{platforms: []Platform{{
