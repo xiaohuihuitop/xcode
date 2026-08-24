@@ -1,3 +1,13 @@
+export const TOKEN_PRICE_SCALE = 1_000_000
+
+export function toPerMillionTokens(value: number | null | undefined): number | null {
+  return value == null ? null : value * TOKEN_PRICE_SCALE
+}
+
+export function fromPerMillionTokens(value: number | null | undefined): number | null {
+  return value == null ? null : value / TOKEN_PRICE_SCALE
+}
+
 /**
  * formatScaled formats a per-token (or per-request) USD price scaled by `scale`.
  *
