@@ -41,6 +41,7 @@ vi.mock('vue-i18n', async () => {
     'admin.modelPricing.perImagePrice': '每张图片价格',
     'admin.modelPricing.effectiveSalePrice': '实际售价',
     'admin.modelPricing.priceDifference': '价差比例',
+    'admin.modelPricing.resolvedAfterSave': '保存后重新解析',
     'admin.modelPricing.notAvailable': '暂无',
     'common.save': '保存',
     'common.cancel': '取消',
@@ -219,6 +220,25 @@ const exactEmptyRow = {
   upstream_model: 'gpt-exact',
   sale_source: 'custom',
   override: emptyOverride(41, ' CODEX ', ' GPT-EXACT '),
+}
+
+const exactTokenRowWithHiddenPrice = {
+  ...inheritedRow,
+  model_pattern: 'gpt-exact-hidden',
+  upstream_model: 'gpt-exact-hidden',
+  sale_pricing: {
+    ...inheritedRow.sale_pricing,
+    input_price: 0.000006,
+    per_request_price: 0.04,
+    intervals: [],
+  },
+  sale_source: 'custom',
+  override: {
+    ...emptyOverride(43, 'codex', 'gpt-exact-hidden'),
+    input_price: 0.000006,
+    per_request_price: 0.04,
+  },
+  intervals: [],
 }
 
 const wildcardEmptyRow = {
@@ -423,6 +443,39 @@ describe('ModelPricingView', () => {
     }))
   })
 
+  it('removes an exact token override when all visible prices inherit despite a hidden historical price', async () => {
+    modelPricing.catalog.mockResolvedValue([exactTokenRowWithHiddenPrice])
+    modelPricing.list.mockResolvedValue([exactTokenRowWithHiddenPrice.override])
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="edit-sale-7-gpt-exact-hidden"]').trigger('click')
+    const editor = wrapper.get('[data-testid="sale-editor"]')
+    await editor.get('[data-price-field="input_price"] [data-mode="inherit"]').trigger('click')
+    await editor.get('[data-testid="sale-save"]').trigger('click')
+    await flushPromises()
+
+    expect(modelPricing.remove).toHaveBeenCalledWith(43)
+    expect(modelPricing.upsertPlatformSale).not.toHaveBeenCalled()
+  })
+
+  it('marks exact-override deletion previews as resolved after save', async () => {
+    modelPricing.catalog.mockResolvedValue([exactTokenRowWithHiddenPrice])
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="edit-sale-7-gpt-exact-hidden"]').trigger('click')
+    const editor = wrapper.get('[data-testid="sale-editor"]')
+    await editor.get('[data-price-field="input_price"] [data-mode="inherit"]').trigger('click')
+
+    const effective = editor.get('[data-testid="effective-price-input_price"]')
+    const difference = editor.get('[data-testid="draft-difference-input_price"]')
+    expect(effective.text()).toContain('保存后重新解析')
+    expect(difference.text()).toContain('保存后重新解析')
+    expect(effective.text()).not.toContain('$5')
+    expect(difference.text()).not.toContain('0%')
+  })
+
   it('keeps the latest filtered catalog when an older unfiltered request resolves later', async () => {
     const oldRequest = deferred<typeof inheritedRow[]>()
     const latestRequest = deferred<typeof customRow[]>()
@@ -463,6 +516,51 @@ describe('ModelPricingView', () => {
 
     expect(wrapper.find('[data-testid="catalog-load-error"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('gpt-custom')
+    expect(showError).not.toHaveBeenCalled()
+  })
+
+  it('keeps rules loaded after saving when the initial rules response resolves later', async () => {
+    const initialRules = deferred<Array<typeof customRow.override>>()
+    const savedRules = deferred<Array<typeof customRow.override>>()
+    const savedRule = { ...customRow.override, id: 70, model_pattern: 'gpt-saved-rule' }
+    modelPricing.list
+      .mockImplementationOnce(() => initialRules.promise)
+      .mockImplementationOnce(() => savedRules.promise)
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="edit-sale-7-gpt-custom"]').trigger('click')
+    await wrapper.get('[data-testid="sale-save"]').trigger('click')
+    savedRules.resolve([savedRule])
+    await flushPromises()
+    initialRules.resolve([customRow.override])
+    await flushPromises()
+    await wrapper.get('[data-testid="advanced-toggle"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="advanced-rule-row"]').text()).toContain('gpt-saved-rule')
+    expect(wrapper.get('[data-testid="advanced-rule-row"]').text()).not.toContain('gpt-custom')
+  })
+
+  it('ignores an older rules failure after rules loaded by saving succeed', async () => {
+    const initialRules = deferred<Array<typeof customRow.override>>()
+    const savedRules = deferred<Array<typeof customRow.override>>()
+    const savedRule = { ...customRow.override, id: 71, model_pattern: 'gpt-saved-rule' }
+    modelPricing.list
+      .mockImplementationOnce(() => initialRules.promise)
+      .mockImplementationOnce(() => savedRules.promise)
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="edit-sale-7-gpt-custom"]').trigger('click')
+    await wrapper.get('[data-testid="sale-save"]').trigger('click')
+    savedRules.resolve([savedRule])
+    await flushPromises()
+    initialRules.reject(new Error('stale rules failed'))
+    await flushPromises()
+    await wrapper.get('[data-testid="advanced-toggle"]').trigger('click')
+
+    expect(wrapper.find('[data-testid="rules-load-error"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="advanced-rule-row"]').text()).toContain('gpt-saved-rule')
     expect(showError).not.toHaveBeenCalled()
   })
 

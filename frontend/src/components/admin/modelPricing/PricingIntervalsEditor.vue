@@ -145,6 +145,9 @@ const props = withDefaults(defineProps<{
     cacheWritePrice: string
     cacheReadPrice: string
     perRequestPrice: string
+    perImagePrice: string
+    requestUnit: string
+    imageUnit: string
     invalidPrice: string
   }>
 }>(), {
@@ -172,6 +175,9 @@ const text = computed(() => ({
   cacheWritePrice: props.labels.cacheWritePrice ?? 'Cache write price',
   cacheReadPrice: props.labels.cacheReadPrice ?? 'Cache read price',
   perRequestPrice: props.labels.perRequestPrice ?? 'Per-request price',
+  perImagePrice: props.labels.perImagePrice ?? 'Per-image price',
+  requestUnit: props.labels.requestUnit ?? '$ / request',
+  imageUnit: props.labels.imageUnit ?? '$ / image',
   invalidPrice: props.labels.invalidPrice ?? 'Interval price is invalid; enter a finite, non-negative value.',
 }))
 
@@ -184,8 +190,11 @@ const priceKeys: PriceKey[] = [
 ]
 
 const priceFields = computed<Array<{ key: PriceKey; label: string; scale: number; unit: string }>>(() => {
-  if (props.billingMode === 'per_request' || props.billingMode === 'image') {
-    return [{ key: 'per_request_price', label: text.value.perRequestPrice, scale: 1, unit: '$ / request' }]
+  if (props.billingMode === 'image') {
+    return [{ key: 'per_request_price', label: text.value.perImagePrice, scale: 1, unit: text.value.imageUnit }]
+  }
+  if (props.billingMode === 'per_request') {
+    return [{ key: 'per_request_price', label: text.value.perRequestPrice, scale: 1, unit: text.value.requestUnit }]
   }
   return [
     { key: 'input_price', label: text.value.inputPrice, scale: TOKEN_PRICE_SCALE, unit: '$ / MTok' },

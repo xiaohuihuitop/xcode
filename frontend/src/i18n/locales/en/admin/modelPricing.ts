@@ -35,6 +35,7 @@ export default {
     salePrice: 'Platform sale price',
     priceDifference: 'Difference ratio',
     effectiveSalePrice: 'Effective sale price',
+    resolvedAfterSave: 'Resolved after save',
     saleStatus: 'Sale status',
     officialSource: 'Official source',
     sourceType: 'Source type',

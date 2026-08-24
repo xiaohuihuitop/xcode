@@ -61,7 +61,11 @@ describe('PricingIntervalsEditor', () => {
 
   it('uses per-request pricing for image intervals and emits edited values', async () => {
     const wrapper = mount(PricingIntervalsEditor, {
-      props: { billingMode: 'token', modelValue: [{ min_tokens: 0, max_tokens: null }] },
+      props: {
+        billingMode: 'token',
+        modelValue: [{ min_tokens: 0, max_tokens: null }],
+        labels: { imageUnit: 'USD / image', requestUnit: 'USD / request' },
+      },
     })
 
     await wrapper.setProps({ billingMode: 'image' })
@@ -71,14 +75,29 @@ describe('PricingIntervalsEditor', () => {
     expect(wrapper.find('[data-price-field="cache_write_price"]').exists()).toBe(false)
     expect(wrapper.find('[data-price-field="cache_read_price"]').exists()).toBe(false)
     expect(wrapper.find('[data-price-field="per_request_price"]').exists()).toBe(true)
-
     await wrapper.get('[data-price-field="per_request_price"] [data-mode="custom"]').trigger('click')
+    expect(wrapper.get('[data-price-field="per_request_price"]').text()).toContain('USD / image')
+    expect(wrapper.get('[data-price-field="per_request_price"]').text()).not.toContain('USD / request')
     await wrapper.get('[data-price-field="per_request_price"] [data-testid="custom-price-input"]').setValue('2')
 
     const emitted = wrapper.emitted('update:modelValue')
     expect(emitted?.[emitted.length - 1][0]).toEqual([
       expect.objectContaining({ per_request_price: 2, sort_order: 0 }),
     ])
+  })
+
+  it('uses request units for per-request intervals without image units', () => {
+    const wrapper = mount(PricingIntervalsEditor, {
+      props: {
+        billingMode: 'per_request',
+        modelValue: [{ min_tokens: 0, max_tokens: null, per_request_price: 0.02 }],
+        labels: { imageUnit: 'USD / image', requestUnit: 'USD / request' },
+      },
+    })
+
+    const field = wrapper.get('[data-price-field="per_request_price"]')
+    expect(field.text()).toContain('USD / request')
+    expect(field.text()).not.toContain('USD / image')
   })
 
   it('supports adding and deleting rows', async () => {

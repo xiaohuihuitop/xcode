@@ -35,6 +35,7 @@ export default {
     salePrice: '平台售价',
     priceDifference: '价差比例',
     effectiveSalePrice: '实际售价',
+    resolvedAfterSave: '保存后重新解析',
     saleStatus: '售价状态',
     officialSource: '官方来源',
     sourceType: '来源类型',

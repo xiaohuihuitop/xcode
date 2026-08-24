@@ -106,14 +106,14 @@
                 <div class="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('admin.modelPricing.salePrice') }}</div>
                 <PricingValueEditor :model-value="saleDraft[field.key]" :scale="field.scale" :unit-label="t(field.unitKey)" :labels="priceEditorLabels(field.labelKey)" @update:model-value="saleDraft[field.key] = $event" @validity-change="saleFieldValidity[field.key] = $event" />
                 <dl class="mt-2 grid min-w-0 grid-cols-2 gap-2 border-t border-gray-200 pt-2 text-xs dark:border-dark-700">
-                  <div class="min-w-0"><dt class="text-gray-500">{{ t('admin.modelPricing.effectiveSalePrice') }}</dt><dd :data-testid="`effective-price-${field.key}`" class="mt-0.5 break-words font-mono tabular-nums">{{ displayPrice(effectiveSalePrice(field.key), field.scale) }}</dd></div>
-                  <div class="min-w-0"><dt class="text-gray-500">{{ t('admin.modelPricing.priceDifference') }}</dt><dd :data-testid="`draft-difference-${field.key}`" class="mt-0.5 break-words font-mono tabular-nums">{{ displayDifferenceRatio(editingCatalogRow?.official_pricing?.[field.key], effectiveSalePrice(field.key)) }}</dd></div>
+                  <div class="min-w-0"><dt class="text-gray-500">{{ t('admin.modelPricing.effectiveSalePrice') }}</dt><dd :data-testid="`effective-price-${field.key}`" class="mt-0.5 break-words font-mono tabular-nums">{{ willDeleteExactOverride ? t('admin.modelPricing.resolvedAfterSave') : displayPrice(effectiveSalePrice(field.key), field.scale) }}</dd></div>
+                  <div class="min-w-0"><dt class="text-gray-500">{{ t('admin.modelPricing.priceDifference') }}</dt><dd :data-testid="`draft-difference-${field.key}`" class="mt-0.5 break-words font-mono tabular-nums">{{ willDeleteExactOverride ? t('admin.modelPricing.resolvedAfterSave') : displayDifferenceRatio(editingCatalogRow?.official_pricing?.[field.key], effectiveSalePrice(field.key)) }}</dd></div>
                 </dl>
               </div>
             </div>
           </fieldset>
         </div>
-        <div class="mt-5"><PricingIntervalsEditor v-model="saleDraft.intervals" v-model:valid="saleIntervalsValid" :billing-mode="saleDraft.billing_mode" :labels="intervalEditorLabels(saleDraft.billing_mode)" /></div>
+        <div class="mt-5"><PricingIntervalsEditor v-model="saleDraft.intervals" v-model:valid="saleIntervalsValid" :billing-mode="saleDraft.billing_mode" :labels="intervalEditorLabels()" /></div>
         <p v-if="!saleCanSave" class="mt-3 text-sm text-red-600">{{ t('admin.modelPricing.invalidIntervals') }}</p>
         <div class="mt-5 flex justify-end gap-2"><button class="btn btn-secondary" type="button" :disabled="savingSale" @click="closeSaleEditor">{{ t('common.cancel') }}</button><button class="btn btn-primary" data-testid="sale-save" type="button" :disabled="savingSale || !saleCanSave" @click="saveSale">{{ savingSale ? t('common.saving') : t('common.save') }}</button></div>
       </div>
@@ -123,7 +123,7 @@
       <div data-testid="advanced-editor" class="min-w-0">
         <div class="mt-4 grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2"><label class="text-sm"><span class="input-label">{{ t('admin.modelPricing.adapter') }}</span><input v-model="advancedDraft.adapter" class="input min-w-0 font-mono" maxlength="50" /></label><label class="text-sm"><span class="input-label">{{ t('admin.modelPricing.modelPattern') }}</span><input v-model="advancedDraft.model_pattern" class="input min-w-0 font-mono" maxlength="100" /></label><label class="text-sm"><span class="input-label">{{ t('admin.modelPricing.billingMode') }}</span><select v-model="advancedDraft.billing_mode" class="input min-w-0"><option value="token">{{ t('admin.modelPricing.token') }}</option><option value="per_request">{{ t('admin.modelPricing.perRequest') }}</option><option value="image">{{ t('admin.modelPricing.image') }}</option></select></label><label class="text-sm"><span class="input-label">{{ t('admin.modelPricing.status') }}</span><select v-model="advancedDraft.status" class="input min-w-0"><option value="active">{{ t('admin.modelPricing.active') }}</option><option value="disabled">{{ t('admin.modelPricing.disabled') }}</option></select></label></div>
         <div class="mt-4 grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2"><fieldset v-for="field in editablePriceFields(advancedDraft.billing_mode)" :key="field.key" class="m-0 min-w-0 border-0 p-0 text-sm" :data-price-field="field.key"><legend class="input-label break-words">{{ t(field.labelKey) }}</legend><PricingValueEditor :model-value="advancedDraft[field.key] ?? null" :scale="field.scale" :unit-label="t(field.unitKey)" :labels="priceEditorLabels(field.labelKey)" @update:model-value="advancedDraft[field.key] = $event" @validity-change="advancedFieldValidity[field.key] = $event" /></fieldset></div>
-        <div class="mt-5"><PricingIntervalsEditor v-model="advancedDraft.intervals" v-model:valid="advancedIntervalsValid" :billing-mode="advancedDraft.billing_mode" :labels="intervalEditorLabels(advancedDraft.billing_mode)" /></div>
+        <div class="mt-5"><PricingIntervalsEditor v-model="advancedDraft.intervals" v-model:valid="advancedIntervalsValid" :billing-mode="advancedDraft.billing_mode" :labels="intervalEditorLabels()" /></div>
         <p v-if="advancedFormError" class="mt-3 text-sm text-red-600">{{ advancedFormError }}</p>
         <div class="mt-5 flex justify-end gap-2"><button class="btn btn-secondary" type="button" :disabled="savingRule" @click="closeAdvancedEditor">{{ t('common.cancel') }}</button><button class="btn btn-primary" type="button" :disabled="savingRule || !advancedCanSave" @click="saveRule">{{ savingRule ? t('common.saving') : t('common.save') }}</button></div>
       </div>
@@ -229,7 +229,24 @@ async function loadCatalog() {
     if (requestEpoch === catalogRequestEpoch) catalogLoading.value = false
   }
 }
-async function loadRules() { rulesLoading.value = true; rulesError.value = false; try { rules.value = await adminAPI.modelPricing.list() } catch (error) { rules.value = []; rulesError.value = true; appStore.showError(extractApiErrorMessage(error, t('admin.modelPricing.rulesLoadFailed'))) } finally { rulesLoading.value = false } }
+let rulesRequestEpoch = 0
+async function loadRules() {
+  const requestEpoch = ++rulesRequestEpoch
+  rulesLoading.value = true
+  rulesError.value = false
+  try {
+    const loadedRules = await adminAPI.modelPricing.list()
+    if (requestEpoch !== rulesRequestEpoch) return
+    rules.value = loadedRules
+  } catch (error) {
+    if (requestEpoch !== rulesRequestEpoch) return
+    rules.value = []
+    rulesError.value = true
+    appStore.showError(extractApiErrorMessage(error, t('admin.modelPricing.rulesLoadFailed')))
+  } finally {
+    if (requestEpoch === rulesRequestEpoch) rulesLoading.value = false
+  }
+}
 async function loadAll() { await Promise.all([loadCatalog(), loadRules()]) }
 function clearFilters() { filters.platform_id = ''; filters.query = ''; void loadCatalog() }
 function catalogKey(row: ModelPricingCatalogRow) { return `${row.platform_id}:${row.model_pattern}` }
@@ -244,7 +261,6 @@ function emptyPricing(mode: ModelPricingBillingMode = 'token'): PricingDraft { r
 function pricingFromOverride(item: ModelPricingOverride | null, mode: ModelPricingBillingMode) { const draft = emptyPricing(mode); if (!item) return draft; draft.status = item.status; draft.intervals = item.intervals.map(interval => ({ ...interval })); allPriceKeys.forEach(key => { draft[key] = item[key] ?? null }); return draft }
 function resetValidity(target: Record<PriceKey, boolean>) { allPriceKeys.forEach(key => { target[key] = true }) }
 function normalizedIdentity(value: string) { return value.trim().toLowerCase() }
-function isEmptySaleDraft() { return saleDraft.intervals.length === 0 && allPriceKeys.every(key => saleDraft[key] === null) }
 function exactEditingOverride() {
   const row = editingCatalogRow.value
   const override = row?.override
@@ -256,18 +272,21 @@ function exactEditingOverride() {
 }
 function effectiveSalePrice(key: PriceKey) { return saleDraft[key] ?? editingCatalogRow.value?.official_pricing?.[key] ?? null }
 function priceEditorLabels(labelKey: string) { return { modeGroup: t('admin.modelPricing.priceBehavior'), inherit: t('admin.modelPricing.inherit'), custom: t('admin.modelPricing.custom'), zero: t('admin.modelPricing.zero'), inputLabel: t(labelKey), required: t('admin.modelPricing.customPriceRequired'), invalid: t('admin.modelPricing.invalidPrice') } }
-function intervalEditorLabels(mode: ModelPricingBillingMode) { return { title: t('admin.modelPricing.intervals'), interval: t('admin.modelPricing.interval'), add: t('admin.modelPricing.addInterval'), delete: t('admin.modelPricing.deleteInterval'), sort: t('admin.modelPricing.sortIntervals'), empty: t('admin.modelPricing.noIntervals'), minTokens: t('admin.modelPricing.minTokens'), maxTokens: t('admin.modelPricing.maxTokens'), tierLabel: t('admin.modelPricing.tierLabel'), unbounded: t('admin.modelPricing.unbounded'), inputPrice: t('admin.modelPricing.inputPrice'), outputPrice: t('admin.modelPricing.outputPrice'), cacheWritePrice: t('admin.modelPricing.cacheWritePrice'), cacheReadPrice: t('admin.modelPricing.cacheReadPrice'), perRequestPrice: mode === 'image' ? `${t('admin.modelPricing.perImagePrice')} (${t('admin.modelPricing.imageUnit')})` : t('admin.modelPricing.perRequestPrice'), invalidPrice: t('admin.modelPricing.invalidPrice') } }
+function intervalEditorLabels() { return { title: t('admin.modelPricing.intervals'), interval: t('admin.modelPricing.interval'), add: t('admin.modelPricing.addInterval'), delete: t('admin.modelPricing.deleteInterval'), sort: t('admin.modelPricing.sortIntervals'), empty: t('admin.modelPricing.noIntervals'), minTokens: t('admin.modelPricing.minTokens'), maxTokens: t('admin.modelPricing.maxTokens'), tierLabel: t('admin.modelPricing.tierLabel'), unbounded: t('admin.modelPricing.unbounded'), inputPrice: t('admin.modelPricing.inputPrice'), outputPrice: t('admin.modelPricing.outputPrice'), cacheWritePrice: t('admin.modelPricing.cacheWritePrice'), cacheReadPrice: t('admin.modelPricing.cacheReadPrice'), perRequestPrice: t('admin.modelPricing.perRequestPrice'), perImagePrice: t('admin.modelPricing.perImagePrice'), requestUnit: t('admin.modelPricing.requestUnit'), imageUnit: t('admin.modelPricing.imageUnit'), invalidPrice: t('admin.modelPricing.invalidPrice') } }
 const blankValidity = (): Record<PriceKey, boolean> => ({ input_price: true, output_price: true, cache_write_price: true, cache_read_price: true, image_input_price: true, image_output_price: true, per_request_price: true })
 
 const saleEditorOpen = ref(false); const savingSale = ref(false); const editingCatalogRow = ref<ModelPricingCatalogRow | null>(null)
 const saleDraft = reactive<PricingDraft & { platform_id: number; model_pattern: string }>({ ...emptyPricing(), platform_id: 0, model_pattern: '' }); const saleIntervalsValid = ref(true); const saleFieldValidity = reactive(blankValidity()); const saleCanSave = computed(() => saleIntervalsValid.value && editablePriceFields(saleDraft.billing_mode).every(field => saleFieldValidity[field.key]))
+const willDeleteExactOverride = computed(() => saleDraft.intervals.length === 0
+  && editablePriceFields(saleDraft.billing_mode).every(field => saleDraft[field.key] === null)
+  && exactEditingOverride() !== null)
 function closeSaleEditor() { if (!savingSale.value) saleEditorOpen.value = false }
 function openSaleEditor(row: ModelPricingCatalogRow) { if (savingSale.value) return; editingCatalogRow.value = row; Object.assign(saleDraft, pricingFromOverride(row.override, row.billing_mode), { platform_id: row.platform_id, model_pattern: row.model_pattern }); resetValidity(saleFieldValidity); saleIntervalsValid.value = true; saleEditorOpen.value = true }
 async function saveSale() {
   if (savingSale.value || !saleCanSave.value) return
   const payload: PlatformSalePricingInput = { platform_id: saleDraft.platform_id, model_pattern: saleDraft.model_pattern, billing_mode: saleDraft.billing_mode, status: saleDraft.status, intervals: saleDraft.intervals.map(interval => ({ ...interval })) }
   allPriceKeys.forEach(key => { payload[key] = saleDraft[key] })
-  const exactOverride = isEmptySaleDraft() ? exactEditingOverride() : null
+  const exactOverride = willDeleteExactOverride.value ? exactEditingOverride() : null
   savingSale.value = true
   try {
     if (exactOverride) {
