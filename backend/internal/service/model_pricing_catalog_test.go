@@ -309,6 +309,37 @@ func TestResolverKeepsAndInheritsOfficialPerRequestPrice(t *testing.T) {
 	require.InDelta(t, officialPrice, resolved.DefaultPerRequestPrice, 1e-12)
 }
 
+func TestResolverKeepsOfficialModeWhenSaleOverrideDiffers(t *testing.T) {
+	officialPrice := 0.04
+	inputPrice, outputPrice := 1e-6, 2e-6
+	cacheWritePrice, cacheReadPrice := 1.25e-6, 0.1e-6
+	pricingService := &PricingService{
+		pricingData: map[string]*LiteLLMModelPricing{
+			"image-model": {OutputCostPerImage: officialPrice, TokenPricingAbsent: true},
+		},
+		pricingSources: map[string]PricingSourceInfo{
+			"image-model": {Type: PricingSourceBundledCatalog, MatchedModel: "image-model"},
+		},
+	}
+	resolver := NewModelPricingResolverWithCatalog(
+		NewBillingService(&config.Config{}, pricingService),
+		NewModelPricingCatalog(&modelPricingOverrideRepoStub{rules: []ModelPricingOverride{{
+			Adapter: "gemini", ModelPattern: "image-model", BillingMode: BillingModeToken,
+			InputPrice: &inputPrice, OutputPrice: &outputPrice,
+			CacheWritePrice: &cacheWritePrice, CacheReadPrice: &cacheReadPrice,
+			Status: ModelPricingStatusActive,
+		}}}),
+	)
+
+	resolved, err := resolver.Resolve(context.Background(), PricingInput{Adapter: "gemini", Model: "image-model"})
+
+	require.NoError(t, err)
+	require.Equal(t, BillingModeToken, resolved.Mode)
+	require.Equal(t, BillingModeImage, resolved.OfficialMode)
+	require.Empty(t, resolved.OfficialIntervals)
+	require.Empty(t, resolved.OfficialRequestTiers)
+}
+
 func TestResolverMarksUnavailableOfficialSourceForCompleteCustomSale(t *testing.T) {
 	inputPrice, outputPrice := 1e-6, 2e-6
 	cacheWritePrice, cacheReadPrice := 1.25e-6, 0.1e-6

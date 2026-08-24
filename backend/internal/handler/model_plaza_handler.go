@@ -157,11 +157,20 @@ func officialPlatformPricingResponse(pricing *service.ResolvedPricing) *modelPla
 	if pricing == nil || pricing.OfficialPricing == nil {
 		return nil
 	}
-	result := modelPlazaPricingFromValues(pricing.Mode, pricing.OfficialPricing)
+	officialMode := pricing.OfficialMode
+	if officialMode == "" && pricing.MatchedOverride == nil {
+		officialMode = pricing.Mode
+	}
+	result := modelPlazaPricingFromValues(officialMode, pricing.OfficialPricing)
 	result.PerRequestPrice = pricingFloatPointer(
 		pricing.OfficialDefaultPerRequestPrice,
 		pricing.OfficialDefaultPerRequestPriceExplicit,
 	)
+	intervals := pricing.OfficialIntervals
+	if (officialMode == service.BillingModePerRequest || officialMode == service.BillingModeImage) && len(pricing.OfficialRequestTiers) > 0 {
+		intervals = pricing.OfficialRequestTiers
+	}
+	result.Intervals = modelPlazaPricingTiers(intervals)
 	return result
 }
 

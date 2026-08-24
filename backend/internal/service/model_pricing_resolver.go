@@ -20,6 +20,7 @@ type ResolvedPricing struct {
 	// Token 模式：基础定价（来自 LiteLLM 或 fallback）
 	BasePricing     *ModelPricing
 	OfficialPricing *ModelPricing
+	OfficialMode    BillingMode
 	OfficialSource  PricingSourceInfo
 	MatchedOverride *ModelPricingOverride
 
@@ -28,6 +29,10 @@ type ResolvedPricing struct {
 
 	// 按次/图片模式：分层定价
 	RequestTiers []PricingInterval
+
+	// 官方目录的独立分层；不得复用管理员售价规则。
+	OfficialIntervals    []PricingInterval
+	OfficialRequestTiers []PricingInterval
 
 	// 按次/图片模式：默认价格（未命中层级时使用）
 	DefaultPerRequestPrice                 float64
@@ -143,6 +148,7 @@ func (r *ModelPricingResolver) resolveWithOverride(input PricingInput, override 
 		}
 		resolved := pricingOverrideToResolved(override, basePricing, officialSource)
 		if lookup != nil {
+			resolved.OfficialMode = lookup.Mode
 			resolved.OfficialDefaultPerRequestPrice = lookup.DefaultPerRequestPrice
 			resolved.OfficialDefaultPerRequestPriceExplicit = lookup.DefaultPerRequestPriceExplicit
 			if override.PerRequestPrice == nil {
@@ -157,6 +163,7 @@ func (r *ModelPricingResolver) resolveWithOverride(input PricingInput, override 
 	}
 	resolved := &ResolvedPricing{
 		Mode:                   BillingModeToken,
+		OfficialMode:           BillingModeToken,
 		BasePricing:            cloneModelPricing(basePricing),
 		OfficialPricing:        cloneModelPricing(basePricing),
 		OfficialSource:         officialSource,
@@ -165,6 +172,7 @@ func (r *ModelPricingResolver) resolveWithOverride(input PricingInput, override 
 	}
 	if lookup != nil {
 		resolved.Mode = lookup.Mode
+		resolved.OfficialMode = lookup.Mode
 		resolved.DefaultPerRequestPrice = lookup.DefaultPerRequestPrice
 		resolved.DefaultPerRequestPriceExplicit = lookup.DefaultPerRequestPriceExplicit
 		resolved.OfficialDefaultPerRequestPrice = lookup.DefaultPerRequestPrice

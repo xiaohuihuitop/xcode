@@ -122,14 +122,20 @@ func TestModelPlazaHandlerReturnsDualPricingWithoutAdminSourceDetails(t *testing
 	require.NotNil(t, model.SalePricing.Intervals[0].CacheWritePrice)
 	require.Zero(t, *model.SalePricing.Intervals[0].CacheWritePrice)
 	require.Equal(t, "custom", model.SalePricingSource)
-	for _, forbidden := range []string{"source_url", "fallback_file", "rule_id", "official_source", "matched_override"} {
+	for _, forbidden := range []string{
+		"matched_override", "MatchedOverride",
+		"source_url", "SourceURL",
+		"fallback_file", "FallbackFile",
+		"rule_id", "RuleID",
+		"official_source", "OfficialSource",
+	} {
 		require.NotContains(t, w.Body.String(), forbidden)
 	}
 }
 
-func TestModelPlazaHandlerMapsDualImageRequestPricingAndRequestTiers(t *testing.T) {
+func TestModelPlazaHandlerMapsIndependentOfficialModeAndRequestTiers(t *testing.T) {
 	zero, officialImage, saleImage := 0.0, 0.04, 0.05
-	tierPrice := 0.08
+	officialTierPrice, saleIntervalPrice, ignoredSaleTierPrice := 0.07, 8e-6, 0.08
 	settings := modelPlazaSettingsStub{runtime: service.ModelPlazaRuntime{Enabled: true}}
 	catalog := service.NewPlatformCatalogService(platformCatalogPlatformRepoStubForHandler{
 		platforms: []service.Platform{{
@@ -138,19 +144,29 @@ func TestModelPlazaHandlerMapsDualImageRequestPricingAndRequestTiers(t *testing.
 			ModelRules: []service.PlatformModelRule{{ModelPattern: "image-model", Enabled: true}},
 		}},
 	}, modelPlazaPricingResolverStub{resolved: &service.ResolvedPricing{
-		Mode: service.BillingModeImage,
+		Mode:         service.BillingModeToken,
+		OfficialMode: service.BillingModeImage,
 		OfficialPricing: &service.ModelPricing{
 			ImageInputPricePerToken: zero, ImageInputPriceExplicit: true,
 			ImageOutputPricePerToken: officialImage, ImageOutputPriceExplicit: true,
 		},
 		OfficialDefaultPerRequestPrice: officialImage, OfficialDefaultPerRequestPriceExplicit: true,
+		OfficialRequestTiers: []service.PricingInterval{{
+			TierLabel: "official-hd", PerRequestPrice: &officialTierPrice,
+		}},
 		BasePricing: &service.ModelPricing{
 			ImageInputPricePerToken: zero, ImageInputPriceExplicit: true,
 			ImageOutputPricePerToken: saleImage, ImageOutputPriceExplicit: true,
 		},
 		DefaultPerRequestPrice: saleImage, DefaultPerRequestPriceExplicit: true,
-		RequestTiers: []service.PricingInterval{{TierLabel: "hd", PerRequestPrice: &tierPrice}},
+		Intervals: []service.PricingInterval{{
+			TierLabel: "sale-context", InputPrice: &saleIntervalPrice,
+		}},
+		RequestTiers: []service.PricingInterval{{
+			TierLabel: "ignored-sale-request", PerRequestPrice: &ignoredSaleTierPrice,
+		}},
 		MatchedOverride: &service.ModelPricingOverride{
+			BillingMode:     service.BillingModeToken,
 			ImageInputPrice: &zero, ImageOutputPrice: &saleImage, PerRequestPrice: &saleImage,
 		},
 	}})
@@ -175,6 +191,8 @@ func TestModelPlazaHandlerMapsDualImageRequestPricingAndRequestTiers(t *testing.
 	}
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
 	model := body.Data.Platforms[0].Models[0]
+	require.Equal(t, string(service.BillingModeImage), model.OfficialPricing.BillingMode)
+	require.Equal(t, string(service.BillingModeToken), model.SalePricing.BillingMode)
 	require.NotNil(t, model.OfficialPricing.ImageInputPrice)
 	require.NotNil(t, model.OfficialPricing.ImageOutputPrice)
 	require.NotNil(t, model.OfficialPricing.PerRequestPrice)
@@ -187,9 +205,12 @@ func TestModelPlazaHandlerMapsDualImageRequestPricingAndRequestTiers(t *testing.
 	require.Equal(t, float64(0), *model.SalePricing.ImageInputPrice)
 	require.Equal(t, saleImage, *model.SalePricing.ImageOutputPrice)
 	require.Equal(t, saleImage, *model.SalePricing.PerRequestPrice)
+	require.Len(t, model.OfficialPricing.Intervals, 1)
+	require.Equal(t, "official-hd", model.OfficialPricing.Intervals[0].TierLabel)
+	require.Equal(t, officialTierPrice, *model.OfficialPricing.Intervals[0].PerRequestPrice)
 	require.Len(t, model.SalePricing.Intervals, 1)
-	require.Equal(t, "hd", model.SalePricing.Intervals[0].TierLabel)
-	require.Equal(t, tierPrice, *model.SalePricing.Intervals[0].PerRequestPrice)
+	require.Equal(t, "sale-context", model.SalePricing.Intervals[0].TierLabel)
+	require.Equal(t, saleIntervalPrice, *model.SalePricing.Intervals[0].InputPrice)
 }
 
 func TestModelPlazaHandlerReturnsNilDualPricingWhenUnavailable(t *testing.T) {
