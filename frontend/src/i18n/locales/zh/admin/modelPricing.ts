@@ -84,6 +84,7 @@ export default {
     loadFailed: '模型目录价格加载失败',
     rulesLoadFailed: '高级价格规则加载失败',
     saveFailed: '模型价格保存失败',
+    deleteFailed: '模型价格删除失败',
     saved: '模型价格已保存',
     deleted: '模型价格已删除',
     confirmDelete: '确认删除这条模型价格规则吗？',

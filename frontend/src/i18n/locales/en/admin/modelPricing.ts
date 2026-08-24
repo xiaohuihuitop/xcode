@@ -84,6 +84,7 @@ export default {
     loadFailed: 'Failed to load model catalog pricing',
     rulesLoadFailed: 'Failed to load advanced pricing rules',
     saveFailed: 'Failed to save model pricing',
+    deleteFailed: 'Failed to delete model pricing',
     saved: 'Model pricing saved',
     deleted: 'Model pricing deleted',
     confirmDelete: 'Delete this model pricing rule?',
