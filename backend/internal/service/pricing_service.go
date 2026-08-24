@@ -133,6 +133,30 @@ type LiteLLMModelPricing struct {
 	TokenPricingAbsent bool `json:"-"`
 }
 
+type PricingSourceType string
+
+const (
+	PricingSourceRemoteCatalog       PricingSourceType = "remote_catalog"
+	PricingSourceCachedRemoteCatalog PricingSourceType = "cached_remote_catalog"
+	PricingSourceBundledCatalog      PricingSourceType = "bundled_catalog"
+	PricingSourceCodeFallback        PricingSourceType = "code_fallback"
+	PricingSourceUnavailable         PricingSourceType = "unavailable"
+)
+
+type PricingSourceInfo struct {
+	Type         PricingSourceType `json:"source_type"`
+	Name         string            `json:"source_name"`
+	URL          string            `json:"source_url,omitempty"`
+	MatchedModel string            `json:"matched_model"`
+	UpdatedAt    *time.Time        `json:"updated_at,omitempty"`
+}
+
+type LiteLLMPricingLookup struct {
+	Pricing      *LiteLLMModelPricing
+	MatchedModel string
+	Source       PricingSourceInfo
+}
+
 // PricingRemoteClient 远程价格数据获取接口
 type PricingRemoteClient interface {
 	FetpricingOverrideJSON(ctx context.Context, url string) ([]byte, error)
@@ -164,12 +188,13 @@ type LiteLLMRawEntry struct {
 
 // PricingService 动态价格服务
 type PricingService struct {
-	cfg          *config.Config
-	remoteClient PricingRemoteClient
-	mu           sync.RWMutex
-	pricingData  map[string]*LiteLLMModelPricing
-	lastUpdated  time.Time
-	localHash    string
+	cfg            *config.Config
+	remoteClient   PricingRemoteClient
+	mu             sync.RWMutex
+	pricingData    map[string]*LiteLLMModelPricing
+	pricingSources map[string]PricingSourceInfo
+	lastUpdated    time.Time
+	localHash      string
 
 	// 停止信号
 	stopCh chan struct{}
@@ -179,10 +204,11 @@ type PricingService struct {
 // NewPricingService 创建价格服务
 func NewPricingService(cfg *config.Config, remoteClient PricingRemoteClient) *PricingService {
 	s := &PricingService{
-		cfg:          cfg,
-		remoteClient: remoteClient,
-		pricingData:  make(map[string]*LiteLLMModelPricing),
-		stopCh:       make(chan struct{}),
+		cfg:            cfg,
+		remoteClient:   remoteClient,
+		pricingData:    make(map[string]*LiteLLMModelPricing),
+		pricingSources: make(map[string]PricingSourceInfo),
+		stopCh:         make(chan struct{}),
 	}
 	return s
 }
@@ -387,7 +413,14 @@ func (s *PricingService) downloadPricingData() error {
 	if err != nil {
 		return fmt.Errorf("parse pricing data: %w", err)
 	}
-	data = s.mergeFallbackPricingData(data)
+	downloadedAt := time.Now()
+	sources := newPricingSourceMap(data, PricingSourceInfo{
+		Type:      PricingSourceRemoteCatalog,
+		Name:      "LiteLLM price catalog",
+		URL:       remoteURL,
+		UpdatedAt: &downloadedAt,
+	})
+	data, sources = s.mergeFallbackPricingDataWithSources(data, sources)
 
 	// 保存到本地文件
 	pricingFile := s.getPricingFilePath()
@@ -409,7 +442,8 @@ func (s *PricingService) downloadPricingData() error {
 	// 更新内存数据
 	s.mu.Lock()
 	s.pricingData = data
-	s.lastUpdated = time.Now()
+	s.pricingSources = sources
+	s.lastUpdated = downloadedAt
 	s.localHash = syncHash
 	s.mu.Unlock()
 
@@ -514,6 +548,19 @@ func (s *PricingService) parsePricingData(body []byte) (map[string]*LiteLLMModel
 	return result, nil
 }
 
+func newPricingSourceMap(
+	data map[string]*LiteLLMModelPricing,
+	source PricingSourceInfo,
+) map[string]PricingSourceInfo {
+	sources := make(map[string]PricingSourceInfo, len(data))
+	for modelName := range data {
+		modelSource := source
+		modelSource.MatchedModel = modelName
+		sources[modelName] = modelSource
+	}
+	return sources
+}
+
 // loadPricingData 从本地文件加载价格数据
 func (s *PricingService) loadPricingData(filePath string) error {
 	data, err := os.ReadFile(filePath)
@@ -526,22 +573,39 @@ func (s *PricingService) loadPricingData(filePath string) error {
 	if err != nil {
 		return fmt.Errorf("parse pricing data: %w", err)
 	}
-	pricingData = s.mergeFallbackPricingData(pricingData)
 
 	// 计算哈希
 	hash := sha256.Sum256(data)
 	hashStr := hex.EncodeToString(hash[:])
 
+	updatedAt := time.Now()
+	if info, statErr := os.Stat(filePath); statErr == nil {
+		updatedAt = info.ModTime()
+	}
+	primarySource := PricingSourceInfo{
+		Type:      PricingSourceCachedRemoteCatalog,
+		Name:      "Cached LiteLLM price catalog",
+		UpdatedAt: &updatedAt,
+	}
+	if s.cfg != nil {
+		primarySource.URL = strings.TrimSpace(s.cfg.Pricing.RemoteURL)
+		if fallbackBody, fallbackErr := os.ReadFile(s.cfg.Pricing.FallbackFile); fallbackErr == nil {
+			fallbackHash := sha256.Sum256(fallbackBody)
+			if hash == fallbackHash {
+				primarySource.Type = PricingSourceBundledCatalog
+				primarySource.Name = "Bundled pricing catalog"
+				primarySource.URL = ""
+			}
+		}
+	}
+	pricingSources := newPricingSourceMap(pricingData, primarySource)
+	pricingData, pricingSources = s.mergeFallbackPricingDataWithSources(pricingData, pricingSources)
+
 	s.mu.Lock()
 	s.pricingData = pricingData
+	s.pricingSources = pricingSources
 	s.localHash = hashStr
-
-	info, _ := os.Stat(filePath)
-	if info != nil {
-		s.lastUpdated = info.ModTime()
-	} else {
-		s.lastUpdated = time.Now()
-	}
+	s.lastUpdated = updatedAt
 	s.mu.Unlock()
 
 	logger.LegacyPrintf("service.pricing", "[Pricing] Loaded %d models from %s", len(pricingData), filePath)
@@ -549,21 +613,36 @@ func (s *PricingService) loadPricingData(filePath string) error {
 }
 
 func (s *PricingService) mergeFallbackPricingData(data map[string]*LiteLLMModelPricing) map[string]*LiteLLMModelPricing {
+	data, _ = s.mergeFallbackPricingDataWithSources(data, nil)
+	return data
+}
+
+func (s *PricingService) mergeFallbackPricingDataWithSources(
+	data map[string]*LiteLLMModelPricing,
+	sources map[string]PricingSourceInfo,
+) (map[string]*LiteLLMModelPricing, map[string]PricingSourceInfo) {
 	if data == nil {
 		data = make(map[string]*LiteLLMModelPricing)
 	}
+	if sources == nil {
+		sources = make(map[string]PricingSourceInfo)
+	}
 	if s == nil || s.cfg == nil || strings.TrimSpace(s.cfg.Pricing.FallbackFile) == "" {
-		return data
+		return data, sources
 	}
 	fallbackBody, err := os.ReadFile(s.cfg.Pricing.FallbackFile)
 	if err != nil {
 		logger.LegacyPrintf("service.pricing", "[Pricing] Fallback merge skipped: %v", err)
-		return data
+		return data, sources
 	}
 	fallbackData, err := s.parsePricingData(fallbackBody)
 	if err != nil {
 		logger.LegacyPrintf("service.pricing", "[Pricing] Fallback merge parse skipped: %v", err)
-		return data
+		return data, sources
+	}
+	fallbackUpdatedAt := time.Now()
+	if info, statErr := os.Stat(s.cfg.Pricing.FallbackFile); statErr == nil {
+		fallbackUpdatedAt = info.ModTime()
 	}
 	merged := 0
 	for modelName, pricing := range fallbackData {
@@ -571,12 +650,18 @@ func (s *PricingService) mergeFallbackPricingData(data map[string]*LiteLLMModelP
 			continue
 		}
 		data[modelName] = pricing
+		sources[modelName] = PricingSourceInfo{
+			Type:         PricingSourceBundledCatalog,
+			Name:         "Bundled pricing catalog",
+			MatchedModel: modelName,
+			UpdatedAt:    &fallbackUpdatedAt,
+		}
 		merged++
 	}
 	if merged > 0 {
 		logger.LegacyPrintf("service.pricing", "[Pricing] Merged %d fallback-only models", merged)
 	}
-	return data
+	return data, sources
 }
 
 // useFallbackPricing 使用回退价格文件
@@ -641,6 +726,14 @@ func (s *PricingService) validatePricingURL(raw string) (string, error) {
 
 // GetModelPricing 获取模型价格（带模糊匹配）
 func (s *PricingService) GetModelPricing(modelName string) *LiteLLMModelPricing {
+	lookup := s.LookupModelPricing(modelName)
+	if lookup == nil {
+		return nil
+	}
+	return lookup.Pricing
+}
+
+func (s *PricingService) LookupModelPricing(modelName string) *LiteLLMPricingLookup {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -657,8 +750,8 @@ func (s *PricingService) GetModelPricing(modelName string) *LiteLLMModelPricing 
 		if candidate == "" {
 			continue
 		}
-		if pricing, ok := s.pricingData[candidate]; ok {
-			return pricing
+		if _, ok := s.pricingData[candidate]; ok {
+			return s.catalogLookupLocked(candidate)
 		}
 	}
 
@@ -666,24 +759,24 @@ func (s *PricingService) GetModelPricing(modelName string) *LiteLLMModelPricing 
 	// claude-opus-4-5-20251101 -> claude-opus-4.5-20251101
 	for _, candidate := range lookupCandidates {
 		normalized := strings.ReplaceAll(candidate, "-4-5-", "-4.5-")
-		if pricing, ok := s.pricingData[normalized]; ok {
-			return pricing
+		if _, ok := s.pricingData[normalized]; ok {
+			return s.catalogLookupLocked(normalized)
 		}
 	}
 
 	// 3. 尝试模糊匹配（去掉版本号后缀）
 	// claude-opus-4-5-20251101 -> claude-opus-4.5
 	baseName := s.extractBaseName(lookupCandidates[0])
-	for key, pricing := range s.pricingData {
+	for key := range s.pricingData {
 		keyBase := s.extractBaseName(strings.ToLower(key))
 		if keyBase == baseName {
-			return pricing
+			return s.catalogLookupLocked(key)
 		}
 	}
 
 	// 4. 基于模型系列匹配（Claude）
-	if pricing := s.matchByModelFamily(lookupCandidates[0]); pricing != nil {
-		return pricing
+	if matchedModel := s.matchByModelFamily(lookupCandidates[0]); matchedModel != "" {
+		return s.catalogLookupLocked(matchedModel)
 	}
 
 	// 5. OpenAI 模型回退策略
@@ -692,6 +785,38 @@ func (s *PricingService) GetModelPricing(modelName string) *LiteLLMModelPricing 
 	}
 
 	return nil
+}
+
+func (s *PricingService) catalogLookupLocked(modelName string) *LiteLLMPricingLookup {
+	pricing, ok := s.pricingData[modelName]
+	if !ok {
+		return nil
+	}
+	source, ok := s.pricingSources[modelName]
+	if !ok {
+		source = PricingSourceInfo{
+			Type: PricingSourceUnavailable,
+			Name: "Pricing source unavailable",
+		}
+	}
+	source.MatchedModel = modelName
+	return &LiteLLMPricingLookup{
+		Pricing:      pricing,
+		MatchedModel: modelName,
+		Source:       source,
+	}
+}
+
+func staticPricingLookup(modelName string, pricing *LiteLLMModelPricing) *LiteLLMPricingLookup {
+	return &LiteLLMPricingLookup{
+		Pricing:      pricing,
+		MatchedModel: modelName,
+		Source: PricingSourceInfo{
+			Type:         PricingSourceCodeFallback,
+			Name:         "XCode built-in pricing",
+			MatchedModel: modelName,
+		},
+	}
 }
 
 func (s *PricingService) buildModelLookupCandidates(modelLower string) []string {
@@ -804,7 +929,7 @@ func (s *PricingService) extractBaseName(model string) string {
 }
 
 // matchByModelFamily 基于模型系列匹配
-func (s *PricingService) matchByModelFamily(model string) *LiteLLMModelPricing {
+func (s *PricingService) matchByModelFamily(model string) string {
 	// modelFamily 定义一个模型系列的匹配和定价查找规则。
 	type modelFamily struct {
 		name    string   // 系列名称
@@ -894,7 +1019,7 @@ func (s *PricingService) matchByModelFamily(model string) *LiteLLMModelPricing {
 	}
 
 	if matched == nil {
-		return nil
+		return ""
 	}
 
 	// Phase 3: 在定价数据中查找该系列的价格
@@ -903,16 +1028,16 @@ func (s *PricingService) matchByModelFamily(model string) *LiteLLMModelPricing {
 		lookups = matched.match
 	}
 	for _, pattern := range lookups {
-		for key, pricing := range s.pricingData {
+		for key := range s.pricingData {
 			keyLower := strings.ToLower(key)
 			if strings.Contains(keyLower, pattern) {
 				logger.LegacyPrintf("service.pricing", "[Pricing] Fuzzy matched %s -> %s", model, key)
-				return pricing
+				return key
 			}
 		}
 	}
 
-	return nil
+	return ""
 }
 
 // matchOpenAIModel OpenAI 模型回退匹配策略
@@ -923,13 +1048,13 @@ func (s *PricingService) matchByModelFamily(model string) *LiteLLMModelPricing {
 // 4. gpt-5.3-codex -> gpt-5.2-codex
 // 5. gpt-5.4* -> 业务静态兜底价
 // 6. 最终回退到 DefaultTestModel (gpt-5.1-codex)
-func (s *PricingService) matchOpenAIModel(model string) *LiteLLMModelPricing {
+func (s *PricingService) matchOpenAIModel(model string) *LiteLLMPricingLookup {
 	if strings.HasPrefix(model, "gpt-5.3-codex-spark") {
-		if pricing, ok := s.pricingData["gpt-5.1-codex"]; ok {
+		if _, ok := s.pricingData["gpt-5.1-codex"]; ok {
 			logger.LegacyPrintf("service.pricing", "[Pricing][SparkBilling] %s -> %s billing", model, "gpt-5.1-codex")
 			logger.With(zap.String("component", "service.pricing")).
 				Info(fmt.Sprintf("[Pricing] OpenAI fallback matched %s -> %s", model, "gpt-5.1-codex"))
-			return pricing
+			return s.catalogLookupLocked("gpt-5.1-codex")
 		}
 	}
 
@@ -937,67 +1062,67 @@ func (s *PricingService) matchOpenAIModel(model string) *LiteLLMModelPricing {
 	variants := s.generateOpenAIModelVariants(model, openAIModelDatePattern)
 
 	for _, variant := range variants {
-		if pricing, ok := s.pricingData[variant]; ok {
+		if _, ok := s.pricingData[variant]; ok {
 			logger.With(zap.String("component", "service.pricing")).
 				Info(fmt.Sprintf("[Pricing] OpenAI fallback matched %s -> %s", model, variant))
-			return pricing
+			return s.catalogLookupLocked(variant)
 		}
 	}
 
 	if strings.HasPrefix(model, "gpt-5.3-codex") {
-		if pricing, ok := s.pricingData["gpt-5.2-codex"]; ok {
+		if _, ok := s.pricingData["gpt-5.2-codex"]; ok {
 			logger.With(zap.String("component", "service.pricing")).
 				Info(fmt.Sprintf("[Pricing] OpenAI fallback matched %s -> %s", model, "gpt-5.2-codex"))
-			return pricing
+			return s.catalogLookupLocked("gpt-5.2-codex")
 		}
 	}
 
 	if strings.HasPrefix(model, "gpt-5.6-sol") {
 		logger.With(zap.String("component", "service.pricing")).
 			Info(fmt.Sprintf("[Pricing] OpenAI fallback matched %s -> %s", model, "gpt-5.6-sol(static)"))
-		return openAIGPT56SolFallbackPricing
+		return staticPricingLookup("gpt-5.6-sol", openAIGPT56SolFallbackPricing)
 	}
 	if strings.HasPrefix(model, "gpt-5.6-terra") {
 		logger.With(zap.String("component", "service.pricing")).
 			Info(fmt.Sprintf("[Pricing] OpenAI fallback matched %s -> %s", model, "gpt-5.6-terra(static)"))
-		return openAIGPT56TerraFallbackPricing
+		return staticPricingLookup("gpt-5.6-terra", openAIGPT56TerraFallbackPricing)
 	}
 	if strings.HasPrefix(model, "gpt-5.6-luna") {
 		logger.With(zap.String("component", "service.pricing")).
 			Info(fmt.Sprintf("[Pricing] OpenAI fallback matched %s -> %s", model, "gpt-5.6-luna(static)"))
-		return openAIGPT56LunaFallbackPricing
+		return staticPricingLookup("gpt-5.6-luna", openAIGPT56LunaFallbackPricing)
 	}
 
 	// GPT-5.5 回退到 GPT-5.4 定价
 	if strings.HasPrefix(model, "gpt-5.5") {
 		logger.With(zap.String("component", "service.pricing")).
 			Info(fmt.Sprintf("[Pricing] OpenAI fallback matched %s -> %s", model, "gpt-5.4(static)"))
-		return openAIGPT54FallbackPricing
+		return staticPricingLookup("gpt-5.4", openAIGPT54FallbackPricing)
 	}
 
 	if strings.HasPrefix(model, "gpt-5.4-mini") {
 		logger.With(zap.String("component", "service.pricing")).
 			Info(fmt.Sprintf("[Pricing] OpenAI fallback matched %s -> %s", model, "gpt-5.4-mini(static)"))
-		return openAIGPT54MiniFallbackPricing
+		return staticPricingLookup("gpt-5.4-mini", openAIGPT54MiniFallbackPricing)
 	}
 
 	if strings.HasPrefix(model, "gpt-5.4-nano") {
 		logger.With(zap.String("component", "service.pricing")).
 			Info(fmt.Sprintf("[Pricing] OpenAI fallback matched %s -> %s", model, "gpt-5.4-nano(static)"))
-		return openAIGPT54NanoFallbackPricing
+		return staticPricingLookup("gpt-5.4-nano", openAIGPT54NanoFallbackPricing)
 	}
 
 	if strings.HasPrefix(model, "gpt-5.4") {
 		logger.With(zap.String("component", "service.pricing")).
 			Info(fmt.Sprintf("[Pricing] OpenAI fallback matched %s -> %s", model, "gpt-5.4(static)"))
-		return openAIGPT54FallbackPricing
+		return staticPricingLookup("gpt-5.4", openAIGPT54FallbackPricing)
 	}
 
 	if isOpenAIImageGenerationModel(model) {
 		for _, candidate := range []string{"gpt-image-2", "gpt-image-1.5", "gpt-image-1"} {
-			if pricing, ok := s.pricingData[candidate]; ok {
+			if _, ok := s.pricingData[candidate]; ok {
 				logger.LegacyPrintf("service.pricing", "[Pricing] OpenAI image fallback matched %s -> %s", model, candidate)
-				return pricing
+				return s.catalogLookupLocked(candidate)
 			}
 		}
 		return nil
@@ -1005,9 +1130,9 @@ func (s *PricingService) matchOpenAIModel(model string) *LiteLLMModelPricing {
 
 	// 最终回退到 DefaultTestModel
 	defaultModel := strings.ToLower(openai.DefaultTestModel)
-	if pricing, ok := s.pricingData[defaultModel]; ok {
+	if _, ok := s.pricingData[defaultModel]; ok {
 		logger.LegacyPrintf("service.pricing", "[Pricing] OpenAI fallback to default model %s -> %s", model, defaultModel)
-		return pricing
+		return s.catalogLookupLocked(defaultModel)
 	}
 
 	return nil
@@ -1029,6 +1154,9 @@ func (s *PricingService) generateOpenAIModelVariants(model string, datePattern *
 	withoutDate := datePattern.ReplaceAllString(model, "")
 	if withoutDate != model {
 		addVariant(withoutDate)
+	}
+	if withoutPreview := strings.TrimSuffix(model, "-preview"); withoutPreview != model {
+		addVariant(withoutPreview)
 	}
 
 	// 2. 提取基础版本号: gpt-5.2-codex -> gpt-5.2

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -10,6 +11,118 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/stretchr/testify/require"
 )
+
+type pricingRemoteClientStub struct {
+	body []byte
+}
+
+func (s *pricingRemoteClientStub) FetpricingOverrideJSON(context.Context, string) ([]byte, error) {
+	return s.body, nil
+}
+
+func (s *pricingRemoteClientStub) FetchHashText(context.Context, string) (string, error) {
+	return "", nil
+}
+
+func TestLookupModelPricingReturnsMatchedModelAndSource(t *testing.T) {
+	svc := &PricingService{
+		pricingData: map[string]*LiteLLMModelPricing{
+			"gpt-5.6-sol": {InputCostPerToken: 5e-6},
+		},
+		pricingSources: map[string]PricingSourceInfo{
+			"gpt-5.6-sol": {Type: PricingSourceRemoteCatalog, Name: "LiteLLM price catalog"},
+		},
+	}
+
+	lookup := svc.LookupModelPricing("gpt-5.6-sol-preview")
+
+	require.NotNil(t, lookup)
+	require.Equal(t, "gpt-5.6-sol", lookup.MatchedModel)
+	require.Equal(t, "gpt-5.6-sol", lookup.Source.MatchedModel)
+	require.Equal(t, PricingSourceRemoteCatalog, lookup.Source.Type)
+}
+
+func TestPricingServiceLoadTracksCachedAndBundledSources(t *testing.T) {
+	dir := t.TempDir()
+	primaryFile := filepath.Join(dir, "model_pricing.json")
+	fallbackFile := filepath.Join(dir, "bundled.json")
+	require.NoError(t, os.WriteFile(primaryFile, []byte(`{
+		"remote-model": {"input_cost_per_token": 0.000002},
+		"shared-model": {"input_cost_per_token": 0.000003}
+	}`), 0644))
+	require.NoError(t, os.WriteFile(fallbackFile, []byte(`{
+		"shared-model": {"input_cost_per_token": 0.000001},
+		"bundled-only": {"input_cost_per_token": 0.000004}
+	}`), 0644))
+	svc := NewPricingService(&config.Config{Pricing: config.PricingConfig{
+		RemoteURL:    "https://example.com/model-pricing.json",
+		FallbackFile: fallbackFile,
+	}}, nil)
+
+	require.NoError(t, svc.loadPricingData(primaryFile))
+
+	remote := svc.LookupModelPricing("remote-model")
+	require.NotNil(t, remote)
+	require.Equal(t, PricingSourceCachedRemoteCatalog, remote.Source.Type)
+	require.Equal(t, "https://example.com/model-pricing.json", remote.Source.URL)
+	require.NotNil(t, remote.Source.UpdatedAt)
+
+	shared := svc.LookupModelPricing("shared-model")
+	require.NotNil(t, shared)
+	require.Equal(t, PricingSourceCachedRemoteCatalog, shared.Source.Type)
+	require.InDelta(t, 0.000003, shared.Pricing.InputCostPerToken, 1e-12)
+
+	bundled := svc.LookupModelPricing("bundled-only")
+	require.NotNil(t, bundled)
+	require.Equal(t, PricingSourceBundledCatalog, bundled.Source.Type)
+	require.NotNil(t, bundled.Source.UpdatedAt)
+}
+
+func TestPricingServiceLoadRecognizesBundledCatalogCopy(t *testing.T) {
+	dir := t.TempDir()
+	body := []byte(`{"bundled-model":{"input_cost_per_token":0.000004}}`)
+	primaryFile := filepath.Join(dir, "model_pricing.json")
+	fallbackFile := filepath.Join(dir, "bundled.json")
+	require.NoError(t, os.WriteFile(primaryFile, body, 0644))
+	require.NoError(t, os.WriteFile(fallbackFile, body, 0644))
+	svc := NewPricingService(&config.Config{Pricing: config.PricingConfig{FallbackFile: fallbackFile}}, nil)
+
+	require.NoError(t, svc.loadPricingData(primaryFile))
+
+	lookup := svc.LookupModelPricing("bundled-model")
+	require.NotNil(t, lookup)
+	require.Equal(t, PricingSourceBundledCatalog, lookup.Source.Type)
+}
+
+func TestPricingServiceDownloadTracksRemoteCatalogSource(t *testing.T) {
+	dir := t.TempDir()
+	remoteURL := "https://example.com/model-pricing.json"
+	svc := NewPricingService(&config.Config{Pricing: config.PricingConfig{
+		RemoteURL: remoteURL,
+		DataDir:   dir,
+	}}, &pricingRemoteClientStub{body: []byte(`{
+		"remote-model": {"input_cost_per_token": 0.000002}
+	}`)})
+
+	require.NoError(t, svc.downloadPricingData())
+
+	lookup := svc.LookupModelPricing("remote-model")
+	require.NotNil(t, lookup)
+	require.Equal(t, PricingSourceRemoteCatalog, lookup.Source.Type)
+	require.Equal(t, remoteURL, lookup.Source.URL)
+	require.NotNil(t, lookup.Source.UpdatedAt)
+}
+
+func TestLookupModelPricingMarksStaticFallbackSource(t *testing.T) {
+	svc := NewPricingService(&config.Config{}, nil)
+
+	lookup := svc.LookupModelPricing("gpt-5.4-preview")
+
+	require.NotNil(t, lookup)
+	require.Equal(t, "gpt-5.4", lookup.MatchedModel)
+	require.Equal(t, PricingSourceCodeFallback, lookup.Source.Type)
+	require.Equal(t, "gpt-5.4", lookup.Source.MatchedModel)
+}
 
 func TestPricingSchedulerBlankRemoteURLDoesNotStart(t *testing.T) {
 	svc := NewPricingService(&config.Config{Pricing: config.PricingConfig{RemoteURL: "  \t  "}}, nil)
