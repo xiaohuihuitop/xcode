@@ -4,6 +4,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -27,10 +28,14 @@ func (s platformCatalogPlatformRepoStub) ListModelRules(context.Context) ([]Plat
 
 type platformCatalogPricingResolverStub struct {
 	seen []PricingInput
+	err  error
 }
 
 func (s *platformCatalogPricingResolverStub) Resolve(_ context.Context, input PricingInput) (*ResolvedPricing, error) {
 	s.seen = append(s.seen, input)
+	if s.err != nil {
+		return nil, s.err
+	}
 	price := 0.000001
 	return &ResolvedPricing{
 		Mode: BillingModeToken,
@@ -40,6 +45,35 @@ func (s *platformCatalogPricingResolverStub) Resolve(_ context.Context, input Pr
 		},
 		Source: PricingSourceLiteLLM,
 	}, nil
+}
+
+func TestPlatformPricingCatalogKeepsUnavailableModelsVisible(t *testing.T) {
+	pricing := &platformCatalogPricingResolverStub{err: ErrModelPricingUnavailable}
+	service := NewPlatformCatalogService(platformCatalogPlatformRepoStub{platforms: []Platform{{
+		ID: 7, Code: "codex", Name: "Codex", AccountPlatform: PlatformOpenAI, Status: PlatformStatusActive,
+		ModelRules: []PlatformModelRule{{ModelPattern: "unknown-model", Enabled: true}},
+	}}}, pricing)
+
+	items, err := service.ListPricingCatalog(context.Background())
+
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	require.Len(t, items[0].Models, 1)
+	require.Equal(t, PricingSourceUnavailable, items[0].Models[0].Pricing.OfficialSource.Type)
+	require.Equal(t, "unknown-model", items[0].Models[0].Pricing.OfficialSource.MatchedModel)
+}
+
+func TestPlatformPricingCatalogPropagatesPricingRepositoryErrors(t *testing.T) {
+	pricing := &platformCatalogPricingResolverStub{err: errors.New("database unavailable")}
+	service := NewPlatformCatalogService(platformCatalogPlatformRepoStub{platforms: []Platform{{
+		ID: 7, Code: "codex", Name: "Codex", AccountPlatform: PlatformOpenAI, Status: PlatformStatusActive,
+		ModelRules: []PlatformModelRule{{ModelPattern: "gpt-5.6-sol", Enabled: true}},
+	}}}, pricing)
+
+	items, err := service.ListPricingCatalog(context.Background())
+
+	require.Nil(t, items)
+	require.ErrorContains(t, err, "database unavailable")
 }
 
 func TestPlatformCatalogListsOnlyActivePlatformsAndEnabledRules(t *testing.T) {

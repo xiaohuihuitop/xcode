@@ -58,6 +58,7 @@ var auditExtraAllowedKeys = map[string]struct{}{
 	"http_status": {}, "latency_ms": {}, "token_applied": {}, "retryable": {},
 	"event_id": {}, "requested_count": {}, "deleted_events": {}, "deleted_jobs": {},
 	"matched_count": {}, "snapshot_max_id": {}, "filter_hash": {}, "confirm": {},
+	"platform_id": {}, "model_pattern": {}, "before_pricing": {}, "after_pricing": {},
 }
 
 // SetAuditExtra adds allowlisted, scalar details to the current audit entry.
@@ -79,7 +80,11 @@ func SetAuditExtra(c *gin.Context, fields map[string]any) {
 			continue
 		}
 		if text, ok := value.(string); ok {
-			value = truncateAuditExtraString(text, 128)
+			limit := 128
+			if key == "before_pricing" || key == "after_pricing" {
+				limit = 512
+			}
+			value = truncateAuditExtraString(text, limit)
 		}
 		current[key] = value
 	}

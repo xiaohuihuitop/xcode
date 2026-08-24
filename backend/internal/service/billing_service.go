@@ -91,14 +91,18 @@ type BillingCache interface {
 // ModelPricing 模型价格配置（per-token价格，与LiteLLM格式一致）
 type ModelPricing struct {
 	InputPricePerToken                 float64 // 每token输入价格 (USD)
+	InputPriceExplicit                 bool    // 是否显式提供输入价格（包括 0）
 	InputPricePerTokenPriority         float64 // priority service tier 下每token输入价格 (USD)
 	ImageInputPricePerToken            float64 // 图片输入 token 价格 (USD)，用于多模态 embedding 等图文不同价场景；为 0 时回退到 InputPricePerToken
+	ImageInputPriceExplicit            bool    // 是否显式提供图片输入价格（包括 0）
 	OutputPricePerToken                float64 // 每token输出价格 (USD)
+	OutputPriceExplicit                bool    // 是否显式提供输出价格（包括 0）
 	OutputPricePerTokenPriority        float64 // priority service tier 下每token输出价格 (USD)
 	CacheCreationPricePerToken         float64 // 缓存创建每token价格 (USD)
 	CacheCreationPricePerTokenPriority float64 // priority service tier 下缓存创建每token价格 (USD)
 	CacheCreationPriceExplicit         bool    // 是否由渠道/区间定价显式设定（为 true 时即使 == 0 也不回退）
 	CacheReadPricePerToken             float64 // 缓存读取每token价格 (USD)
+	CacheReadPriceExplicit             bool    // 是否显式提供缓存读取价格（包括 0）
 	CacheReadPricePerTokenPriority     float64 // priority service tier 下缓存读取每token价格 (USD)
 	CacheCreation5mPrice               float64 // 5分钟缓存创建每token价格 (USD)
 	CacheCreation1hPrice               float64 // 1小时缓存创建每token价格 (USD)
@@ -111,10 +115,11 @@ type ModelPricing struct {
 }
 
 type ModelPricingLookup struct {
-	Pricing                *ModelPricing
-	Mode                   BillingMode
-	DefaultPerRequestPrice float64
-	Source                 PricingSourceInfo
+	Pricing                        *ModelPricing
+	Mode                           BillingMode
+	DefaultPerRequestPrice         float64
+	DefaultPerRequestPriceExplicit bool
+	Source                         PricingSourceInfo
 }
 
 const (
@@ -832,12 +837,13 @@ func (s *BillingService) LookupModelPricing(model string) (*ModelPricingLookup, 
 		catalogLookup := s.pricingService.LookupModelPricing(model)
 		if catalogLookup != nil && catalogLookup.Pricing != nil {
 			catalogPricing := catalogLookup.Pricing
-			if catalogPricing.TokenPricingAbsent && catalogPricing.OutputCostPerImage > 0 {
+			if catalogPricing.TokenPricingAbsent && (catalogPricing.OutputCostPerImage > 0 || catalogPricing.OutputCostPerImageExplicit) {
 				return &ModelPricingLookup{
-					Pricing:                liteLLMToModelPricing(catalogPricing),
-					Mode:                   BillingModeImage,
-					DefaultPerRequestPrice: catalogPricing.OutputCostPerImage,
-					Source:                 catalogLookup.Source,
+					Pricing:                        liteLLMToModelPricing(catalogPricing),
+					Mode:                           BillingModeImage,
+					DefaultPerRequestPrice:         catalogPricing.OutputCostPerImage,
+					DefaultPerRequestPriceExplicit: catalogPricing.OutputCostPerImageExplicit,
+					Source:                         catalogLookup.Source,
 				}, nil
 			}
 			if !catalogPricing.TokenPricingAbsent {
@@ -877,12 +883,16 @@ func liteLLMToModelPricing(pricing *LiteLLMModelPricing) *ModelPricing {
 	price1h := pricing.CacheCreationInputTokenCostAbove1hr
 	return &ModelPricing{
 		InputPricePerToken:                 pricing.InputCostPerToken,
+		InputPriceExplicit:                 pricing.InputCostPerTokenExplicit,
 		InputPricePerTokenPriority:         pricing.InputCostPerTokenPriority,
 		OutputPricePerToken:                pricing.OutputCostPerToken,
+		OutputPriceExplicit:                pricing.OutputCostPerTokenExplicit,
 		OutputPricePerTokenPriority:        pricing.OutputCostPerTokenPriority,
 		CacheCreationPricePerToken:         pricing.CacheCreationInputTokenCost,
+		CacheCreationPriceExplicit:         pricing.CacheCreationInputTokenCostExplicit,
 		CacheCreationPricePerTokenPriority: pricing.CacheCreationInputTokenCostPriority,
 		CacheReadPricePerToken:             pricing.CacheReadInputTokenCost,
+		CacheReadPriceExplicit:             pricing.CacheReadInputTokenCostExplicit,
 		CacheReadPricePerTokenPriority:     pricing.CacheReadInputTokenCostPriority,
 		CacheCreation5mPrice:               price5m,
 		CacheCreation1hPrice:               price1h,
@@ -891,7 +901,9 @@ func liteLLMToModelPricing(pricing *LiteLLMModelPricing) *ModelPricing {
 		LongContextInputMultiplier:         pricing.LongContextInputCostMultiplier,
 		LongContextOutputMultiplier:        pricing.LongContextOutputCostMultiplier,
 		ImageInputPricePerToken:            pricing.InputCostPerImageToken,
+		ImageInputPriceExplicit:            pricing.InputCostPerImageTokenExplicit,
 		ImageOutputPricePerToken:           pricing.OutputCostPerImageToken,
+		ImageOutputPriceExplicit:           pricing.OutputCostPerImageTokenExplicit,
 	}
 }
 
@@ -944,12 +956,16 @@ func (s *BillingService) GetModelPricing(model string) (*ModelPricing, error) {
 			enableBreakdown := price1h > 0 && price1h > price5m
 			return s.applyModelSpecificPricingPolicy(model, &ModelPricing{
 				InputPricePerToken:                 litellmPricing.InputCostPerToken,
+				InputPriceExplicit:                 litellmPricing.InputCostPerTokenExplicit,
 				InputPricePerTokenPriority:         litellmPricing.InputCostPerTokenPriority,
 				OutputPricePerToken:                litellmPricing.OutputCostPerToken,
+				OutputPriceExplicit:                litellmPricing.OutputCostPerTokenExplicit,
 				OutputPricePerTokenPriority:        litellmPricing.OutputCostPerTokenPriority,
 				CacheCreationPricePerToken:         litellmPricing.CacheCreationInputTokenCost,
+				CacheCreationPriceExplicit:         litellmPricing.CacheCreationInputTokenCostExplicit,
 				CacheCreationPricePerTokenPriority: litellmPricing.CacheCreationInputTokenCostPriority,
 				CacheReadPricePerToken:             litellmPricing.CacheReadInputTokenCost,
+				CacheReadPriceExplicit:             litellmPricing.CacheReadInputTokenCostExplicit,
 				CacheReadPricePerTokenPriority:     litellmPricing.CacheReadInputTokenCostPriority,
 				CacheCreation5mPrice:               price5m,
 				CacheCreation1hPrice:               price1h,
@@ -958,7 +974,9 @@ func (s *BillingService) GetModelPricing(model string) (*ModelPricing, error) {
 				LongContextInputMultiplier:         litellmPricing.LongContextInputCostMultiplier,
 				LongContextOutputMultiplier:        litellmPricing.LongContextOutputCostMultiplier,
 				ImageInputPricePerToken:            litellmPricing.InputCostPerImageToken,
+				ImageInputPriceExplicit:            litellmPricing.InputCostPerImageTokenExplicit,
 				ImageOutputPricePerToken:           litellmPricing.OutputCostPerImageToken,
+				ImageOutputPriceExplicit:           litellmPricing.OutputCostPerImageTokenExplicit,
 			}), nil
 		}
 	}
@@ -1124,6 +1142,10 @@ func validateResolvedPricingAvailable(resolved *ResolvedPricing) error {
 	return ErrModelPricingUnavailable
 }
 
+func IsResolvedPricingAvailable(resolved *ResolvedPricing) bool {
+	return validateResolvedPricingAvailable(resolved) == nil
+}
+
 // calculateTokenCost 按 token 区间计费
 func (s *BillingService) calculateTokenCost(resolved *ResolvedPricing, input CostInput) (*CostBreakdown, error) {
 	totalContext := input.Tokens.InputTokens + input.Tokens.CacheCreationTokens + input.Tokens.CacheReadTokens
@@ -1207,7 +1229,7 @@ func (s *BillingService) computeTokenBreakdown(
 			imageInputTokens = tokens.InputTokens
 		}
 		imageInputPrice := pricing.ImageInputPricePerToken
-		if imageInputPrice == 0 {
+		if imageInputPrice == 0 && !pricing.ImageInputPriceExplicit {
 			// 未配置图片输入档时回退到文本 input 价（已含 priority / 长上下文调整）
 			imageInputPrice = inputPrice
 		}

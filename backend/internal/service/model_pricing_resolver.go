@@ -30,7 +30,10 @@ type ResolvedPricing struct {
 	RequestTiers []PricingInterval
 
 	// 按次/图片模式：默认价格（未命中层级时使用）
-	DefaultPerRequestPrice float64
+	DefaultPerRequestPrice                 float64
+	DefaultPerRequestPriceExplicit         bool
+	OfficialDefaultPerRequestPrice         float64
+	OfficialDefaultPerRequestPriceExplicit bool
 
 	// 来源标识
 	Source string // "channel", "litellm", "fallback"
@@ -81,18 +84,32 @@ func (r *ModelPricingResolver) Resolve(ctx context.Context, input PricingInput) 
 		}
 	}
 
-	lookup, source, lookupErr := r.resolveBasePricing(pricingModelForInput(input))
+	pricingModel := pricingModelForInput(input)
+	lookup, source, lookupErr := r.resolveBasePricing(pricingModel)
 	var basePricing *ModelPricing
 	var officialSource PricingSourceInfo
 	if lookup != nil {
 		basePricing = lookup.Pricing
 		officialSource = lookup.Source
+	} else if errors.Is(lookupErr, ErrModelPricingUnavailable) {
+		officialSource = PricingSourceInfo{
+			Type: PricingSourceUnavailable, Name: "Unavailable", MatchedModel: pricingModel,
+		}
 	}
 	if override != nil {
 		if lookupErr != nil && !errors.Is(lookupErr, ErrModelPricingUnavailable) {
 			return nil, lookupErr
 		}
-		return pricingOverrideToResolved(override, basePricing, officialSource), nil
+		resolved := pricingOverrideToResolved(override, basePricing, officialSource)
+		if lookup != nil {
+			resolved.OfficialDefaultPerRequestPrice = lookup.DefaultPerRequestPrice
+			resolved.OfficialDefaultPerRequestPriceExplicit = lookup.DefaultPerRequestPriceExplicit
+			if override.PerRequestPrice == nil {
+				resolved.DefaultPerRequestPrice = lookup.DefaultPerRequestPrice
+				resolved.DefaultPerRequestPriceExplicit = lookup.DefaultPerRequestPriceExplicit
+			}
+		}
+		return resolved, nil
 	}
 	if lookupErr != nil {
 		return nil, lookupErr
@@ -108,6 +125,9 @@ func (r *ModelPricingResolver) Resolve(ctx context.Context, input PricingInput) 
 	if lookup != nil {
 		resolved.Mode = lookup.Mode
 		resolved.DefaultPerRequestPrice = lookup.DefaultPerRequestPrice
+		resolved.DefaultPerRequestPriceExplicit = lookup.DefaultPerRequestPriceExplicit
+		resolved.OfficialDefaultPerRequestPrice = lookup.DefaultPerRequestPrice
+		resolved.OfficialDefaultPerRequestPriceExplicit = lookup.DefaultPerRequestPriceExplicit
 	}
 
 	return resolved, nil

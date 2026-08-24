@@ -7,14 +7,16 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"github.com/stretchr/testify/require"
 )
 
 type modelPricingOverrideRepoStub struct {
-	rules []ModelPricingOverride
-	calls int
-	err   error
+	rules    []ModelPricingOverride
+	calls    int
+	err      error
+	upserted *ModelPricingOverride
 }
 
 func (s *modelPricingOverrideRepoStub) List(context.Context, string) ([]ModelPricingOverride, error) {
@@ -34,6 +36,13 @@ func (s *modelPricingOverrideRepoStub) Update(context.Context, *ModelPricingOver
 	return nil
 }
 func (s *modelPricingOverrideRepoStub) Delete(context.Context, int64) error { return nil }
+
+func (s *modelPricingOverrideRepoStub) Upsert(_ context.Context, override *ModelPricingOverride) error {
+	copy := *override
+	s.upserted = &copy
+	override.ID = 91
+	return s.err
+}
 
 func TestModelPricingCatalogExactPatternWins(t *testing.T) {
 	catalog := NewModelPricingCatalog(&modelPricingOverrideRepoStub{rules: []ModelPricingOverride{
@@ -189,6 +198,134 @@ func TestResolverReturnsPricingRepositoryError(t *testing.T) {
 
 	require.Nil(t, resolved)
 	require.ErrorContains(t, err, "database unavailable")
+}
+
+func TestModelPricingCatalogUpsertPlatformSaleForcesPlatformCodeAndEnabledModel(t *testing.T) {
+	repo := &modelPricingOverrideRepoStub{}
+	catalog := NewModelPricingCatalog(repo)
+	platform := &Platform{
+		ID: 7, Code: "Codex", Status: PlatformStatusActive,
+		ModelRules: []PlatformModelRule{{ModelPattern: "gpt-5.6-sol", Enabled: true}},
+	}
+	inputPrice := 6e-6
+
+	result, err := catalog.UpsertPlatformSale(context.Background(), platform, "GPT-5.6-SOL", ModelPricingOverride{
+		Adapter: "untrusted", ModelPattern: "other", BillingMode: BillingModeToken,
+		InputPrice: &inputPrice, Status: ModelPricingStatusActive,
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, int64(91), result.ID)
+	require.Equal(t, "codex", repo.upserted.Adapter)
+	require.Equal(t, "gpt-5.6-sol", repo.upserted.ModelPattern)
+}
+
+func TestModelPricingCatalogUpsertPlatformSaleReusesExistingPatternCase(t *testing.T) {
+	repo := &modelPricingOverrideRepoStub{rules: []ModelPricingOverride{{
+		Adapter: "codex", ModelPattern: "GPT-5.6-SOL", Status: ModelPricingStatusActive,
+	}}}
+	catalog := NewModelPricingCatalog(repo)
+	platform := &Platform{
+		ID: 7, Code: "codex", Status: PlatformStatusActive,
+		ModelRules: []PlatformModelRule{{ModelPattern: "gpt-5.6-sol", Enabled: true}},
+	}
+
+	result, err := catalog.UpsertPlatformSale(context.Background(), platform, "gpt-5.6-sol", ModelPricingOverride{
+		BillingMode: BillingModeToken,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, "GPT-5.6-SOL", repo.upserted.ModelPattern)
+}
+
+func TestModelPricingCatalogUpsertPlatformSaleRejectsDisabledModel(t *testing.T) {
+	repo := &modelPricingOverrideRepoStub{}
+	catalog := NewModelPricingCatalog(repo)
+	platform := &Platform{
+		ID: 7, Code: "codex", Status: PlatformStatusActive,
+		ModelRules: []PlatformModelRule{{ModelPattern: "gpt-5.6-sol", Enabled: false}},
+	}
+
+	result, err := catalog.UpsertPlatformSale(context.Background(), platform, "gpt-5.6-sol", ModelPricingOverride{})
+
+	require.Nil(t, result)
+	require.ErrorContains(t, err, "not enabled")
+	require.Nil(t, repo.upserted)
+}
+
+func TestModelPricingCatalogGetExactIgnoresDisabledRules(t *testing.T) {
+	catalog := NewModelPricingCatalog(&modelPricingOverrideRepoStub{rules: []ModelPricingOverride{
+		{Adapter: "codex", ModelPattern: "gpt-5.6-sol", Status: "disabled"},
+	}})
+
+	result, err := catalog.GetExact(context.Background(), "codex", "gpt-5.6-sol")
+
+	require.NoError(t, err)
+	require.Nil(t, result)
+}
+
+func TestApplyOverridePricesMarksExplicitZeroValues(t *testing.T) {
+	zero := 0.0
+	pricing := &ModelPricing{}
+	override := &ModelPricingOverride{
+		InputPrice: &zero, OutputPrice: &zero,
+		CacheWritePrice: &zero, CacheReadPrice: &zero,
+		ImageInputPrice: &zero, ImageOutputPrice: &zero,
+	}
+
+	applyOverridePrices(override, pricing)
+
+	require.True(t, pricing.InputPriceExplicit)
+	require.True(t, pricing.OutputPriceExplicit)
+	require.True(t, pricing.CacheCreationPriceExplicit)
+	require.True(t, pricing.CacheReadPriceExplicit)
+	require.True(t, pricing.ImageInputPriceExplicit)
+	require.True(t, pricing.ImageOutputPriceExplicit)
+}
+
+func TestResolverKeepsAndInheritsOfficialPerRequestPrice(t *testing.T) {
+	officialPrice := 0.04
+	pricingService := &PricingService{
+		pricingData: map[string]*LiteLLMModelPricing{
+			"image-model": {OutputCostPerImage: officialPrice, TokenPricingAbsent: true},
+		},
+		pricingSources: map[string]PricingSourceInfo{
+			"image-model": {Type: PricingSourceBundledCatalog, MatchedModel: "image-model"},
+		},
+	}
+	billing := NewBillingService(&config.Config{}, pricingService)
+	catalog := NewModelPricingCatalog(&modelPricingOverrideRepoStub{rules: []ModelPricingOverride{{
+		Adapter: "gemini", ModelPattern: "image-model", BillingMode: BillingModeImage,
+		Status: ModelPricingStatusActive,
+	}}})
+
+	resolved, err := NewModelPricingResolverWithCatalog(billing, catalog).Resolve(context.Background(), PricingInput{
+		Adapter: "gemini", Model: "image-model",
+	})
+
+	require.NoError(t, err)
+	require.InDelta(t, officialPrice, resolved.OfficialDefaultPerRequestPrice, 1e-12)
+	require.InDelta(t, officialPrice, resolved.DefaultPerRequestPrice, 1e-12)
+}
+
+func TestResolverMarksUnavailableOfficialSourceForCompleteCustomSale(t *testing.T) {
+	inputPrice, outputPrice := 1e-6, 2e-6
+	cacheWritePrice, cacheReadPrice := 1.25e-6, 0.1e-6
+	catalog := NewModelPricingCatalog(&modelPricingOverrideRepoStub{rules: []ModelPricingOverride{{
+		Adapter: "custom", ModelPattern: "private-model", BillingMode: BillingModeToken,
+		InputPrice: &inputPrice, OutputPrice: &outputPrice,
+		CacheWritePrice: &cacheWritePrice, CacheReadPrice: &cacheReadPrice,
+		Status: ModelPricingStatusActive,
+	}}})
+
+	resolved, err := NewModelPricingResolverWithCatalog(newTestBillingService(), catalog).Resolve(
+		context.Background(), PricingInput{Adapter: "custom", Model: "private-model"},
+	)
+
+	require.NoError(t, err)
+	require.Equal(t, PricingSourceUnavailable, resolved.OfficialSource.Type)
+	require.Equal(t, "private-model", resolved.OfficialSource.MatchedModel)
 }
 
 func floatPtr(value float64) *float64 { return &value }

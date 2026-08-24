@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -54,6 +55,10 @@ func (s *PlatformCatalogService) ListAvailable(ctx context.Context) ([]PlatformC
 }
 
 func (s *PlatformCatalogService) ListPlaza(ctx context.Context) ([]PlatformCatalogPlatform, error) {
+	return s.list(ctx, true)
+}
+
+func (s *PlatformCatalogService) ListPricingCatalog(ctx context.Context) ([]PlatformCatalogPlatform, error) {
 	return s.list(ctx, true)
 }
 
@@ -110,7 +115,16 @@ func (s *PlatformCatalogService) list(ctx context.Context, withPricing bool) ([]
 					PublicModel:  model.Pattern,
 				})
 				if err != nil {
-					return nil, fmt.Errorf("resolve pricing for platform %s model %s: %w", platform.Code, model.Pattern, err)
+					if errors.Is(err, ErrModelPricingUnavailable) {
+						model.Pricing = &ResolvedPricing{
+							OfficialSource: PricingSourceInfo{
+								Type: PricingSourceUnavailable, Name: "Unavailable", MatchedModel: pricingModel,
+							},
+							Source: string(PricingSourceUnavailable),
+						}
+					} else {
+						return nil, fmt.Errorf("resolve pricing for platform %s model %s: %w", platform.Code, model.Pattern, err)
+					}
 				}
 			}
 			item.Models = append(item.Models, model)

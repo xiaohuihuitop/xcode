@@ -314,6 +314,8 @@ func registerModelPricingRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	pricing := admin.Group("/model-pricing")
 	{
 		pricing.GET("", h.Admin.ModelPricing.List)
+		pricing.GET("/catalog", h.Admin.ModelPricing.Catalog)
+		pricing.PUT("/platform-sale", h.Admin.ModelPricing.UpsertPlatformSale)
 		pricing.GET("/:id", h.Admin.ModelPricing.Get)
 		pricing.POST("", h.Admin.ModelPricing.Create)
 		pricing.PUT("/:id", h.Admin.ModelPricing.Update)

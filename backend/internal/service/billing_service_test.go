@@ -1581,6 +1581,31 @@ func TestGetModelPricing_MapsDynamicPriorityFieldsIntoBillingPricing(t *testing.
 	require.InDelta(t, 1.25, pricing.LongContextOutputMultiplier, 1e-12)
 }
 
+func TestGetModelPricingPreservesExplicitPriceFlagsFromCatalog(t *testing.T) {
+	svc := NewBillingService(&config.Config{}, &PricingService{
+		pricingData: map[string]*LiteLLMModelPricing{
+			"explicit-zero-model": {
+				InputCostPerTokenExplicit:           true,
+				OutputCostPerTokenExplicit:          true,
+				CacheCreationInputTokenCostExplicit: true,
+				CacheReadInputTokenCostExplicit:     true,
+				InputCostPerImageTokenExplicit:      true,
+				OutputCostPerImageTokenExplicit:     true,
+			},
+		},
+	})
+
+	pricing, err := svc.GetModelPricing("explicit-zero-model")
+
+	require.NoError(t, err)
+	require.True(t, pricing.InputPriceExplicit)
+	require.True(t, pricing.OutputPriceExplicit)
+	require.True(t, pricing.CacheCreationPriceExplicit)
+	require.True(t, pricing.CacheReadPriceExplicit)
+	require.True(t, pricing.ImageInputPriceExplicit)
+	require.True(t, pricing.ImageOutputPriceExplicit)
+}
+
 // ---------------------------------------------------------------------------
 // GetModelPricingWithOverride
 // ---------------------------------------------------------------------------
@@ -1736,6 +1761,22 @@ func TestComputeTokenBreakdown_ExplicitZeroImagePrice_NoFallback(t *testing.T) {
 	require.Equal(t, 0.0, bd.ImageOutputCost)
 	// textOutputTokens = 200 - 50 = 150
 	require.InDelta(t, 150*15e-6, bd.OutputCost, 1e-12)
+}
+
+func TestComputeTokenBreakdown_ExplicitZeroImageInputPrice_NoFallback(t *testing.T) {
+	svc := newTestBillingService()
+
+	pricing := &ModelPricing{
+		InputPricePerToken:      3e-6,
+		ImageInputPricePerToken: 0,
+		ImageInputPriceExplicit: true,
+	}
+	tokens := UsageTokens{InputTokens: 100, ImageInputTokens: 40}
+
+	breakdown := svc.computeTokenBreakdown(pricing, tokens, 1.0, "", false)
+
+	require.InDelta(t, 60*3e-6, breakdown.InputCost, 1e-12)
+	require.Zero(t, breakdown.ImageInputCost)
 }
 
 func TestComputeTokenBreakdown_NonExplicitZeroImagePrice_FallsBackToOutput(t *testing.T) {

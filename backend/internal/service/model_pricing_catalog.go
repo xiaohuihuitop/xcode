@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/domain"
+	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 )
 
 const (
@@ -17,8 +18,12 @@ const (
 )
 
 var (
-	ErrModelPricingOverrideNotFound = errors.New("model pricing override not found")
-	ErrModelPricingOverrideConflict = errors.New("model pricing override already exists")
+	ErrModelPricingOverrideNotFound        = errors.New("model pricing override not found")
+	ErrModelPricingOverrideConflict        = errors.New("model pricing override already exists")
+	ErrModelPricingPlatformModelNotEnabled = infraerrors.BadRequest(
+		"MODEL_PRICING_PLATFORM_MODEL_NOT_ENABLED",
+		"model is not enabled on the selected platform",
+	)
 )
 
 // ModelPricingOverride is the service representation of an administrator
@@ -46,6 +51,7 @@ type ModelPricingOverrideRepository interface {
 	Get(ctx context.Context, id int64) (*ModelPricingOverride, error)
 	Create(ctx context.Context, override *ModelPricingOverride) error
 	Update(ctx context.Context, override *ModelPricingOverride) error
+	Upsert(ctx context.Context, override *ModelPricingOverride) error
 	Delete(ctx context.Context, id int64) error
 }
 
@@ -103,6 +109,72 @@ func (c *ModelPricingCatalog) Delete(ctx context.Context, id int64) error {
 		return ErrModelPricingOverrideNotFound
 	}
 	return c.repo.Delete(ctx, id)
+}
+
+func (c *ModelPricingCatalog) GetExact(ctx context.Context, adapter, modelPattern string) (*ModelPricingOverride, error) {
+	if c == nil || c.repo == nil {
+		return nil, nil
+	}
+	adapter = strings.ToLower(strings.TrimSpace(adapter))
+	modelPattern = strings.TrimSpace(modelPattern)
+	if adapter == "" || modelPattern == "" {
+		return nil, nil
+	}
+	rules, err := c.repo.List(ctx, adapter)
+	if err != nil {
+		return nil, fmt.Errorf("list model pricing overrides: %w", err)
+	}
+	for i := range rules {
+		if strings.EqualFold(strings.TrimSpace(rules[i].Status), ModelPricingStatusActive) &&
+			strings.EqualFold(strings.TrimSpace(rules[i].Adapter), adapter) &&
+			strings.EqualFold(strings.TrimSpace(rules[i].ModelPattern), modelPattern) {
+			result := rules[i]
+			return &result, nil
+		}
+	}
+	return nil, nil
+}
+
+func (c *ModelPricingCatalog) UpsertPlatformSale(
+	ctx context.Context,
+	platform *Platform,
+	modelPattern string,
+	input ModelPricingOverride,
+) (*ModelPricingOverride, error) {
+	if c == nil || c.repo == nil {
+		return nil, fmt.Errorf("model pricing repository is required")
+	}
+	modelPattern = strings.TrimSpace(modelPattern)
+	if platform == nil || platform.ID <= 0 || strings.TrimSpace(platform.Code) == "" || !platform.IsActive() {
+		return nil, ErrModelPricingPlatformModelNotEnabled
+	}
+	canonicalModelPattern := ""
+	for i := range platform.ModelRules {
+		if platform.ModelRules[i].Enabled && strings.EqualFold(strings.TrimSpace(platform.ModelRules[i].ModelPattern), modelPattern) {
+			canonicalModelPattern = strings.TrimSpace(platform.ModelRules[i].ModelPattern)
+			break
+		}
+	}
+	if canonicalModelPattern == "" {
+		return nil, ErrModelPricingPlatformModelNotEnabled
+	}
+	existing, err := c.GetExact(ctx, platform.Code, canonicalModelPattern)
+	if err != nil {
+		return nil, err
+	}
+	if existing != nil {
+		canonicalModelPattern = strings.TrimSpace(existing.ModelPattern)
+	}
+	input.ID = 0
+	input.Adapter = platform.Code
+	input.ModelPattern = canonicalModelPattern
+	if err := validateModelPricingOverride(&input); err != nil {
+		return nil, err
+	}
+	if err := c.repo.Upsert(ctx, &input); err != nil {
+		return nil, err
+	}
+	return &input, nil
 }
 
 func validateModelPricingOverride(item *ModelPricingOverride) error {
@@ -325,6 +397,7 @@ func pricingOverrideToResolved(
 	resolved.Intervals = filterValidIntervals(resolved.Intervals)
 	if override.PerRequestPrice != nil {
 		resolved.DefaultPerRequestPrice = *override.PerRequestPrice
+		resolved.DefaultPerRequestPriceExplicit = true
 	}
 	if resolved.Mode == BillingModePerRequest || resolved.Mode == BillingModeImage {
 		resolved.RequestTiers = append([]PricingInterval(nil), resolved.Intervals...)
@@ -344,10 +417,12 @@ func applyOverridePrices(override *ModelPricingOverride, pricing *ModelPricing) 
 	if override.InputPrice != nil {
 		pricing.InputPricePerToken = *override.InputPrice
 		pricing.InputPricePerTokenPriority = *override.InputPrice
+		pricing.InputPriceExplicit = true
 	}
 	if override.OutputPrice != nil {
 		pricing.OutputPricePerToken = *override.OutputPrice
 		pricing.OutputPricePerTokenPriority = *override.OutputPrice
+		pricing.OutputPriceExplicit = true
 	}
 	if override.CacheWritePrice != nil {
 		pricing.CacheCreationPricePerToken = *override.CacheWritePrice
@@ -359,9 +434,11 @@ func applyOverridePrices(override *ModelPricingOverride, pricing *ModelPricing) 
 	if override.CacheReadPrice != nil {
 		pricing.CacheReadPricePerToken = *override.CacheReadPrice
 		pricing.CacheReadPricePerTokenPriority = *override.CacheReadPrice
+		pricing.CacheReadPriceExplicit = true
 	}
 	if override.ImageInputPrice != nil {
 		pricing.ImageInputPricePerToken = *override.ImageInputPrice
+		pricing.ImageInputPriceExplicit = true
 	}
 	if override.ImageOutputPrice != nil {
 		pricing.ImageOutputPricePerToken = *override.ImageOutputPrice

@@ -125,6 +125,42 @@ func (r *modelPricingOverrideRepository) Update(ctx context.Context, override *s
 	return nil
 }
 
+func (r *modelPricingOverrideRepository) Upsert(ctx context.Context, override *service.ModelPricingOverride) error {
+	if override == nil {
+		return fmt.Errorf("model pricing override is nil")
+	}
+	intervals, err := json.Marshal(normalizeIntervals(override.Intervals))
+	if err != nil {
+		return fmt.Errorf("marshal model pricing intervals: %w", err)
+	}
+	err = r.db.QueryRowContext(ctx, `INSERT INTO model_pricing_overrides
+        (adapter, model_pattern, billing_mode, input_price, output_price,
+         cache_write_price, cache_read_price, image_input_price,
+         image_output_price, per_request_price, intervals, status)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        ON CONFLICT ((LOWER(adapter)), model_pattern) DO UPDATE SET
+          billing_mode = EXCLUDED.billing_mode,
+          input_price = EXCLUDED.input_price,
+          output_price = EXCLUDED.output_price,
+          cache_write_price = EXCLUDED.cache_write_price,
+          cache_read_price = EXCLUDED.cache_read_price,
+          image_input_price = EXCLUDED.image_input_price,
+          image_output_price = EXCLUDED.image_output_price,
+          per_request_price = EXCLUDED.per_request_price,
+          intervals = EXCLUDED.intervals,
+          status = EXCLUDED.status,
+          updated_at = NOW()
+        RETURNING id`, strings.ToLower(strings.TrimSpace(override.Adapter)),
+		strings.TrimSpace(override.ModelPattern), normalizeBillingMode(override.BillingMode),
+		override.InputPrice, override.OutputPrice, override.CacheWritePrice,
+		override.CacheReadPrice, override.ImageInputPrice, override.ImageOutputPrice,
+		override.PerRequestPrice, intervals, normalizeStatus(override.Status)).Scan(&override.ID)
+	if err != nil {
+		return fmt.Errorf("upsert model pricing override: %w", err)
+	}
+	return nil
+}
+
 func (r *modelPricingOverrideRepository) Delete(ctx context.Context, id int64) error {
 	result, err := r.db.ExecContext(ctx, `DELETE FROM model_pricing_overrides WHERE id = $1`, id)
 	if err != nil {

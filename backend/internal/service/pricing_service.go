@@ -126,6 +126,13 @@ type LiteLLMModelPricing struct {
 	OutputCostPerImage                  float64 `json:"output_cost_per_image"`       // 图片生成模型每张图片价格
 	OutputCostPerImageToken             float64 `json:"output_cost_per_image_token"` // 图片输出 token 价格
 	InputCostPerImageToken              float64 `json:"input_cost_per_image_token"`  // 图片输入 token 价格（如 gpt-image-2 图片编辑）
+	InputCostPerTokenExplicit           bool    `json:"-"`
+	OutputCostPerTokenExplicit          bool    `json:"-"`
+	CacheCreationInputTokenCostExplicit bool    `json:"-"`
+	CacheReadInputTokenCostExplicit     bool    `json:"-"`
+	OutputCostPerImageExplicit          bool    `json:"-"`
+	OutputCostPerImageTokenExplicit     bool    `json:"-"`
+	InputCostPerImageTokenExplicit      bool    `json:"-"`
 
 	// TokenPricingAbsent 表示源数据中 input/output token 价格均缺失（仅有图片价）。
 	// 此类条目只可用于图片计费，token 计费必须回退到 fallback 或 fail-closed，
@@ -481,11 +488,18 @@ func (s *PricingService) parsePricingData(body []byte) (map[string]*LiteLLMModel
 		}
 
 		pricing := &LiteLLMModelPricing{
-			LiteLLMProvider:       entry.LiteLLMProvider,
-			Mode:                  entry.Mode,
-			SupportsPromptCaching: entry.SupportsPromptCaching,
-			SupportsServiceTier:   entry.SupportsServiceTier,
-			TokenPricingAbsent:    entry.InputCostPerToken == nil && entry.OutputCostPerToken == nil,
+			LiteLLMProvider:                     entry.LiteLLMProvider,
+			Mode:                                entry.Mode,
+			SupportsPromptCaching:               entry.SupportsPromptCaching,
+			SupportsServiceTier:                 entry.SupportsServiceTier,
+			TokenPricingAbsent:                  entry.InputCostPerToken == nil && entry.OutputCostPerToken == nil,
+			InputCostPerTokenExplicit:           entry.InputCostPerToken != nil,
+			OutputCostPerTokenExplicit:          entry.OutputCostPerToken != nil,
+			CacheCreationInputTokenCostExplicit: entry.CacheCreationInputTokenCost != nil,
+			CacheReadInputTokenCostExplicit:     entry.CacheReadInputTokenCost != nil,
+			OutputCostPerImageExplicit:          entry.OutputCostPerImage != nil,
+			OutputCostPerImageTokenExplicit:     entry.OutputCostPerImageToken != nil,
+			InputCostPerImageTokenExplicit:      entry.InputCostPerImageToken != nil,
 		}
 
 		if entry.InputCostPerToken != nil {

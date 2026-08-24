@@ -5,6 +5,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -13,6 +14,27 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
+
+func TestSetAuditExtraUsesPricingSummaryLimitAndRejectsUnknownKeys(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	longSummary := strings.Repeat("价", 600)
+	SetAuditExtra(c, map[string]any{
+		"platform_id": int64(7), "model_pattern": strings.Repeat("m", 160),
+		"before_pricing": longSummary, "after_pricing": longSummary,
+		"api_key": "must-not-be-recorded",
+	})
+
+	value, exists := c.Get(auditCtxKeyExtra)
+	require.True(t, exists)
+	extra, ok := value.(map[string]any)
+	require.True(t, ok)
+	require.EqualValues(t, 7, extra["platform_id"])
+	require.Len(t, []rune(extra["model_pattern"].(string)), 128)
+	require.Len(t, []rune(extra["before_pricing"].(string)), 512)
+	require.Len(t, []rune(extra["after_pricing"].(string)), 512)
+	require.NotContains(t, extra, "api_key")
+}
 
 func TestDeriveAuditAction(t *testing.T) {
 	cases := []struct {

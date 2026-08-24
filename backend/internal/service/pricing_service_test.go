@@ -422,6 +422,24 @@ func TestParsePricingData_KeepsImageOnlyPricing(t *testing.T) {
 	require.True(t, pricing.TokenPricingAbsent)
 }
 
+func TestParsePricingDataPreservesExplicitZeroPricePresence(t *testing.T) {
+	data, err := (&PricingService{}).parsePricingData([]byte(`{
+		"free-output-model": {
+			"input_cost_per_token": 0.00000015,
+			"output_cost_per_token": 0,
+			"cache_read_input_token_cost": 0,
+			"output_cost_per_image": 0
+		}
+	}`))
+	require.NoError(t, err)
+	pricing := data["free-output-model"]
+	require.NotNil(t, pricing)
+	require.True(t, pricing.InputCostPerTokenExplicit)
+	require.True(t, pricing.OutputCostPerTokenExplicit)
+	require.True(t, pricing.CacheReadInputTokenCostExplicit)
+	require.True(t, pricing.OutputCostPerImageExplicit)
+}
+
 func TestBillingService_GetModelPricing_FailsClosedForImageOnlyEntries(t *testing.T) {
 	pricingSvc := &PricingService{}
 	data, err := pricingSvc.parsePricingData([]byte(`{

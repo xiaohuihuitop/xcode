@@ -15,8 +15,12 @@ func ProvideAdminPlatformHandler(platformService *service.PlatformService) *admi
 	return admin.NewPlatformHandler(platformService)
 }
 
-func ProvideAdminModelPricingHandler(catalog *service.ModelPricingCatalog) *admin.ModelPricingHandler {
-	return admin.NewModelPricingHandler(catalog)
+func ProvideAdminModelPricingHandler(
+	catalog *service.ModelPricingCatalog,
+	platformCatalog *service.PlatformCatalogService,
+	platforms *service.PlatformService,
+) *admin.ModelPricingHandler {
+	return admin.NewModelPricingHandler(catalog, platformCatalog, platforms)
 }
 
 // ProvideAPIKeyHandler adds the read-only platform selector used by API Key
