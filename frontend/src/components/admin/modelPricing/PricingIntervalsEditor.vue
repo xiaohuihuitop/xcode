@@ -90,6 +90,7 @@
             :model-value="row[field.key]"
             :scale="field.scale"
             :unit-label="field.unit"
+            :labels="{ invalid: text.invalidPrice }"
             @update:model-value="updatePrice(row, field.key, $event)"
             @validity-change="setPriceValidity(row, field.key, $event)"
           />
@@ -143,6 +144,7 @@ const props = withDefaults(defineProps<{
     cacheWritePrice: string
     cacheReadPrice: string
     perRequestPrice: string
+    invalidPrice: string
   }>
 }>(), {
   labels: () => ({}),
@@ -168,13 +170,21 @@ const text = computed(() => ({
   cacheWritePrice: props.labels.cacheWritePrice ?? 'Cache write price',
   cacheReadPrice: props.labels.cacheReadPrice ?? 'Cache read price',
   perRequestPrice: props.labels.perRequestPrice ?? 'Per-request price',
+  invalidPrice: props.labels.invalidPrice ?? 'Interval price is invalid; enter a finite, non-negative value.',
 }))
 
+const priceKeys: PriceKey[] = [
+  'input_price',
+  'output_price',
+  'cache_write_price',
+  'cache_read_price',
+  'per_request_price',
+]
+
 const priceFields = computed<Array<{ key: PriceKey; label: string; scale: number; unit: string }>>(() => {
-  if (props.billingMode === 'per_request') {
+  if (props.billingMode === 'per_request' || props.billingMode === 'image') {
     return [{ key: 'per_request_price', label: text.value.perRequestPrice, scale: 1, unit: '$ / request' }]
   }
-  if (props.billingMode === 'image') return []
   return [
     { key: 'input_price', label: text.value.inputPrice, scale: TOKEN_PRICE_SCALE, unit: '$ / MTok' },
     { key: 'output_price', label: text.value.outputPrice, scale: TOKEN_PRICE_SCALE, unit: '$ / MTok' },
@@ -261,7 +271,7 @@ function addRow() {
 function deleteRow(index: number) {
   const [deleted] = rows.value.splice(index, 1)
   if (deleted) {
-    for (const key of ['input_price', 'output_price', 'cache_write_price', 'cache_read_price', 'per_request_price'] as PriceKey[]) {
+    for (const key of priceKeys) {
       invalidPrices.delete(priceValidityKey(deleted, key))
     }
   }
@@ -293,6 +303,14 @@ function validateAndNormalize(): ModelPricingInterval[] | null {
 
   const parsed: Array<{ row: DraftInterval; min: number; max: number | null }> = []
   for (const row of rows.value) {
+    for (const key of priceKeys) {
+      const price = row[key]
+      if (price !== null && (!Number.isFinite(price) || price < 0)) {
+        validationError.value = text.value.invalidPrice
+        return null
+      }
+    }
+
     const min = parseInteger(row.min_tokens)
     const max = parseInteger(row.max_tokens)
     if (min === null || min < 0 || (row.max_tokens.trim() && (max === null || max < 0))) {

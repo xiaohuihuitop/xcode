@@ -48,7 +48,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 
 import { TOKEN_PRICE_SCALE } from '@/utils/pricing'
 
@@ -96,12 +96,17 @@ const modeOptions = computed<Array<{ mode: PricingValueMode; label: string }>>((
 
 const mode = ref<PricingValueMode>(modeForValue(props.modelValue))
 const customValue = ref(displayValue(props.modelValue))
-const error = ref('')
+const error = ref(modelValueError(props.modelValue))
+
+onMounted(() => {
+  if (error.value) emit('validity-change', false)
+})
 
 watch(() => props.modelValue, value => {
   mode.value = modeForValue(value)
   customValue.value = displayValue(value)
-  error.value = ''
+  error.value = modelValueError(value)
+  emit('validity-change', !error.value)
 })
 
 function modeForValue(value: number | null): PricingValueMode {
@@ -110,7 +115,11 @@ function modeForValue(value: number | null): PricingValueMode {
 }
 
 function displayValue(value: number | null): string {
-  return value != null && value > 0 ? String(value * props.scale) : ''
+  return value != null && value !== 0 ? String(value * props.scale) : ''
+}
+
+function modelValueError(value: number | null): string {
+  return value != null && (!Number.isFinite(value) || value < 0) ? text.value.invalid : ''
 }
 
 function selectMode(nextMode: PricingValueMode) {
@@ -131,7 +140,10 @@ function selectMode(nextMode: PricingValueMode) {
   }
 
   customValue.value = displayValue(props.modelValue)
-  if (!customValue.value) {
+  error.value = modelValueError(props.modelValue)
+  if (error.value) {
+    emit('validity-change', false)
+  } else if (!customValue.value) {
     error.value = text.value.required
     emit('validity-change', false)
   }

@@ -38,4 +38,19 @@ describe('PricingValueEditor', () => {
     expect(wrapper.get('[role="alert"]').text()).toContain('required')
     expect(wrapper.emitted('update:modelValue')).toBeUndefined()
   })
+
+  it('shows an injected error and reports invalidity for a negative initial value', () => {
+    const wrapper = mount(PricingValueEditor, {
+      props: {
+        modelValue: -0.000005,
+        labels: { invalid: 'Localized invalid price.' },
+      },
+    })
+
+    expect(wrapper.get('[data-mode="custom"]').attributes('aria-pressed')).toBe('true')
+    expect(wrapper.get<HTMLInputElement>('[data-testid="custom-price-input"]').element.value).toBe('-5')
+    expect(wrapper.get('[role="alert"]').text()).toBe('Localized invalid price.')
+    expect(wrapper.emitted('validity-change')).toEqual([[false]])
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+  })
 })

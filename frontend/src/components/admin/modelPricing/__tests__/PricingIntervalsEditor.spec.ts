@@ -42,6 +42,28 @@ describe('PricingIntervalsEditor', () => {
     expect(wrapper.find('[data-price-field="per_request_price"]').exists()).toBe(true)
   })
 
+  it('uses per-request pricing for image intervals and emits edited values', async () => {
+    const wrapper = mount(PricingIntervalsEditor, {
+      props: { billingMode: 'token', modelValue: [{ min_tokens: 0, max_tokens: null }] },
+    })
+
+    await wrapper.setProps({ billingMode: 'image' })
+
+    expect(wrapper.find('[data-price-field="input_price"]').exists()).toBe(false)
+    expect(wrapper.find('[data-price-field="output_price"]').exists()).toBe(false)
+    expect(wrapper.find('[data-price-field="cache_write_price"]').exists()).toBe(false)
+    expect(wrapper.find('[data-price-field="cache_read_price"]').exists()).toBe(false)
+    expect(wrapper.find('[data-price-field="per_request_price"]').exists()).toBe(true)
+
+    await wrapper.get('[data-price-field="per_request_price"] [data-mode="custom"]').trigger('click')
+    await wrapper.get('[data-price-field="per_request_price"] [data-testid="custom-price-input"]').setValue('2')
+
+    const emitted = wrapper.emitted('update:modelValue')
+    expect(emitted?.[emitted.length - 1][0]).toEqual([
+      expect.objectContaining({ per_request_price: 2, sort_order: 0 }),
+    ])
+  })
+
   it('supports adding and deleting rows', async () => {
     const wrapper = mount(PricingIntervalsEditor, {
       props: {
@@ -136,6 +158,41 @@ describe('PricingIntervalsEditor', () => {
     await wrapper.get('[data-price-field="input_price"] [data-testid="custom-price-input"]').setValue('')
 
     expect(wrapper.findAll('[role="alert"]').some(alert => alert.text().includes('required'))).toBe(true)
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+  })
+
+  it.each([
+    'input_price',
+    'output_price',
+    'cache_write_price',
+    'cache_read_price',
+    'per_request_price',
+  ] as const)('rejects an initial negative %s even when the field is hidden', async field => {
+    const wrapper = mount(PricingIntervalsEditor, {
+      props: {
+        billingMode: field === 'per_request_price' ? 'token' : 'per_request',
+        modelValue: [{ min_tokens: 0, max_tokens: null, [field]: -1 }],
+        labels: { invalidPrice: 'Localized invalid interval price.' },
+      },
+    })
+
+    await wrapper.get('[data-testid="tier-label-0"]').setValue('Edited')
+
+    expect(wrapper.get('[role="alert"]').text()).toContain('Localized invalid interval price.')
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+  })
+
+  it.each([Number.NaN, Number.POSITIVE_INFINITY])('rejects a non-finite interval price: %s', async value => {
+    const wrapper = mount(PricingIntervalsEditor, {
+      props: {
+        billingMode: 'per_request',
+        modelValue: [{ min_tokens: 0, max_tokens: null, cache_read_price: value }],
+      },
+    })
+
+    await wrapper.get('[data-testid="tier-label-0"]').setValue('Edited')
+
+    expect(wrapper.get('[role="alert"]').text()).toContain('invalid')
     expect(wrapper.emitted('update:modelValue')).toBeUndefined()
   })
 })
