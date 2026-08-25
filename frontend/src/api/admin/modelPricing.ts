@@ -78,6 +78,10 @@ export interface ModelPricingCatalogRow {
   intervals: ModelPricingInterval[]
 }
 
+export interface ModelPricingCatalogWireRow extends Omit<ModelPricingCatalogRow, 'official_billing_mode'> {
+  official_billing_mode?: ModelPricingBillingMode | ''
+}
+
 export interface ModelPricingCatalogQuery {
   platform_id?: number
   query?: string
@@ -121,10 +125,13 @@ export async function catalog(query: ModelPricingCatalogQuery = {}): Promise<Mod
   if (query.platform_id != null) params.platform_id = query.platform_id
   const model = query.query?.trim()
   if (model) params.model = model
-  const { data } = await apiClient.get<ModelPricingCatalogRow[]>('/admin/model-pricing/catalog', {
+  const { data } = await apiClient.get<ModelPricingCatalogWireRow[]>('/admin/model-pricing/catalog', {
     params: Object.keys(params).length ? params : undefined,
   })
-  return data
+  return data.map(row => ({
+    ...row,
+    official_billing_mode: row.official_billing_mode ?? '',
+  }))
 }
 
 export async function upsertPlatformSale(input: PlatformSalePricingInput): Promise<ModelPricingOverride> {

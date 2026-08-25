@@ -44,6 +44,9 @@ vi.mock('vue-i18n', async () => {
     'admin.modelPricing.officialBillingMode': '官方模式',
     'admin.modelPricing.saleBillingMode': '售价模式',
     'admin.modelPricing.notComparable': '不可比较',
+    'admin.modelPricing.inherit': '继承官方价',
+    'admin.modelPricing.notSet': '未设置',
+    'admin.modelPricing.incompleteSalePricing': '跨模式售价必须覆盖所有请求场景',
     'admin.modelPricing.resolvedAfterSave': '保存后重新解析',
     'admin.modelPricing.rangeBounded': '{min}–{max} Tokens',
     'admin.modelPricing.rangeUnbounded': '{min}+ Tokens',
@@ -409,10 +412,10 @@ describe('ModelPricingView', () => {
     await flushPromises()
 
     const row = wrapper.get('[data-testid="catalog-row"]')
-    expect(row.get('[data-testid="official-billing-mode"]').text()).toContain('官方模式')
-    expect(row.get('[data-testid="official-billing-mode"]').text()).toContain('图片')
-    expect(row.get('[data-testid="sale-billing-mode"]').text()).toContain('售价模式')
-    expect(row.get('[data-testid="sale-billing-mode"]').text()).toContain('Token')
+    expect(row.get('[data-testid="desktop-official-billing-mode"]').text()).toContain('官方模式')
+    expect(row.get('[data-testid="desktop-official-billing-mode"]').text()).toContain('图片')
+    expect(row.get('[data-testid="desktop-sale-billing-mode"]').text()).toContain('售价模式')
+    expect(row.get('[data-testid="desktop-sale-billing-mode"]').text()).toContain('Token')
     expect(row.text()).toContain('$0.04')
     expect(row.text()).toContain('USD / 图片')
     expect(row.text()).toContain('$6')
@@ -429,9 +432,9 @@ describe('ModelPricingView', () => {
 
     const mobile = wrapper.get('[data-testid="mobile-catalog-row"]')
     expect(mobile.text()).toContain('官方模式')
-    expect(mobile.get('[data-testid="official-billing-mode"]').text()).toContain('图片')
+    expect(mobile.get('[data-testid="mobile-official-billing-mode"]').text()).toContain('图片')
     expect(mobile.text()).toContain('售价模式')
-    expect(mobile.get('[data-testid="sale-billing-mode"]').text()).toContain('Token')
+    expect(mobile.get('[data-testid="mobile-sale-billing-mode"]').text()).toContain('Token')
     expect(mobile.text()).toContain('$0.04')
     expect(mobile.text()).toContain('USD / 图片')
     expect(mobile.text()).toContain('$6')
@@ -478,6 +481,124 @@ describe('ModelPricingView', () => {
       output_price: 0.000016,
       per_request_price: null,
     }))
+  })
+
+  it('blocks a cross-mode token sale when a required price is unset', async () => {
+    modelPricing.catalog.mockResolvedValue([crossModeRow])
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="edit-sale-7-cross-mode-model"]').trigger('click')
+    const editor = wrapper.get('[data-testid="sale-editor"]')
+    await editor.get('[data-price-field="output_price"] [data-mode="inherit"]').trigger('click')
+
+    expect(editor.get('[data-price-field="output_price"] [data-mode="inherit"]').text()).toContain('未设置')
+    expect(editor.text()).not.toContain('继承官方价')
+    expect(editor.text()).toContain('跨模式售价必须覆盖所有请求场景')
+    expect(editor.get<HTMLButtonElement>('[data-testid="sale-save"]').element.disabled).toBe(true)
+
+    await editor.get('[data-testid="sale-save"]').trigger('click')
+    expect(modelPricing.upsertPlatformSale).not.toHaveBeenCalled()
+  })
+
+  it('allows cross-mode token intervals that continuously provide every missing price', async () => {
+    const intervals = [
+      { min_tokens: 0, max_tokens: 100, input_price: 0, sort_order: 0 },
+      { min_tokens: 100, max_tokens: null, input_price: 0.000002, sort_order: 1 },
+    ]
+    const row = {
+      ...crossModeRow,
+      model_pattern: 'cross-mode-interval-complete',
+      override: {
+        ...crossModeRow.override,
+        model_pattern: 'cross-mode-interval-complete',
+        input_price: null,
+        intervals,
+      },
+      intervals,
+    }
+    modelPricing.catalog.mockResolvedValue([row])
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="edit-sale-7-cross-mode-interval-complete"]').trigger('click')
+
+    expect(wrapper.get<HTMLButtonElement>('[data-testid="sale-editor"] [data-testid="sale-save"]').element.disabled).toBe(false)
+  })
+
+  it.each([
+    ['does not start at the lowest context', [
+      { min_tokens: 1, max_tokens: null, input_price: 0.000001, sort_order: 0 },
+    ]],
+    ['contains a context gap', [
+      { min_tokens: 0, max_tokens: 100, input_price: 0.000001, sort_order: 0 },
+      { min_tokens: 101, max_tokens: null, input_price: 0.000002, sort_order: 1 },
+    ]],
+    ['does not reach an unbounded context', [
+      { min_tokens: 0, max_tokens: 100, input_price: 0.000001, sort_order: 0 },
+    ]],
+    ['leaves a merged interval price incomplete', [
+      { min_tokens: 0, max_tokens: null, input_price: 0.000001, output_price: null, sort_order: 0 },
+    ]],
+  ])('blocks cross-mode token interval coverage that %s', async (scenario, intervals) => {
+    const missingOutput = scenario.includes('merged interval')
+    const row = {
+      ...crossModeRow,
+      model_pattern: `cross-mode-invalid-${scenario.replaceAll(' ', '-')}`,
+      override: {
+        ...crossModeRow.override,
+        model_pattern: `cross-mode-invalid-${scenario.replaceAll(' ', '-')}`,
+        input_price: null,
+        output_price: missingOutput ? null : crossModeRow.override.output_price,
+        intervals,
+      },
+      intervals,
+    }
+    modelPricing.catalog.mockResolvedValue([row])
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get(`[data-testid="edit-sale-7-${row.model_pattern}"]`).trigger('click')
+
+    expect(wrapper.get<HTMLButtonElement>('[data-testid="sale-editor"] [data-testid="sale-save"]').element.disabled).toBe(true)
+  })
+
+  it.each(['per_request', 'image'] as const)('requires a cross-mode %s sale to have an explicit default request price', async billingMode => {
+    const intervals = [{ min_tokens: 0, max_tokens: null, tier_label: 'HD', per_request_price: 0.04, sort_order: 0 }]
+    const modelPattern = `cross-mode-${billingMode}`
+    const row = {
+      ...crossModeRow,
+      model_pattern: modelPattern,
+      billing_mode: billingMode,
+      official_billing_mode: 'token',
+      override: {
+        ...crossModeRow.override,
+        model_pattern: modelPattern,
+        billing_mode: billingMode,
+        per_request_price: null,
+        intervals,
+      },
+      intervals,
+    }
+    modelPricing.catalog.mockResolvedValue([row])
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get(`[data-testid="edit-sale-7-${modelPattern}"]`).trigger('click')
+
+    expect(wrapper.get<HTMLButtonElement>('[data-testid="sale-editor"] [data-testid="sale-save"]').element.disabled).toBe(true)
+  })
+
+  it('keeps same-mode official inheritance saveable', async () => {
+    modelPricing.catalog.mockResolvedValue([inheritedRow])
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="edit-sale-7-gpt-5.6-sol"]').trigger('click')
+    const editor = wrapper.get('[data-testid="sale-editor"]')
+
+    expect(editor.get('[data-price-field="input_price"] [data-mode="inherit"]').text()).toContain('继承官方价')
+    expect(editor.get<HTMLButtonElement>('[data-testid="sale-save"]').element.disabled).toBe(false)
   })
 
   it('opens the platform sale editor and saves token values in per-token units', async () => {

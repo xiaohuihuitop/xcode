@@ -90,7 +90,7 @@
             :model-value="row[field.key]"
             :scale="field.scale"
             :unit-label="field.unit"
-            :labels="{ invalid: text.invalidPrice }"
+            :labels="{ inherit: text.inherit, invalid: text.invalidPrice }"
             @update:model-value="updatePrice(row, field.key, $event)"
             @validity-change="setPriceValidity(row, field.key, $event)"
           />
@@ -148,6 +148,7 @@ const props = withDefaults(defineProps<{
     perImagePrice: string
     requestUnit: string
     imageUnit: string
+    inherit: string
     invalidPrice: string
   }>
 }>(), {
@@ -178,6 +179,7 @@ const text = computed(() => ({
   perImagePrice: props.labels.perImagePrice ?? 'Per-image price',
   requestUnit: props.labels.requestUnit ?? '$ / request',
   imageUnit: props.labels.imageUnit ?? '$ / image',
+  inherit: props.labels.inherit ?? 'Inherit',
   invalidPrice: props.labels.invalidPrice ?? 'Interval price is invalid; enter a finite, non-negative value.',
 }))
 
