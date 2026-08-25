@@ -1,0 +1,12 @@
+[Unit]
+Description=Run XCode backup retention daily
+
+[Timer]
+OnCalendar=*-*-* 04:30:00
+RandomizedDelaySec=10m
+Persistent=true
+AccuracySec=1m
+Unit=xhh-backup-retention.service
+
+[Install]
+WantedBy=timers.target
