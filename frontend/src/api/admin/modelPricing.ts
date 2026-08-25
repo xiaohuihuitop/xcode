@@ -69,6 +69,7 @@ export interface ModelPricingCatalogRow {
   model_pattern: string
   upstream_model: string
   billing_mode: ModelPricingBillingMode
+  official_billing_mode: ModelPricingBillingMode | ''
   official_pricing: ModelPricingValues | null
   official_source: ModelPricingOfficialSource
   sale_pricing: ModelPricingValues | null

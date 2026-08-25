@@ -41,10 +41,15 @@ vi.mock('vue-i18n', async () => {
     'admin.modelPricing.perImagePrice': '每张图片价格',
     'admin.modelPricing.effectiveSalePrice': '实际售价',
     'admin.modelPricing.priceDifference': '价差比例',
+    'admin.modelPricing.officialBillingMode': '官方模式',
+    'admin.modelPricing.saleBillingMode': '售价模式',
+    'admin.modelPricing.notComparable': '不可比较',
     'admin.modelPricing.resolvedAfterSave': '保存后重新解析',
     'admin.modelPricing.rangeBounded': '{min}–{max} Tokens',
     'admin.modelPricing.rangeUnbounded': '{min}+ Tokens',
     'admin.modelPricing.notAvailable': '暂无',
+    'admin.modelPricing.token': 'Token',
+    'admin.modelPricing.image': '图片',
     'common.save': '保存',
     'common.cancel': '取消',
     'common.saving': '保存中',
@@ -68,6 +73,7 @@ const inheritedRow = {
   model_pattern: 'gpt-5.6-sol',
   upstream_model: 'gpt-5.6-sol-upstream',
   billing_mode: 'token',
+  official_billing_mode: 'token',
   official_pricing: {
     input_price: 0.000005,
     output_price: 0.000015,
@@ -166,6 +172,7 @@ const imageRow = {
   model_pattern: 'image-gen',
   upstream_model: 'image-gen-upstream',
   billing_mode: 'image',
+  official_billing_mode: 'image',
   official_pricing: {
     ...inheritedRow.official_pricing,
     input_price: null,
@@ -201,6 +208,51 @@ const imageRow = {
     status: 'active',
   },
   intervals: [{ min_tokens: 0, max_tokens: null, per_request_price: 0.04, sort_order: 0 }],
+}
+
+const crossModeRow = {
+  ...inheritedRow,
+  model_pattern: 'cross-mode-model',
+  upstream_model: 'cross-mode-model-upstream',
+  billing_mode: 'token',
+  official_billing_mode: 'image',
+  official_pricing: {
+    ...inheritedRow.official_pricing,
+    input_price: null,
+    output_price: null,
+    cache_read_price: null,
+    image_input_price: 0.000002,
+    image_output_price: 0.000003,
+    per_request_price: 0.04,
+  },
+  sale_pricing: {
+    ...inheritedRow.sale_pricing,
+    input_price: 0.000006,
+    output_price: 0.000016,
+    cache_write_price: 0.000001,
+    cache_read_price: 0.0000001,
+    image_input_price: null,
+    image_output_price: null,
+    per_request_price: null,
+    intervals: [{ min_tokens: 0, max_tokens: null, input_price: 0.000001, sort_order: 0 }],
+  },
+  sale_source: 'custom',
+  override: {
+    id: 31,
+    adapter: 'codex',
+    model_pattern: 'cross-mode-model',
+    billing_mode: 'token',
+    input_price: 0.000006,
+    output_price: 0.000016,
+    cache_write_price: 0.000001,
+    cache_read_price: 0.0000001,
+    image_input_price: null,
+    image_output_price: null,
+    per_request_price: null,
+    intervals: [{ min_tokens: 0, max_tokens: null, input_price: 0.000001, sort_order: 0 }],
+    status: 'active',
+  },
+  intervals: [{ min_tokens: 0, max_tokens: null, input_price: 0.000001, sort_order: 0 }],
 }
 
 function emptyOverride(id: number, adapter: string, modelPattern: string) {
@@ -262,6 +314,7 @@ function perRequestRow(modelPattern: string, official: number | null, sale: numb
     model_pattern: modelPattern,
     upstream_model: modelPattern,
     billing_mode: 'per_request',
+    official_billing_mode: 'per_request',
     official_pricing: { ...inheritedRow.official_pricing, per_request_price: official },
     sale_pricing: { ...inheritedRow.sale_pricing, per_request_price: sale },
     sale_source: sale === official ? 'official' : 'custom',
@@ -348,6 +401,83 @@ describe('ModelPricingView', () => {
     const minWidth = Number(minWidthClass?.match(/\d+/)?.[0])
 
     expect(minWidth).toBeLessThanOrEqual(1118)
+  })
+
+  it('renders distinct official and sale modes with their own desktop prices and units', async () => {
+    modelPricing.catalog.mockResolvedValue([crossModeRow])
+    const wrapper = mountView()
+    await flushPromises()
+
+    const row = wrapper.get('[data-testid="catalog-row"]')
+    expect(row.get('[data-testid="official-billing-mode"]').text()).toContain('官方模式')
+    expect(row.get('[data-testid="official-billing-mode"]').text()).toContain('图片')
+    expect(row.get('[data-testid="sale-billing-mode"]').text()).toContain('售价模式')
+    expect(row.get('[data-testid="sale-billing-mode"]').text()).toContain('Token')
+    expect(row.text()).toContain('$0.04')
+    expect(row.text()).toContain('USD / 图片')
+    expect(row.text()).toContain('$6')
+    expect(row.text()).toContain('$16')
+    expect(row.text()).toContain('USD / 1M Token')
+    expect(row.text()).toContain('不可比较')
+    expect(row.text()).not.toContain('%')
+  })
+
+  it('renders distinct modes and non-comparable pricing in the mobile semantic layout', async () => {
+    modelPricing.catalog.mockResolvedValue([crossModeRow])
+    const wrapper = mountView()
+    await flushPromises()
+
+    const mobile = wrapper.get('[data-testid="mobile-catalog-row"]')
+    expect(mobile.text()).toContain('官方模式')
+    expect(mobile.get('[data-testid="official-billing-mode"]').text()).toContain('图片')
+    expect(mobile.text()).toContain('售价模式')
+    expect(mobile.get('[data-testid="sale-billing-mode"]').text()).toContain('Token')
+    expect(mobile.text()).toContain('$0.04')
+    expect(mobile.text()).toContain('USD / 图片')
+    expect(mobile.text()).toContain('$6')
+    expect(mobile.text()).toContain('USD / 1M Token')
+    expect(mobile.text()).toContain('不可比较')
+    expect(mobile.text()).not.toContain('%')
+  })
+
+  it('keeps official and sale field selection separate in expanded cross-mode details', async () => {
+    modelPricing.catalog.mockResolvedValue([crossModeRow])
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="catalog-row"] button').trigger('click')
+    const details = wrapper.findAll('[data-testid="catalog-details"]')[0]
+    expect(details).toBeDefined()
+    expect(details!.get('[data-testid="official-price-list"]').text()).toContain('$0.04 USD / 图片')
+    expect(details!.get('[data-testid="official-price-list"]').text()).not.toContain('输入价格')
+    expect(details!.get('[data-testid="sale-price-list"]').text()).toContain('$6 USD / 1M Token')
+    expect(details!.get('[data-testid="catalog-interval-0"]').text()).toContain('$1 USD / 1M Token')
+  })
+
+  it('shows official image prices beside editable token prices without cross-mode comparison', async () => {
+    modelPricing.catalog.mockResolvedValue([crossModeRow])
+    modelPricing.list.mockResolvedValue([crossModeRow.override])
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="edit-sale-7-cross-mode-model"]').trigger('click')
+    const editor = wrapper.get('[data-testid="sale-editor"]')
+    expect(editor.get('[data-testid="official-price-per_request_price"]').text()).toContain('$0.04')
+    expect(editor.get('[data-testid="official-price-per_request_price"]').text()).toContain('USD / 图片')
+    expect(editor.find('[data-testid="official-price-input_price"]').exists()).toBe(false)
+    expect(editor.get('[data-price-field="input_price"]').text()).toContain('USD / 1M Token')
+    expect(editor.get<HTMLInputElement>('[data-price-field="input_price"] [data-testid="custom-price-input"]').element.value).toBe('6')
+    expect(editor.get('[data-testid="draft-difference-input_price"]').text()).toContain('不可比较')
+    expect(editor.get('[data-testid="draft-difference-input_price"]').text()).not.toContain('%')
+
+    await editor.get('[data-testid="sale-save"]').trigger('click')
+    await flushPromises()
+    expect(modelPricing.upsertPlatformSale).toHaveBeenCalledWith(expect.objectContaining({
+      billing_mode: 'token',
+      input_price: 0.000006,
+      output_price: 0.000016,
+      per_request_price: null,
+    }))
   })
 
   it('opens the platform sale editor and saves token values in per-token units', async () => {

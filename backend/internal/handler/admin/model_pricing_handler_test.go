@@ -82,7 +82,8 @@ func TestModelPricingHandlerCatalogReturnsOfficialAndSalePricing(t *testing.T) {
 	saleInput := 6e-6
 	override := &service.ModelPricingOverride{
 		ID: 12, Adapter: "codex", ModelPattern: "gpt-5.6-sol",
-		BillingMode: service.BillingModeToken, InputPrice: &saleInput,
+		BillingMode: service.BillingModeToken, InputPrice: &saleInput, OutputPrice: &saleInput,
+		CacheWritePrice: &saleInput, CacheReadPrice: &saleInput,
 		Status: service.ModelPricingStatusActive,
 	}
 	router := setupModelPricingHandlerRouter(
@@ -93,6 +94,7 @@ func TestModelPricingHandlerCatalogReturnsOfficialAndSalePricing(t *testing.T) {
 				Pattern: "gpt-5.6-sol", UpstreamModel: "gpt-5.6-sol-upstream",
 				Pricing: &service.ResolvedPricing{
 					Mode:            service.BillingModeToken,
+					OfficialMode:    service.BillingModeToken,
 					OfficialPricing: &service.ModelPricing{InputPricePerToken: officialInput},
 					OfficialSource: service.PricingSourceInfo{
 						Type: service.PricingSourceBundledCatalog, Name: "Bundled pricing catalog", MatchedModel: "gpt-5.6-sol",
@@ -123,6 +125,59 @@ func TestModelPricingHandlerCatalogReturnsOfficialAndSalePricing(t *testing.T) {
 	require.NotNil(t, row["sale_pricing"])
 	require.Equal(t, "custom", row["sale_source"])
 	require.NotNil(t, row["override"])
+}
+
+func TestModelPricingHandlerCatalogReturnsDistinctOfficialAndSaleBillingModes(t *testing.T) {
+	officialImagePrice := 0.04
+	inputPrice, outputPrice := 1e-6, 2e-6
+	cacheWritePrice, cacheReadPrice := 1.25e-6, 0.1e-6
+	override := &service.ModelPricingOverride{
+		ID: 13, Adapter: "gemini", ModelPattern: "image-model",
+		BillingMode: service.BillingModeToken, InputPrice: &inputPrice, OutputPrice: &outputPrice,
+		CacheWritePrice: &cacheWritePrice, CacheReadPrice: &cacheReadPrice,
+		Status: service.ModelPricingStatusActive,
+	}
+	router := setupModelPricingHandlerRouter(
+		&modelPricingHandlerManagementStub{},
+		&modelPricingHandlerCatalogStub{items: []service.PlatformCatalogPlatform{{
+			ID: 8, Code: "gemini", Name: "Gemini", AccountPlatform: service.PlatformGemini,
+			Models: []service.PlatformCatalogModel{{
+				Pattern: "image-model", UpstreamModel: "image-model-upstream",
+				Pricing: &service.ResolvedPricing{
+					Mode:                                   service.BillingModeToken,
+					OfficialMode:                           service.BillingModeImage,
+					OfficialPricing:                        &service.ModelPricing{},
+					OfficialDefaultPerRequestPrice:         officialImagePrice,
+					OfficialDefaultPerRequestPriceExplicit: true,
+					BasePricing: &service.ModelPricing{
+						InputPricePerToken: inputPrice, OutputPricePerToken: outputPrice,
+						CacheCreationPricePerToken: cacheWritePrice, CacheReadPricePerToken: cacheReadPrice,
+					},
+					MatchedOverride: override,
+					Source:          service.PricingSourceOverride,
+				},
+			}},
+		}}},
+		&modelPricingHandlerPlatformStub{},
+	)
+	recorder := httptest.NewRecorder()
+
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/v1/admin/model-pricing/catalog", nil))
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	var payload struct {
+		Data []map[string]any `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &payload))
+	require.Len(t, payload.Data, 1)
+	row := payload.Data[0]
+	require.Equal(t, "token", row["billing_mode"])
+	require.Equal(t, "image", row["official_billing_mode"])
+	officialPricing := row["official_pricing"].(map[string]any)
+	salePricing := row["sale_pricing"].(map[string]any)
+	require.Equal(t, officialImagePrice, officialPricing["per_request_price"])
+	require.Equal(t, inputPrice, salePricing["input_price"])
+	require.Equal(t, outputPrice, salePricing["output_price"])
 }
 
 func TestModelPricingHandlerUpsertsPlatformSaleUsingPlatformCode(t *testing.T) {
@@ -205,6 +260,7 @@ func TestModelPricingHandlerCatalogMarksIncompleteCustomSaleUnavailable(t *testi
 		Data []map[string]any `json:"data"`
 	}
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &payload))
+	require.Equal(t, "", payload.Data[0]["official_billing_mode"])
 	require.Equal(t, "unavailable", payload.Data[0]["sale_source"])
 	require.Nil(t, payload.Data[0]["sale_pricing"])
 	require.NotNil(t, payload.Data[0]["override"])

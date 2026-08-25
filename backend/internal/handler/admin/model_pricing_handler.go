@@ -132,19 +132,20 @@ type pricingValuesResponse struct {
 }
 
 type modelPricingCatalogResponse struct {
-	PlatformID      int64                         `json:"platform_id"`
-	PlatformCode    string                        `json:"platform_code"`
-	PlatformName    string                        `json:"platform_name"`
-	AccountPlatform string                        `json:"account_platform"`
-	ModelPattern    string                        `json:"model_pattern"`
-	UpstreamModel   string                        `json:"upstream_model"`
-	BillingMode     string                        `json:"billing_mode"`
-	OfficialPricing *pricingValuesResponse        `json:"official_pricing"`
-	OfficialSource  service.PricingSourceInfo     `json:"official_source"`
-	SalePricing     *pricingValuesResponse        `json:"sale_pricing"`
-	SaleSource      string                        `json:"sale_source"`
-	Override        *modelPricingResponse         `json:"override"`
-	Intervals       []domain.ModelPricingInterval `json:"intervals"`
+	PlatformID          int64                         `json:"platform_id"`
+	PlatformCode        string                        `json:"platform_code"`
+	PlatformName        string                        `json:"platform_name"`
+	AccountPlatform     string                        `json:"account_platform"`
+	ModelPattern        string                        `json:"model_pattern"`
+	UpstreamModel       string                        `json:"upstream_model"`
+	BillingMode         string                        `json:"billing_mode"`
+	OfficialBillingMode string                        `json:"official_billing_mode"`
+	OfficialPricing     *pricingValuesResponse        `json:"official_pricing"`
+	OfficialSource      service.PricingSourceInfo     `json:"official_source"`
+	SalePricing         *pricingValuesResponse        `json:"sale_pricing"`
+	SaleSource          string                        `json:"sale_source"`
+	Override            *modelPricingResponse         `json:"override"`
+	Intervals           []domain.ModelPricingInterval `json:"intervals"`
 }
 
 func modelPricingResponseFromService(item *service.ModelPricingOverride) modelPricingResponse {
@@ -314,6 +315,7 @@ func (h *ModelPricingHandler) Catalog(c *gin.Context) {
 			}
 			if model.Pricing != nil {
 				row.BillingMode = string(model.Pricing.Mode)
+				row.OfficialBillingMode = string(model.Pricing.OfficialMode)
 				row.OfficialSource = model.Pricing.OfficialSource
 				row.Intervals = pricingIntervalsFromService(model.Pricing.Intervals)
 				if model.Pricing.MatchedOverride != nil {

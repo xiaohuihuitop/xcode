@@ -48,10 +48,10 @@
                 <tr data-testid="catalog-row" class="align-top hover:bg-gray-50 dark:hover:bg-dark-800/70">
                   <td class="px-3 py-3"><div class="truncate font-medium" :title="row.platform_name">{{ row.platform_name }}</div><div class="truncate font-mono text-xs text-gray-500">{{ row.platform_code }}</div></td>
                   <td class="px-3 py-3"><div class="truncate font-mono" :title="row.model_pattern">{{ row.model_pattern }}</div><div class="mt-0.5 truncate font-mono text-xs text-gray-500" :title="row.upstream_model || row.model_pattern">{{ row.upstream_model || row.model_pattern }}</div></td>
-                  <td class="px-3 py-3"><span class="status-chip">{{ modeLabel(row.billing_mode) }}</span></td>
-                  <td class="px-3 py-3"><PriceLines :fields="primaryPriceFields(row.billing_mode)" :pricing="row.official_pricing" /><div class="mt-1 truncate text-xs text-gray-500" :title="row.official_source.source_name">{{ row.official_source.source_name || sourceTypeLabel(row.official_source.source_type) }}</div></td>
+                  <td class="space-y-2 px-3 py-3"><div data-testid="official-billing-mode" class="min-w-0 text-xs"><div class="truncate text-gray-500">{{ t('admin.modelPricing.officialBillingMode') }}</div><span class="mt-0.5 status-chip">{{ modeLabel(row.official_billing_mode) }}</span></div><div data-testid="sale-billing-mode" class="min-w-0 text-xs"><div class="truncate text-gray-500">{{ t('admin.modelPricing.saleBillingMode') }}</div><span class="mt-0.5 status-chip">{{ modeLabel(row.billing_mode) }}</span></div></td>
+                  <td class="px-3 py-3"><PriceLines :fields="primaryPriceFields(row.official_billing_mode)" :pricing="row.official_pricing" /><div class="mt-1 truncate text-xs text-gray-500" :title="row.official_source.source_name">{{ row.official_source.source_name || sourceTypeLabel(row.official_source.source_type) }}</div></td>
                   <td class="px-3 py-3"><PriceLines :fields="primaryPriceFields(row.billing_mode)" :pricing="row.sale_pricing" /></td>
-                  <td class="px-3 py-3"><DifferenceLines :fields="primaryPriceFields(row.billing_mode)" :official="row.official_pricing" :sale="row.sale_pricing" /></td>
+                  <td class="px-3 py-3"><span v-if="!billingModesComparable(row)" class="text-xs text-gray-500">{{ t('admin.modelPricing.notComparable') }}</span><DifferenceLines v-else :fields="primaryPriceFields(row.billing_mode)" :official="row.official_pricing" :sale="row.sale_pricing" /></td>
                   <td class="px-3 py-3"><span class="status-chip" :class="saleSourceClass(row.sale_source)">{{ saleSourceLabel(row.sale_source) }}</span></td>
                   <td class="px-3 py-3"><div class="flex justify-end gap-1"><button class="icon-button" type="button" :title="detailsTitle(row)" :aria-label="detailsTitle(row)" @click="toggleDetails(row)"><Icon :name="isExpanded(row) ? 'chevronUp' : 'chevronDown'" size="sm" /></button><button class="icon-button" type="button" :data-testid="`edit-sale-${row.platform_id}-${row.model_pattern}`" :title="t('admin.modelPricing.editSale')" :aria-label="t('admin.modelPricing.editSale')" @click="openSaleEditor(row)"><Icon name="edit" size="sm" /></button></div></td>
                 </tr>
@@ -62,14 +62,15 @@
         </div>
 
         <div v-if="!catalogLoading && !catalogError && catalogRows.length" class="mt-3 divide-y divide-gray-200 border-y border-gray-200 dark:divide-dark-700 dark:border-dark-700 md:hidden">
-          <article v-for="row in catalogRows" :key="`mobile-${catalogKey(row)}`" class="min-w-0 py-4">
+          <article v-for="row in catalogRows" :key="`mobile-${catalogKey(row)}`" data-testid="mobile-catalog-row" class="min-w-0 py-4">
             <div class="mb-3 flex min-w-0 items-start justify-between gap-2"><div class="min-w-0"><div class="truncate font-medium">{{ row.platform_name }}</div><div class="truncate font-mono text-sm">{{ row.model_pattern }}</div></div><div class="flex shrink-0 gap-1"><button class="icon-button" type="button" :title="detailsTitle(row)" :aria-label="detailsTitle(row)" @click="toggleDetails(row)"><Icon :name="isExpanded(row) ? 'chevronUp' : 'chevronDown'" size="sm" /></button><button class="icon-button" type="button" :title="t('admin.modelPricing.editSale')" :aria-label="t('admin.modelPricing.editSale')" @click="openSaleEditor(row)"><Icon name="edit" size="sm" /></button></div></div>
             <dl class="grid min-w-0 grid-cols-[minmax(0,7rem)_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">
               <dt class="text-gray-500">{{ t('admin.modelPricing.upstreamModel') }}</dt><dd class="min-w-0 break-words font-mono">{{ row.upstream_model || row.model_pattern }}</dd>
-              <dt class="text-gray-500">{{ t('admin.modelPricing.billingMode') }}</dt><dd>{{ modeLabel(row.billing_mode) }}</dd>
-              <dt class="text-gray-500">{{ t('admin.modelPricing.officialPrice') }}</dt><dd><PriceLines :fields="primaryPriceFields(row.billing_mode)" :pricing="row.official_pricing" /></dd>
+              <dt class="text-gray-500">{{ t('admin.modelPricing.officialBillingMode') }}</dt><dd data-testid="official-billing-mode">{{ modeLabel(row.official_billing_mode) }}</dd>
+              <dt class="text-gray-500">{{ t('admin.modelPricing.saleBillingMode') }}</dt><dd data-testid="sale-billing-mode">{{ modeLabel(row.billing_mode) }}</dd>
+              <dt class="text-gray-500">{{ t('admin.modelPricing.officialPrice') }}</dt><dd><PriceLines :fields="primaryPriceFields(row.official_billing_mode)" :pricing="row.official_pricing" /></dd>
               <dt class="text-gray-500">{{ t('admin.modelPricing.salePrice') }}</dt><dd><PriceLines :fields="primaryPriceFields(row.billing_mode)" :pricing="row.sale_pricing" /></dd>
-              <dt class="text-gray-500">{{ t('admin.modelPricing.priceDifference') }}</dt><dd><DifferenceLines :fields="primaryPriceFields(row.billing_mode)" :official="row.official_pricing" :sale="row.sale_pricing" /></dd>
+              <dt class="text-gray-500">{{ t('admin.modelPricing.priceDifference') }}</dt><dd><span v-if="!billingModesComparable(row)" class="text-gray-500">{{ t('admin.modelPricing.notComparable') }}</span><DifferenceLines v-else :fields="primaryPriceFields(row.billing_mode)" :official="row.official_pricing" :sale="row.sale_pricing" /></dd>
               <dt class="text-gray-500">{{ t('admin.modelPricing.saleStatus') }}</dt><dd>{{ saleSourceLabel(row.sale_source) }}</dd>
             </dl>
             <div v-if="isExpanded(row)" class="mt-4 border-t border-gray-200 pt-4 dark:border-dark-700"><CatalogDetails :row="row" /></div>
@@ -93,24 +94,32 @@
     <BaseDialog :show="saleEditorOpen" :title="t('admin.modelPricing.editSale')" width="wide" :close-on-escape="!savingSale" :show-close-button="!savingSale" @close="closeSaleEditor">
       <div data-testid="sale-editor" class="min-w-0">
         <dl class="mt-4 grid min-w-0 grid-cols-[minmax(0,7rem)_minmax(0,1fr)] gap-x-3 gap-y-2 border-y border-gray-200 py-3 text-sm dark:border-dark-700 sm:grid-cols-[7rem_minmax(0,1fr)_7rem_minmax(0,1fr)]"><dt class="text-gray-500">{{ t('admin.modelPricing.platform') }}</dt><dd class="min-w-0 break-words">{{ editingCatalogRow?.platform_name }}</dd><dt class="text-gray-500">{{ t('admin.modelPricing.modelPattern') }}</dt><dd class="min-w-0 break-words font-mono">{{ saleDraft.model_pattern }}</dd></dl>
-        <div class="mt-4 min-w-0 space-y-4">
+        <div class="mt-4 min-w-0">
+          <div class="flex min-w-0 flex-wrap items-center justify-between gap-2">
+            <h3 class="text-sm font-semibold">{{ t('admin.modelPricing.officialPrice') }}</h3>
+            <span class="text-xs text-gray-500">{{ t('admin.modelPricing.officialBillingMode') }}: {{ modeLabel(editingCatalogRow?.official_billing_mode ?? '') }}</span>
+          </div>
+          <div v-if="editingCatalogRow?.official_billing_mode" class="mt-2 grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2">
+            <div v-for="field in editablePriceFields(editingCatalogRow.official_billing_mode)" :key="field.key" :data-testid="`official-price-${field.key}`" class="min-w-0 border-b border-gray-200 py-2 text-sm dark:border-dark-700">
+              <div class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t(field.labelKey) }}</div>
+              <div class="mt-1 break-words font-mono tabular-nums">{{ displayPrice(editingCatalogRow.official_pricing?.[field.key], field.scale) }}</div>
+              <div class="mt-0.5 break-words text-xs text-gray-500 dark:text-gray-400">{{ t(field.unitKey) }}</div>
+            </div>
+          </div>
+          <p v-else class="mt-2 text-sm text-gray-500">{{ t('admin.modelPricing.noPrice') }}</p>
+        </div>
+        <div class="mt-5 min-w-0 space-y-4">
+          <div class="flex min-w-0 flex-wrap items-center justify-between gap-2">
+            <h3 class="text-sm font-semibold">{{ t('admin.modelPricing.salePrice') }}</h3>
+            <span class="text-xs text-gray-500">{{ t('admin.modelPricing.saleBillingMode') }}: {{ modeLabel(saleDraft.billing_mode) }}</span>
+          </div>
           <fieldset v-for="field in editablePriceFields(saleDraft.billing_mode)" :key="field.key" class="m-0 min-w-0 border-0 border-b border-gray-200 p-0 pb-4 text-sm last:border-b-0 last:pb-0 dark:border-dark-700" :data-price-field="field.key">
             <legend class="input-label break-words">{{ t(field.labelKey) }}</legend>
-            <div class="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
-              <div :data-testid="`official-price-${field.key}`" class="min-w-0 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 dark:border-dark-600 dark:bg-dark-900">
-                <div class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('admin.modelPricing.officialPrice') }}</div>
-                <div class="mt-1 break-words font-mono text-sm tabular-nums">{{ displayPrice(editingCatalogRow?.official_pricing?.[field.key], field.scale) }}</div>
-                <div class="mt-0.5 break-words text-xs text-gray-500 dark:text-gray-400">{{ t(field.unitKey) }}</div>
-              </div>
-              <div class="min-w-0">
-                <div class="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('admin.modelPricing.salePrice') }}</div>
-                <PricingValueEditor :model-value="saleDraft[field.key]" :scale="field.scale" :unit-label="t(field.unitKey)" :labels="priceEditorLabels(field.labelKey)" @update:model-value="saleDraft[field.key] = $event" @validity-change="saleFieldValidity[field.key] = $event" />
-                <dl class="mt-2 grid min-w-0 grid-cols-2 gap-2 border-t border-gray-200 pt-2 text-xs dark:border-dark-700">
-                  <div class="min-w-0"><dt class="text-gray-500">{{ t('admin.modelPricing.effectiveSalePrice') }}</dt><dd :data-testid="`effective-price-${field.key}`" class="mt-0.5 break-words font-mono tabular-nums">{{ willDeleteExactOverride ? t('admin.modelPricing.resolvedAfterSave') : displayPrice(effectiveSalePrice(field.key), field.scale) }}</dd></div>
-                  <div class="min-w-0"><dt class="text-gray-500">{{ t('admin.modelPricing.priceDifference') }}</dt><dd :data-testid="`draft-difference-${field.key}`" class="mt-0.5 break-words font-mono tabular-nums">{{ willDeleteExactOverride ? t('admin.modelPricing.resolvedAfterSave') : displayDifferenceRatio(editingCatalogRow?.official_pricing?.[field.key], effectiveSalePrice(field.key)) }}</dd></div>
-                </dl>
-              </div>
-            </div>
+            <PricingValueEditor :model-value="saleDraft[field.key]" :scale="field.scale" :unit-label="t(field.unitKey)" :labels="priceEditorLabels(field.labelKey)" @update:model-value="saleDraft[field.key] = $event" @validity-change="saleFieldValidity[field.key] = $event" />
+            <dl class="mt-2 grid min-w-0 grid-cols-2 gap-2 border-t border-gray-200 pt-2 text-xs dark:border-dark-700">
+              <div class="min-w-0"><dt class="text-gray-500">{{ t('admin.modelPricing.effectiveSalePrice') }}</dt><dd :data-testid="`effective-price-${field.key}`" class="mt-0.5 break-words font-mono tabular-nums">{{ willDeleteExactOverride ? t('admin.modelPricing.resolvedAfterSave') : displayPrice(effectiveSalePrice(field.key), field.scale) }}</dd></div>
+              <div class="min-w-0"><dt class="text-gray-500">{{ t('admin.modelPricing.priceDifference') }}</dt><dd :data-testid="`draft-difference-${field.key}`" class="mt-0.5 break-words font-mono tabular-nums">{{ willDeleteExactOverride ? t('admin.modelPricing.resolvedAfterSave') : !billingModesComparable(editingCatalogRow) ? t('admin.modelPricing.notComparable') : displayDifferenceRatio(editingCatalogRow?.official_pricing?.[field.key], effectiveSalePrice(field.key)) }}</dd></div>
+            </dl>
           </fieldset>
         </div>
         <div class="mt-5"><PricingIntervalsEditor v-model="saleDraft.intervals" v-model:valid="saleIntervalsValid" :billing-mode="saleDraft.billing_mode" :labels="intervalEditorLabels()" /></div>
@@ -150,6 +159,7 @@ const appStore = useAppStore()
 type PriceKey = 'input_price' | 'output_price' | 'cache_write_price' | 'cache_read_price' | 'image_input_price' | 'image_output_price' | 'per_request_price'
 interface PriceField { key: PriceKey; labelKey: string; scale: number; unitKey: string }
 interface PricingDraft extends Record<PriceKey, number | null> { billing_mode: ModelPricingBillingMode; intervals: ModelPricingInterval[]; status: ModelPricingOverride['status'] }
+type CatalogBillingMode = ModelPricingBillingMode | ''
 
 const tokenFields: PriceField[] = [
   { key: 'input_price', labelKey: 'admin.modelPricing.inputPrice', scale: TOKEN_PRICE_SCALE, unitKey: 'admin.modelPricing.tokenUnit' },
@@ -164,8 +174,9 @@ const imageFields: PriceField[] = [
 ]
 const requestFields: PriceField[] = [{ key: 'per_request_price', labelKey: 'admin.modelPricing.perRequestPrice', scale: 1, unitKey: 'admin.modelPricing.requestUnit' }]
 const allPriceKeys: PriceKey[] = ['input_price', 'output_price', 'cache_write_price', 'cache_read_price', 'image_input_price', 'image_output_price', 'per_request_price']
-function primaryPriceFields(mode: ModelPricingBillingMode) { return mode === 'token' ? tokenFields.slice(0, 2) : mode === 'image' ? imageFields.slice(2) : requestFields }
-function editablePriceFields(mode: ModelPricingBillingMode) { return mode === 'token' ? tokenFields : mode === 'image' ? imageFields : requestFields }
+function primaryPriceFields(mode: CatalogBillingMode) { return mode === 'token' ? tokenFields.slice(0, 2) : mode === 'image' ? imageFields.slice(2) : mode === 'per_request' ? requestFields : [] }
+function editablePriceFields(mode: CatalogBillingMode) { return mode === 'token' ? tokenFields : mode === 'image' ? imageFields : mode === 'per_request' ? requestFields : [] }
+function billingModesComparable(row: ModelPricingCatalogRow | null | undefined) { return row != null && row.official_billing_mode !== '' && row.official_billing_mode === row.billing_mode }
 function displayPrice(value: number | null | undefined, scale: number) { return value == null ? t('admin.modelPricing.noPrice') : formatScaled(value, scale) }
 function priceDifferenceRatio(official: number | null | undefined, sale: number | null | undefined) {
   if (official == null || sale == null) return null
@@ -180,7 +191,7 @@ function displayDifferenceRatio(official: number | null | undefined, sale: numbe
   return `${normalized > 0 ? '+' : ''}${normalized}%`
 }
 
-const PriceLines = defineComponent({ props: { fields: { type: Array as PropType<PriceField[]>, required: true }, pricing: { type: Object as PropType<ModelPricingValues | null>, default: null } }, setup(props) { return () => h('div', { class: 'space-y-0.5 tabular-nums' }, props.fields.map(field => h('div', { class: 'flex min-w-0 justify-between gap-2 text-xs' }, [h('span', { class: 'truncate text-gray-500', title: t(field.labelKey) }, t(field.labelKey)), h('span', { class: 'shrink-0 font-mono' }, displayPrice(props.pricing?.[field.key], field.scale))]))) } })
+const PriceLines = defineComponent({ props: { fields: { type: Array as PropType<PriceField[]>, required: true }, pricing: { type: Object as PropType<ModelPricingValues | null>, default: null } }, setup(props) { return () => h('div', { class: 'space-y-0.5 tabular-nums' }, props.fields.map(field => h('div', { class: 'min-w-0 text-xs' }, [h('div', { class: 'truncate text-gray-500', title: t(field.labelKey) }, t(field.labelKey)), h('div', { class: 'break-words font-mono' }, `${displayPrice(props.pricing?.[field.key], field.scale)} ${t(field.unitKey)}`)]))) } })
 const DifferenceLines = defineComponent({ props: { fields: { type: Array as PropType<PriceField[]>, required: true }, official: { type: Object as PropType<ModelPricingValues | null>, default: null }, sale: { type: Object as PropType<ModelPricingValues | null>, default: null } }, setup(props) { return () => h('div', { class: 'space-y-0.5 tabular-nums' }, props.fields.map(field => { const official = props.official?.[field.key]; const sale = props.sale?.[field.key]; const ratio = priceDifferenceRatio(official, sale); return h('div', { class: 'flex min-w-0 justify-between gap-2 text-xs' }, [h('span', { class: 'truncate text-gray-500' }, t(field.labelKey)), h('span', { class: ratio == null || ratio === 0 ? 'shrink-0 font-mono text-gray-500' : ratio > 0 ? 'shrink-0 font-mono text-amber-600' : 'shrink-0 font-mono text-emerald-600' }, displayDifferenceRatio(official, sale))]) })) } })
 
 function sourceTypeLabel(type: ModelPricingOfficialSourceType) { if (!type) return t('admin.modelPricing.sourceTypeUnavailable'); const suffix = type.split('_').map(part => part[0].toUpperCase() + part.slice(1)).join(''); return t(`admin.modelPricing.sourceType${suffix}`) }
@@ -204,8 +215,21 @@ function formatIntervalHeading(interval: ModelPricingInterval) {
   const range = formatIntervalRange(interval)
   return interval.tier_label ? `${interval.tier_label}: ${range}` : range
 }
-const CatalogDetails = defineComponent({ props: { row: { type: Object as PropType<ModelPricingCatalogRow>, required: true } }, setup(props) { return () => h('div', { class: 'grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-3' }, [
-  h('div', [h('h3', { class: 'text-sm font-semibold' }, t('admin.modelPricing.details')), h('dl', { class: 'mt-2 grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm' }, editablePriceFields(props.row.billing_mode).flatMap(field => [h('dt', { class: 'text-gray-500' }, t(field.labelKey)), h('dd', { class: 'min-w-0 space-y-0.5 break-words font-mono text-xs' }, [h('div', `${t('admin.modelPricing.officialPrice')}: ${displayPrice(props.row.official_pricing?.[field.key], field.scale)}`), h('div', `${t('admin.modelPricing.salePrice')}: ${displayPrice(props.row.sale_pricing?.[field.key], field.scale)}`), h('div', { class: 'text-gray-500' }, t(field.unitKey))])]))]),
+function detailPriceList(fields: PriceField[], pricing: ModelPricingValues | null, testId: string) {
+  if (fields.length === 0) return h('p', { class: 'mt-2 text-sm text-gray-500', 'data-testid': testId }, t('admin.modelPricing.noPrice'))
+  return h('dl', { class: 'mt-2 grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm', 'data-testid': testId }, fields.flatMap(field => [
+    h('dt', { class: 'text-gray-500' }, t(field.labelKey)),
+    h('dd', { class: 'min-w-0 break-words font-mono text-xs' }, `${displayPrice(pricing?.[field.key], field.scale)} ${t(field.unitKey)}`),
+  ]))
+}
+const CatalogDetails = defineComponent({ props: { row: { type: Object as PropType<ModelPricingCatalogRow>, required: true } }, setup(props) { return () => h('div', { class: 'grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-3', 'data-testid': 'catalog-details' }, [
+  h('div', [
+    h('h3', { class: 'text-sm font-semibold' }, t('admin.modelPricing.details')),
+    h('h4', { class: 'mt-2 text-xs font-medium text-gray-500' }, `${t('admin.modelPricing.officialPrice')} · ${t('admin.modelPricing.officialBillingMode')}: ${modeLabel(props.row.official_billing_mode)}`),
+    detailPriceList(editablePriceFields(props.row.official_billing_mode), props.row.official_pricing, 'official-price-list'),
+    h('h4', { class: 'mt-4 text-xs font-medium text-gray-500' }, `${t('admin.modelPricing.salePrice')} · ${t('admin.modelPricing.saleBillingMode')}: ${modeLabel(props.row.billing_mode)}`),
+    detailPriceList(editablePriceFields(props.row.billing_mode), props.row.sale_pricing, 'sale-price-list'),
+  ]),
   h('div', [h('h3', { class: 'text-sm font-semibold' }, t('admin.modelPricing.officialSource')), h('dl', { class: 'mt-2 grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm' }, [h('dt', { class: 'text-gray-500' }, t('admin.modelPricing.sourceType')), h('dd', sourceTypeLabel(props.row.official_source.source_type)), h('dt', { class: 'text-gray-500' }, t('admin.modelPricing.sourceName')), h('dd', { class: 'break-words' }, props.row.official_source.source_url ? [h('a', { class: 'text-primary-600 hover:underline', href: props.row.official_source.source_url, target: '_blank', rel: 'noopener noreferrer' }, props.row.official_source.source_name || props.row.official_source.source_url)] : props.row.official_source.source_name || t('admin.modelPricing.notAvailable')), h('dt', { class: 'text-gray-500' }, t('admin.modelPricing.matchedModel')), h('dd', { class: 'break-words font-mono' }, props.row.official_source.matched_model || t('admin.modelPricing.notAvailable')), h('dt', { class: 'text-gray-500' }, t('admin.modelPricing.updatedAt')), h('dd', formatDate(props.row.official_source.updated_at))])]),
   h('div', [h('h3', { class: 'text-sm font-semibold' }, t('admin.modelPricing.matchedRule')), props.row.override ? h('p', { class: 'mt-2 break-words font-mono text-sm' }, `${props.row.override.adapter} / ${props.row.override.model_pattern}`) : h('p', { class: 'mt-2 text-sm text-gray-500' }, t('admin.modelPricing.notAvailable')), h('h3', { class: 'mt-4 text-sm font-semibold' }, t('admin.modelPricing.intervals')), props.row.intervals.length ? h('div', { class: 'mt-2 space-y-2 text-xs' }, props.row.intervals.map((interval, index) => h('div', { class: 'border-b border-gray-200 pb-2 last:border-0 last:pb-0', 'data-testid': `catalog-interval-${index}` }, [h('div', { class: 'mb-1 font-medium' }, formatIntervalHeading(interval)), h('dl', { class: 'grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)] gap-x-2 gap-y-1' }, intervalPriceFields(props.row.billing_mode).flatMap(field => [h('dt', { class: 'truncate text-gray-500', title: t(field.labelKey) }, t(field.labelKey)), h('dd', { class: 'break-words font-mono tabular-nums', 'data-testid': `interval-price-${field.key}` }, `${displayPrice(intervalFieldValue(interval, field.key), field.scale)} ${t(field.unitKey)}`)]))]))) : h('p', { class: 'mt-2 text-sm text-gray-500' }, t('admin.modelPricing.noIntervals'))]),
 ]) } })
@@ -263,7 +287,7 @@ function catalogKey(row: ModelPricingCatalogRow) { return `${row.platform_id}:${
 function isExpanded(row: ModelPricingCatalogRow) { return expandedRows.has(catalogKey(row)) }
 function toggleDetails(row: ModelPricingCatalogRow) { const key = catalogKey(row); expandedRows.has(key) ? expandedRows.delete(key) : expandedRows.add(key) }
 function detailsTitle(row: ModelPricingCatalogRow) { return isExpanded(row) ? t('admin.modelPricing.hideDetails') : t('admin.modelPricing.showDetails') }
-function modeLabel(mode: ModelPricingBillingMode) { return mode === 'per_request' ? t('admin.modelPricing.perRequest') : mode === 'image' ? t('admin.modelPricing.image') : t('admin.modelPricing.token') }
+function modeLabel(mode: CatalogBillingMode) { return mode === 'per_request' ? t('admin.modelPricing.perRequest') : mode === 'image' ? t('admin.modelPricing.image') : mode === 'token' ? t('admin.modelPricing.token') : t('admin.modelPricing.notAvailable') }
 function saleSourceLabel(source: ModelPricingSaleSource) { return t(`admin.modelPricing.${source}`) }
 function saleSourceClass(source: ModelPricingSaleSource) { return source === 'custom' ? 'status-chip--custom' : source === 'official' ? 'status-chip--official' : 'status-chip--unavailable' }
 
@@ -280,7 +304,7 @@ function exactEditingOverride() {
   const sameModel = normalizedIdentity(override.model_pattern) === normalizedIdentity(row.model_pattern)
   return sameAdapter && sameModel ? override : null
 }
-function effectiveSalePrice(key: PriceKey) { return saleDraft[key] ?? editingCatalogRow.value?.official_pricing?.[key] ?? null }
+function effectiveSalePrice(key: PriceKey) { return saleDraft[key] ?? (billingModesComparable(editingCatalogRow.value) ? editingCatalogRow.value?.official_pricing?.[key] : null) ?? null }
 function priceEditorLabels(labelKey: string) { return { modeGroup: t('admin.modelPricing.priceBehavior'), inherit: t('admin.modelPricing.inherit'), custom: t('admin.modelPricing.custom'), zero: t('admin.modelPricing.zero'), inputLabel: t(labelKey), required: t('admin.modelPricing.customPriceRequired'), invalid: t('admin.modelPricing.invalidPrice') } }
 function intervalEditorLabels() { return { title: t('admin.modelPricing.intervals'), interval: t('admin.modelPricing.interval'), add: t('admin.modelPricing.addInterval'), delete: t('admin.modelPricing.deleteInterval'), sort: t('admin.modelPricing.sortIntervals'), empty: t('admin.modelPricing.noIntervals'), minTokens: t('admin.modelPricing.minTokens'), maxTokens: t('admin.modelPricing.maxTokens'), tierLabel: t('admin.modelPricing.tierLabel'), unbounded: t('admin.modelPricing.unbounded'), inputPrice: t('admin.modelPricing.inputPrice'), outputPrice: t('admin.modelPricing.outputPrice'), cacheWritePrice: t('admin.modelPricing.cacheWritePrice'), cacheReadPrice: t('admin.modelPricing.cacheReadPrice'), perRequestPrice: t('admin.modelPricing.perRequestPrice'), perImagePrice: t('admin.modelPricing.perImagePrice'), requestUnit: t('admin.modelPricing.requestUnit'), imageUnit: t('admin.modelPricing.imageUnit'), invalidPrice: t('admin.modelPricing.invalidPrice') } }
 const blankValidity = (): Record<PriceKey, boolean> => ({ input_price: true, output_price: true, cache_write_price: true, cache_read_price: true, image_input_price: true, image_output_price: true, per_request_price: true })
