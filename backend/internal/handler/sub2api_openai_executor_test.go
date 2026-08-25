@@ -9,8 +9,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/gatewayruntime"
+	sub2api "github.com/Wei-Shaw/sub2api/internal/runtime/sub2api"
 	"github.com/Wei-Shaw/sub2api/internal/service"
+	v1 "github.com/Wei-Shaw/sub2api/pkg/runtimebridge/v1"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
@@ -22,6 +25,46 @@ type openAIExecutorSink struct {
 func (s *openAIExecutorSink) RecordFinal(_ context.Context, event gatewayruntime.UsageEvent) error {
 	s.events = append(s.events, event)
 	return nil
+}
+
+func TestSub2APIOpenAIPortRejectsUnavailablePricingBeforeAccountSelection(t *testing.T) {
+	cfg := &config.Config{}
+	billing := service.NewBillingService(cfg, nil)
+	resolver := service.NewModelPricingResolver(billing)
+	gateway := service.NewOpenAIGatewayService(
+		nil, nil, nil, nil, nil, nil, cfg, nil, nil, billing,
+		nil, nil, nil, nil, nil, nil, resolver, nil, nil, nil,
+	)
+	ctx := service.WithGatewayPlatformAssetContext(context.Background(), &service.GatewayPlatformAssetContext{
+		Platform: &service.ResolvedPlatformModel{
+			PlatformID: 1, PlatformCode: "codex", AccountPlatform: service.PlatformOpenAI,
+			RequestedModel: "pricing-missing-model", UpstreamModel: "pricing-missing-model",
+		},
+		SchedulingScope: service.PlatformSchedulingScope{
+			PlatformID: 1, PlatformCode: "codex", AccountPlatform: service.PlatformOpenAI,
+		},
+	})
+	port := &sub2APIOpenAIPort{service: gateway}
+	for _, endpoint := range []v1.Endpoint{
+		v1.EndpointChatCompletions,
+		v1.EndpointResponses,
+		v1.EndpointMessages,
+	} {
+		t.Run(string(endpoint), func(t *testing.T) {
+			_, err := port.Select(ctx, v1.Request{
+				ContractVersion: v1.ContractVersionV1,
+				Platform: v1.PlatformRoute{
+					ID: 1, Code: "codex", RuntimeAdapter: service.PlatformOpenAI,
+					RequestedModel: "pricing-missing-model", UpstreamModel: "pricing-missing-model",
+				},
+				Endpoint: endpoint,
+			}, nil, string(endpoint))
+
+			require.ErrorIs(t, err, service.ErrModelPricingUnavailable)
+			var retryErr *sub2api.RetryError
+			require.False(t, errors.As(err, &retryErr))
+		})
+	}
 }
 
 func TestSub2APIOpenAIExecutorDispatchesRegisteredProtocol(t *testing.T) {

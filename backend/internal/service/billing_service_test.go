@@ -239,6 +239,58 @@ func TestCalculateCostUnifiedAllowsIntervalToCompleteOfficialTokenPricing(t *tes
 	require.InDelta(t, 0.000275, cost.TotalCost, 1e-12)
 }
 
+func TestCalculateCostUnifiedAllowsOfficialTokenPricingWithoutCacheWritePrice(t *testing.T) {
+	pricingService := &PricingService{
+		pricingData: map[string]*LiteLLMModelPricing{
+			"official-without-cache-write": {
+				InputCostPerToken:               1e-6,
+				InputCostPerTokenExplicit:       true,
+				OutputCostPerToken:              2e-6,
+				OutputCostPerTokenExplicit:      true,
+				CacheReadInputTokenCost:         0.1e-6,
+				CacheReadInputTokenCostExplicit: true,
+			},
+		},
+	}
+	billing := NewBillingService(&config.Config{}, pricingService)
+	resolver := NewModelPricingResolver(billing)
+
+	cost, err := billing.CalculateCostUnified(CostInput{
+		Ctx: context.Background(), Model: "official-without-cache-write",
+		Tokens: UsageTokens{
+			InputTokens: 100, OutputTokens: 50,
+			CacheCreationTokens: 20, CacheReadTokens: 30,
+		},
+		RateMultiplier: 1,
+		Resolver:       resolver,
+	})
+
+	require.NoError(t, err)
+	require.InDelta(t, 0.000203, cost.TotalCost, 1e-12)
+}
+
+func TestValidateResolvedPricingRejectsCrossModeTokenIntervalCoverageGap(t *testing.T) {
+	inputPrice := 1e-6
+	outputPrice := 2e-6
+	cacheWritePrice := 3e-6
+	cacheReadPrice := 0.1e-6
+	maxTokens := 100
+	resolved := &ResolvedPricing{
+		Mode:            BillingModeToken,
+		OfficialMode:    BillingModeImage,
+		OfficialPricing: &ModelPricing{},
+		BasePricing:     &ModelPricing{},
+		MatchedOverride: &ModelPricingOverride{BillingMode: BillingModeToken},
+		Intervals: []PricingInterval{{
+			MinTokens: 10, MaxTokens: &maxTokens,
+			InputPrice: &inputPrice, OutputPrice: &outputPrice,
+			CacheWritePrice: &cacheWritePrice, CacheReadPrice: &cacheReadPrice,
+		}},
+	}
+
+	require.ErrorIs(t, validateResolvedPricingAvailable(resolved), ErrModelPricingUnavailable)
+}
+
 func TestCalculateCostUnifiedRejectsUnmatchedIntervalWithIncompleteBase(t *testing.T) {
 	inputPrice := 1e-6
 	outputPrice := 2e-6
@@ -260,7 +312,7 @@ func TestCalculateCostUnifiedRejectsUnmatchedIntervalWithIncompleteBase(t *testi
 		Adapter: "custom", Model: "private-unmatched-interval-xyz",
 	})
 	require.NoError(t, err)
-	require.NoError(t, validateResolvedPricingAvailable(resolved))
+	require.ErrorIs(t, validateResolvedPricingAvailable(resolved), ErrModelPricingUnavailable)
 
 	cost, err := billing.CalculateCostUnified(CostInput{
 		Ctx: context.Background(), Model: "private-unmatched-interval-xyz", Adapter: "custom",
@@ -269,6 +321,41 @@ func TestCalculateCostUnifiedRejectsUnmatchedIntervalWithIncompleteBase(t *testi
 	})
 
 	require.Nil(t, cost)
+	require.ErrorIs(t, err, ErrModelPricingUnavailable)
+}
+
+func TestOpenAIGatewayServiceValidateRequestPricingRejectsIncompleteWildcardSale(t *testing.T) {
+	pricingService := &PricingService{
+		pricingData: map[string]*LiteLLMModelPricing{
+			"gpt-5.6-upstream": {
+				OutputCostPerImage:         0.04,
+				OutputCostPerImageExplicit: true,
+				TokenPricingAbsent:         true,
+			},
+		},
+	}
+	inputPrice := 1e-6
+	billing := NewBillingService(&config.Config{}, pricingService)
+	resolver := NewModelPricingResolverWithCatalog(
+		billing,
+		NewModelPricingCatalog(&modelPricingOverrideRepoStub{rules: []ModelPricingOverride{{
+			Adapter: "codex", ModelPattern: "gpt-*", BillingMode: BillingModeToken,
+			InputPrice: &inputPrice, Status: ModelPricingStatusActive,
+		}}}),
+	)
+	ctx := WithGatewayPlatformAssetContext(context.Background(), &GatewayPlatformAssetContext{
+		Platform: &ResolvedPlatformModel{
+			PlatformID: 1, PlatformCode: "codex", AccountPlatform: PlatformOpenAI,
+			RequestedModel: "gpt-5.6-sol", UpstreamModel: "gpt-5.6-upstream",
+		},
+		SchedulingScope: PlatformSchedulingScope{
+			PlatformID: 1, PlatformCode: "codex", AccountPlatform: PlatformOpenAI,
+		},
+	})
+	svc := &OpenAIGatewayService{resolver: resolver}
+
+	err := svc.ValidateRequestPricing(ctx, "gpt-5.6-upstream")
+
 	require.ErrorIs(t, err, ErrModelPricingUnavailable)
 }
 
@@ -457,6 +544,62 @@ func TestCalculateCostUnifiedValidatesTokenIntervalPrices(t *testing.T) {
 				CacheWritePrice: &cacheWritePrice, CacheReadPrice: &cacheReadPrice,
 			})
 
+			require.Nil(t, cost)
+			require.ErrorIs(t, err, ErrModelPricingUnavailable)
+		})
+	}
+}
+
+func TestResolvedTokenPricingRejectsInvalidEffectivePriceFields(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*ModelPricing)
+	}{
+		{name: "priority input infinity", mutate: func(p *ModelPricing) { p.InputPricePerTokenPriority = math.Inf(1) }},
+		{name: "priority output infinity", mutate: func(p *ModelPricing) { p.OutputPricePerTokenPriority = math.Inf(1) }},
+		{name: "priority cache write infinity", mutate: func(p *ModelPricing) { p.CacheCreationPricePerTokenPriority = math.Inf(1) }},
+		{name: "priority cache read infinity", mutate: func(p *ModelPricing) { p.CacheReadPricePerTokenPriority = math.Inf(1) }},
+		{name: "negative image input", mutate: func(p *ModelPricing) {
+			p.ImageInputPricePerToken = -1
+			p.ImageInputPriceExplicit = true
+		}},
+		{name: "NaN image output", mutate: func(p *ModelPricing) {
+			p.ImageOutputPricePerToken = math.NaN()
+			p.ImageOutputPriceExplicit = true
+		}},
+		{name: "5m cache infinity", mutate: func(p *ModelPricing) {
+			p.SupportsCacheBreakdown = true
+			p.CacheCreation5mPrice = math.Inf(1)
+		}},
+		{name: "negative 1h cache", mutate: func(p *ModelPricing) {
+			p.SupportsCacheBreakdown = true
+			p.CacheCreation5mPrice = 1e-6
+			p.CacheCreation1hPrice = -1
+		}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pricing := &ModelPricing{
+				InputPricePerToken: 1e-6, InputPriceExplicit: true,
+				OutputPricePerToken: 2e-6, OutputPriceExplicit: true,
+			}
+			tt.mutate(pricing)
+			resolved := &ResolvedPricing{
+				Mode: BillingModeToken, OfficialMode: BillingModeToken,
+				BasePricing: pricing, OfficialPricing: cloneModelPricing(pricing),
+			}
+
+			require.ErrorIs(t, validateResolvedPricingAvailable(resolved), ErrModelPricingUnavailable)
+			cost, err := newTestBillingService().CalculateCostUnified(CostInput{
+				Ctx: context.Background(), Model: "invalid-effective-price",
+				Tokens: UsageTokens{
+					InputTokens: 1, OutputTokens: 1, ImageInputTokens: 1, ImageOutputTokens: 1,
+					CacheCreationTokens: 1, CacheCreation5mTokens: 1, CacheCreation1hTokens: 1,
+				},
+				RateMultiplier: 1, ServiceTier: "priority",
+				Resolver: NewModelPricingResolver(newTestBillingService()), Resolved: resolved,
+			})
 			require.Nil(t, cost)
 			require.ErrorIs(t, err, ErrModelPricingUnavailable)
 		})

@@ -345,6 +345,18 @@ func (h *ModelPricingHandler) UpsertPlatformSale(c *gin.Context) {
 		return
 	}
 	modelPattern := strings.TrimSpace(req.ModelPattern)
+	officialMode, err := h.officialBillingMode(c.Request.Context(), req.PlatformID, modelPattern)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	candidate := req.toService()
+	candidate.Adapter = platform.Code
+	candidate.ModelPattern = modelPattern
+	if err := service.ValidatePlatformSaleOverride(officialMode, candidate); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
 	before, err := h.pricing.GetExact(c.Request.Context(), platform.Code, modelPattern)
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -361,6 +373,28 @@ func (h *ModelPricingHandler) UpsertPlatformSale(c *gin.Context) {
 	}
 	middleware.SetAuditExtra(c, map[string]any{"after_pricing": modelPricingAuditSummary(item)})
 	response.Success(c, modelPricingResponseFromService(item))
+}
+
+func (h *ModelPricingHandler) officialBillingMode(ctx context.Context, platformID int64, modelPattern string) (service.BillingMode, error) {
+	if h.catalog == nil {
+		return "", service.ErrModelPricingOverrideNotFound
+	}
+	items, err := h.catalog.ListPricingCatalog(ctx)
+	if err != nil {
+		return "", err
+	}
+	for i := range items {
+		if items[i].ID != platformID {
+			continue
+		}
+		for j := range items[i].Models {
+			model := items[i].Models[j]
+			if strings.EqualFold(strings.TrimSpace(model.Pattern), strings.TrimSpace(modelPattern)) && model.Pricing != nil {
+				return model.Pricing.OfficialMode, nil
+			}
+		}
+	}
+	return "", nil
 }
 
 func (h *ModelPricingHandler) Get(c *gin.Context) {

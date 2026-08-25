@@ -25,6 +25,69 @@ func TestBatchImagePricingResolverPropagatesPricingRepositoryError(t *testing.T)
 	require.ErrorContains(t, err, "database unavailable")
 }
 
+func TestBatchImagePricingResolverUsesPlatformCodeFromRequestRoute(t *testing.T) {
+	price := 0.09
+	resolver := &BatchImageModelPricingResolver{Resolver: NewModelPricingResolverWithCatalog(
+		newTestBillingService(),
+		NewModelPricingCatalog(&batchImageAdapterFilteringPricingRepo{rules: []ModelPricingOverride{{
+			Adapter: "gemini-sale", ModelPattern: "private-image-model",
+			BillingMode: BillingModeImage, PerRequestPrice: &price,
+			Status: ModelPricingStatusActive,
+		}}}),
+	)}
+	ctx := WithGatewayPlatformAssetContext(context.Background(), &GatewayPlatformAssetContext{
+		Platform: &ResolvedPlatformModel{
+			PlatformID: 7, PlatformCode: "gemini-sale", AccountPlatform: PlatformGemini,
+			RequestedModel: "private-image-model", UpstreamModel: "private-image-model",
+		},
+		SchedulingScope: PlatformSchedulingScope{
+			PlatformID: 7, PlatformCode: "gemini-sale", AccountPlatform: PlatformGemini,
+		},
+	})
+
+	got, err := resolver.BatchImageUnitPrice(ctx, &BatchImageJob{
+		Provider: BatchImageProviderGeminiAPI,
+		Model:    "private-image-model",
+	})
+
+	require.NoError(t, err)
+	require.InDelta(t, price, got, 1e-12)
+}
+
+type batchImageAdapterFilteringPricingRepo struct {
+	rules []ModelPricingOverride
+}
+
+func (r *batchImageAdapterFilteringPricingRepo) List(_ context.Context, adapter string) ([]ModelPricingOverride, error) {
+	result := make([]ModelPricingOverride, 0)
+	for _, rule := range r.rules {
+		if strings.EqualFold(strings.TrimSpace(rule.Adapter), strings.TrimSpace(adapter)) {
+			result = append(result, rule)
+		}
+	}
+	return result, nil
+}
+
+func (r *batchImageAdapterFilteringPricingRepo) Get(context.Context, int64) (*ModelPricingOverride, error) {
+	return nil, ErrModelPricingOverrideNotFound
+}
+
+func (r *batchImageAdapterFilteringPricingRepo) Create(context.Context, *ModelPricingOverride) error {
+	return nil
+}
+
+func (r *batchImageAdapterFilteringPricingRepo) Update(context.Context, *ModelPricingOverride) error {
+	return nil
+}
+
+func (r *batchImageAdapterFilteringPricingRepo) Upsert(context.Context, *ModelPricingOverride) error {
+	return nil
+}
+
+func (r *batchImageAdapterFilteringPricingRepo) Delete(context.Context, int64) error {
+	return nil
+}
+
 func TestBatchImageSettlementService_SettlesAndChargesSuccessfulImagesOnly(t *testing.T) {
 	repo := newFakeBatchImageRepository()
 	job := testSettlingBatchImageJob("imgbatch_settle")

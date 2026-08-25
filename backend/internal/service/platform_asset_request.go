@@ -97,6 +97,23 @@ func pricingInputForRequest(ctx context.Context, apiKey *APIKey, model string) P
 	return input
 }
 
+// ValidateRequestPricing resolves the concrete platform/model sale price before
+// an upstream request can produce a response that later fails billing.
+func (s *OpenAIGatewayService) ValidateRequestPricing(ctx context.Context, model string) error {
+	if s == nil || s.resolver == nil {
+		return nil
+	}
+	input := pricingInputForRequest(ctx, nil, model)
+	if input.Adapter == "" {
+		return nil
+	}
+	resolved, err := s.resolver.Resolve(ctx, input)
+	if err != nil {
+		return err
+	}
+	return validateResolvedPricingAvailable(resolved)
+}
+
 func overridePlatformAssetBillingMultipliers(ctx context.Context, token, image, video float64) (float64, float64, float64) {
 	route, ok := GatewayPlatformAssetContextFromContext(ctx)
 	if !ok || route.BillingAsset == nil {

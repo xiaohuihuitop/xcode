@@ -26,6 +26,10 @@ func (p *sub2APIOpenAIPort) Select(ctx context.Context, request v1.Request, excl
 	if p == nil || p.service == nil {
 		return sub2api.AccountSelection{}, ErrSub2APIRuntimeUnavailable
 	}
+	pricingModel := firstNonEmptyHandler(request.Platform.UpstreamModel, request.Platform.RequestedModel)
+	if err := p.service.ValidateRequestPricing(ctx, pricingModel); err != nil {
+		return sub2api.AccountSelection{}, err
+	}
 	exchange, _ := runtimebridge.LocalExchangeFromContext(ctx)
 	legacyRequest := gatewayRequestFromContract(request, exchange)
 	sessionHash := strings.TrimSpace(request.Session.SessionID)

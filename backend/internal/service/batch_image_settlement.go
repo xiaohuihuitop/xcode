@@ -34,10 +34,11 @@ func (r *BatchImageModelPricingResolver) BatchImageUnitPrice(ctx context.Context
 	if r == nil || r.Resolver == nil || job == nil || strings.TrimSpace(job.Model) == "" {
 		return 0, ErrBatchImageSettlementPricingMissing
 	}
-	resolved, err := r.Resolver.Resolve(ctx, PricingInput{
-		Adapter: batchImageProviderPlatform(job.Provider),
-		Model:   job.Model,
-	})
+	pricingInput := pricingInputForRequest(ctx, nil, job.Model)
+	if pricingInput.Adapter == "" {
+		pricingInput.Adapter = batchImageProviderPlatform(job.Provider)
+	}
+	resolved, err := r.Resolver.Resolve(ctx, pricingInput)
 	if err != nil {
 		return 0, err
 	}

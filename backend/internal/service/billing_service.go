@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -1121,6 +1122,9 @@ func validateResolvedPricingAvailable(resolved *ResolvedPricing) error {
 		return ErrModelPricingUnavailable
 	}
 	if resolved.Mode == BillingModePerRequest || resolved.Mode == BillingModeImage {
+		if requiresIndependentSalePricing(resolved) && !resolved.DefaultPerRequestPriceExplicit {
+			return ErrModelPricingUnavailable
+		}
 		if resolved.DefaultPerRequestPriceExplicit {
 			return nil
 		}
@@ -1131,11 +1135,34 @@ func validateResolvedPricingAvailable(resolved *ResolvedPricing) error {
 		}
 		return ErrModelPricingUnavailable
 	}
+	if resolved.BasePricing != nil && !tokenPricingValuesValid(resolved.BasePricing) {
+		return ErrModelPricingUnavailable
+	}
+	for i := range resolved.Intervals {
+		pricing := intervalToModelPricing(
+			&resolved.Intervals[i],
+			resolved.BasePricing,
+			resolved.SupportsCacheBreakdown,
+			nil,
+		)
+		if !tokenPricingValuesValid(pricing) {
+			return ErrModelPricingUnavailable
+		}
+	}
 	if resolved.MatchedOverride == nil {
-		return nil
+		if len(resolved.Intervals) > 0 || isCoreTokenPricingAvailable(resolved.BasePricing) {
+			return nil
+		}
+		return ErrModelPricingUnavailable
+	}
+	if !requiresIndependentSalePricing(resolved) {
+		if len(resolved.Intervals) > 0 || isCoreTokenPricingAvailable(resolved.BasePricing) {
+			return nil
+		}
+		return ErrModelPricingUnavailable
 	}
 	if len(resolved.Intervals) > 0 {
-		return nil
+		return validateIndependentTokenIntervalCoverage(resolved)
 	}
 	override := resolved.MatchedOverride
 	var official *ModelPricing
@@ -1157,6 +1184,50 @@ func validateResolvedPricingAvailable(resolved *ResolvedPricing) error {
 		return nil
 	}
 	return ErrModelPricingUnavailable
+}
+
+func requiresIndependentSalePricing(resolved *ResolvedPricing) bool {
+	return resolved != nil && resolved.MatchedOverride != nil &&
+		(resolved.OfficialPricing == nil || resolved.OfficialMode != resolved.Mode)
+}
+
+func validateIndependentTokenIntervalCoverage(resolved *ResolvedPricing) error {
+	if resolved == nil || len(resolved.Intervals) == 0 {
+		return ErrModelPricingUnavailable
+	}
+	intervals := append([]PricingInterval(nil), resolved.Intervals...)
+	sort.SliceStable(intervals, func(i, j int) bool {
+		if intervals[i].MinTokens != intervals[j].MinTokens {
+			return intervals[i].MinTokens < intervals[j].MinTokens
+		}
+		return intervals[i].SortOrder < intervals[j].SortOrder
+	})
+
+	baseComplete := isCompleteTokenPricing(resolved.BasePricing)
+	nextToken := 0
+	coveredToInfinity := false
+	for i := range intervals {
+		interval := &intervals[i]
+		if coveredToInfinity || interval.MinTokens < nextToken || (interval.MinTokens > nextToken && !baseComplete) {
+			return ErrModelPricingUnavailable
+		}
+		pricing := intervalToModelPricing(interval, resolved.BasePricing, resolved.SupportsCacheBreakdown, nil)
+		if !isCompleteTokenPricing(pricing) {
+			return ErrModelPricingUnavailable
+		}
+		if interval.MaxTokens == nil {
+			coveredToInfinity = true
+			continue
+		}
+		if *interval.MaxTokens <= interval.MinTokens {
+			return ErrModelPricingUnavailable
+		}
+		nextToken = *interval.MaxTokens
+	}
+	if !coveredToInfinity && !baseComplete {
+		return ErrModelPricingUnavailable
+	}
+	return nil
 }
 
 func tokenPriceAvailable(
@@ -1187,7 +1258,14 @@ func (s *BillingService) calculateTokenCost(resolved *ResolvedPricing, input Cos
 		return nil, fmt.Errorf("no pricing available for model: %s: %w", input.Model, ErrModelPricingUnavailable)
 	}
 
-	if !isCompleteTokenPricing(pricing) {
+	if !tokenPricingValuesValid(pricing) {
+		return nil, fmt.Errorf("invalid token pricing for model: %s: %w", input.Model, ErrModelPricingUnavailable)
+	}
+	if requiresIndependentSalePricing(resolved) {
+		if !isCompleteTokenPricing(pricing) {
+			return nil, fmt.Errorf("incomplete token pricing for model: %s: %w", input.Model, ErrModelPricingUnavailable)
+		}
+	} else if !isCoreTokenPricingAvailable(pricing) {
 		return nil, fmt.Errorf("incomplete token pricing for model: %s: %w", input.Model, ErrModelPricingUnavailable)
 	}
 	pricing = s.applyModelSpecificPricingPolicy(input.Model, pricing)
@@ -1202,11 +1280,40 @@ func (s *BillingService) calculateTokenCost(resolved *ResolvedPricing, input Cos
 }
 
 func isCompleteTokenPricing(pricing *ModelPricing) bool {
-	return pricing != nil &&
-		tokenPriceValueAvailable(pricing.InputPricePerToken, pricing.InputPriceExplicit) &&
-		tokenPriceValueAvailable(pricing.OutputPricePerToken, pricing.OutputPriceExplicit) &&
+	return isCoreTokenPricingAvailable(pricing) &&
 		tokenPriceValueAvailable(pricing.CacheCreationPricePerToken, pricing.CacheCreationPriceExplicit) &&
 		tokenPriceValueAvailable(pricing.CacheReadPricePerToken, pricing.CacheReadPriceExplicit)
+}
+
+func isCoreTokenPricingAvailable(pricing *ModelPricing) bool {
+	return pricing != nil &&
+		tokenPriceValueAvailable(pricing.InputPricePerToken, pricing.InputPriceExplicit) &&
+		tokenPriceValueAvailable(pricing.OutputPricePerToken, pricing.OutputPriceExplicit)
+}
+
+func tokenPricingValuesValid(pricing *ModelPricing) bool {
+	if pricing == nil {
+		return false
+	}
+	for _, value := range []float64{
+		pricing.InputPricePerToken,
+		pricing.InputPricePerTokenPriority,
+		pricing.ImageInputPricePerToken,
+		pricing.OutputPricePerToken,
+		pricing.OutputPricePerTokenPriority,
+		pricing.ImageOutputPricePerToken,
+		pricing.CacheCreationPricePerToken,
+		pricing.CacheCreationPricePerTokenPriority,
+		pricing.CacheReadPricePerToken,
+		pricing.CacheReadPricePerTokenPriority,
+		pricing.CacheCreation5mPrice,
+		pricing.CacheCreation1hPrice,
+	} {
+		if math.IsNaN(value) || math.IsInf(value, 0) || value < 0 {
+			return false
+		}
+	}
+	return true
 }
 
 func tokenPriceValueAvailable(value float64, explicit bool) bool {

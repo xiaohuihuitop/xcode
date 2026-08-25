@@ -136,6 +136,7 @@ func TestModelPlazaHandlerReturnsDualPricingWithoutAdminSourceDetails(t *testing
 func TestModelPlazaHandlerMapsIndependentOfficialModeAndRequestTiers(t *testing.T) {
 	zero, officialImage, saleImage := 0.0, 0.04, 0.05
 	officialTierPrice, saleIntervalPrice, ignoredSaleTierPrice := 0.07, 8e-6, 0.08
+	saleOutputPrice, saleCacheWritePrice, saleCacheReadPrice := 30e-6, 6.25e-6, 0.5e-6
 	settings := modelPlazaSettingsStub{runtime: service.ModelPlazaRuntime{Enabled: true}}
 	catalog := service.NewPlatformCatalogService(platformCatalogPlatformRepoStubForHandler{
 		platforms: []service.Platform{{
@@ -155,6 +156,10 @@ func TestModelPlazaHandlerMapsIndependentOfficialModeAndRequestTiers(t *testing.
 			TierLabel: "official-hd", PerRequestPrice: &officialTierPrice,
 		}},
 		BasePricing: &service.ModelPricing{
+			InputPricePerToken: saleIntervalPrice, InputPriceExplicit: true,
+			OutputPricePerToken: saleOutputPrice, OutputPriceExplicit: true,
+			CacheCreationPricePerToken: saleCacheWritePrice, CacheCreationPriceExplicit: true,
+			CacheReadPricePerToken: saleCacheReadPrice, CacheReadPriceExplicit: true,
 			ImageInputPricePerToken: zero, ImageInputPriceExplicit: true,
 			ImageOutputPricePerToken: saleImage, ImageOutputPriceExplicit: true,
 		},
@@ -166,7 +171,9 @@ func TestModelPlazaHandlerMapsIndependentOfficialModeAndRequestTiers(t *testing.
 			TierLabel: "ignored-sale-request", PerRequestPrice: &ignoredSaleTierPrice,
 		}},
 		MatchedOverride: &service.ModelPricingOverride{
-			BillingMode:     service.BillingModeToken,
+			BillingMode: service.BillingModeToken,
+			InputPrice:  &saleIntervalPrice, OutputPrice: &saleOutputPrice,
+			CacheWritePrice: &saleCacheWritePrice, CacheReadPrice: &saleCacheReadPrice,
 			ImageInputPrice: &zero, ImageOutputPrice: &saleImage, PerRequestPrice: &saleImage,
 		},
 	}})

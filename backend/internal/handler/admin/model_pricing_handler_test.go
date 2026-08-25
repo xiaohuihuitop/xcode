@@ -99,7 +99,12 @@ func TestModelPricingHandlerCatalogReturnsOfficialAndSalePricing(t *testing.T) {
 					OfficialSource: service.PricingSourceInfo{
 						Type: service.PricingSourceBundledCatalog, Name: "Bundled pricing catalog", MatchedModel: "gpt-5.6-sol",
 					},
-					BasePricing:     &service.ModelPricing{InputPricePerToken: saleInput},
+					BasePricing: &service.ModelPricing{
+						InputPricePerToken: saleInput, InputPriceExplicit: true,
+						OutputPricePerToken: saleInput, OutputPriceExplicit: true,
+						CacheCreationPricePerToken: saleInput, CacheCreationPriceExplicit: true,
+						CacheReadPricePerToken: saleInput, CacheReadPriceExplicit: true,
+					},
 					MatchedOverride: override,
 					Source:          service.PricingSourceOverride,
 				},
@@ -208,6 +213,41 @@ func TestModelPricingHandlerUpsertsPlatformSaleUsingPlatformCode(t *testing.T) {
 	require.NotNil(t, pricing.upserted.CacheWritePrice)
 	require.Zero(t, *pricing.upserted.CacheWritePrice)
 	require.Contains(t, recorder.Body.String(), `"adapter":"codex"`)
+}
+
+func TestModelPricingHandlerRejectsIncompleteCrossModePlatformSaleBeforeWrite(t *testing.T) {
+	pricing := &modelPricingHandlerManagementStub{}
+	platform := &service.Platform{
+		ID: 8, Code: "gemini-sale", Name: "Gemini Sale", AccountPlatform: service.PlatformGemini,
+		Status:     service.PlatformStatusActive,
+		ModelRules: []service.PlatformModelRule{{ModelPattern: "image-model", Enabled: true}},
+	}
+	router := setupModelPricingHandlerRouter(
+		pricing,
+		&modelPricingHandlerCatalogStub{items: []service.PlatformCatalogPlatform{{
+			ID: 8, Code: "gemini-sale", Name: "Gemini Sale", AccountPlatform: service.PlatformGemini,
+			Models: []service.PlatformCatalogModel{{
+				Pattern: "image-model",
+				Pricing: &service.ResolvedPricing{
+					Mode:            service.BillingModeImage,
+					OfficialMode:    service.BillingModeImage,
+					OfficialPricing: &service.ModelPricing{},
+				},
+			}},
+		}}},
+		&modelPricingHandlerPlatformStub{platform: platform},
+	)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPut, "/api/v1/admin/model-pricing/platform-sale", bytes.NewBufferString(`{
+		"platform_id":8,"model_pattern":"image-model","billing_mode":"token",
+		"input_price":0.000006,"status":"active"
+	}`))
+	request.Header.Set("Content-Type", "application/json")
+
+	router.ServeHTTP(recorder, request)
+
+	require.Equal(t, http.StatusBadRequest, recorder.Code)
+	require.Nil(t, pricing.upsertPlatform)
 }
 
 func TestOfficialPricingValuesPreservesExplicitZero(t *testing.T) {

@@ -18,13 +18,36 @@ const (
 )
 
 var (
-	ErrModelPricingOverrideNotFound        = errors.New("model pricing override not found")
-	ErrModelPricingOverrideConflict        = errors.New("model pricing override already exists")
+	ErrModelPricingOverrideNotFound = errors.New("model pricing override not found")
+	ErrModelPricingOverrideConflict = errors.New("model pricing override already exists")
+	ErrModelPricingIncompleteSale   = infraerrors.BadRequest(
+		"MODEL_PRICING_INCOMPLETE_SALE",
+		"platform sale pricing must cover every request scenario when it cannot inherit official pricing",
+	)
 	ErrModelPricingPlatformModelNotEnabled = infraerrors.BadRequest(
 		"MODEL_PRICING_PLATFORM_MODEL_NOT_ENABLED",
 		"model is not enabled on the selected platform",
 	)
 )
+
+func ValidatePlatformSaleOverride(officialMode BillingMode, input ModelPricingOverride) error {
+	candidate := input
+	if err := validateModelPricingOverride(&candidate); err != nil {
+		return err
+	}
+	if candidate.Status != ModelPricingStatusActive {
+		return nil
+	}
+	if officialMode != "" && officialMode == candidate.BillingMode {
+		return nil
+	}
+	resolved := pricingOverrideToResolved(&candidate, nil, PricingSourceInfo{Type: PricingSourceUnavailable})
+	resolved.OfficialMode = officialMode
+	if err := validateResolvedPricingAvailable(resolved); err != nil {
+		return ErrModelPricingIncompleteSale
+	}
+	return nil
+}
 
 // ModelPricingOverride is the service representation of an administrator
 // price rule. It is deliberately independent from Group and Channel.
