@@ -190,6 +190,23 @@ func TestModelPricingCatalogRejectsOverlappingPerRequestAndImageIntervals(t *tes
 	}
 }
 
+func TestValidateIntervalsRejectsUnboundedNonFinalPerRequestAndImageIntervals(t *testing.T) {
+	max := 2000
+	price := 0.04
+	intervals := []PricingInterval{
+		{MinTokens: 0, TierLabel: "SD", PerRequestPrice: &price},
+		{MinTokens: 1000, MaxTokens: &max, TierLabel: "HD", PerRequestPrice: &price},
+	}
+
+	for _, mode := range []BillingMode{BillingModePerRequest, BillingModeImage} {
+		t.Run(string(mode), func(t *testing.T) {
+			err := ValidateIntervals(intervals, mode)
+
+			require.ErrorContains(t, err, "unbounded interval")
+		})
+	}
+}
+
 func TestModelPricingCatalogSnapshotLoadsRulesOnce(t *testing.T) {
 	repo := &modelPricingOverrideRepoStub{rules: []ModelPricingOverride{
 		{Adapter: "codex", ModelPattern: "gpt-*", InputPrice: floatPtr(1e-6), Status: ModelPricingStatusActive},

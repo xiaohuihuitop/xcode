@@ -1133,6 +1133,9 @@ func validateResolvedPricingAvailable(resolved *ResolvedPricing) error {
 	if resolved.MatchedOverride == nil {
 		return nil
 	}
+	if len(resolved.Intervals) > 0 {
+		return nil
+	}
 	override := resolved.MatchedOverride
 	var official *ModelPricing
 	if resolved.OfficialMode == resolved.Mode {
@@ -1184,6 +1187,9 @@ func (s *BillingService) calculateTokenCost(resolved *ResolvedPricing, input Cos
 	}
 
 	pricing = s.applyModelSpecificPricingPolicy(input.Model, pricing)
+	if !isCompleteTokenPricing(pricing) {
+		return nil, fmt.Errorf("incomplete token pricing for model: %s: %w", input.Model, ErrModelPricingUnavailable)
+	}
 
 	// 长上下文定价仅在无区间定价时应用（区间定价已包含上下文分层）
 	applyLongCtx := len(resolved.Intervals) == 0
@@ -1192,6 +1198,14 @@ func (s *BillingService) calculateTokenCost(resolved *ResolvedPricing, input Cos
 	}
 
 	return s.computeTokenBreakdown(pricing, input.Tokens, input.RateMultiplier, input.ServiceTier, applyLongCtx), nil
+}
+
+func isCompleteTokenPricing(pricing *ModelPricing) bool {
+	return pricing != nil &&
+		(pricing.InputPricePerToken > 0 || pricing.InputPriceExplicit) &&
+		(pricing.OutputPricePerToken > 0 || pricing.OutputPriceExplicit) &&
+		(pricing.CacheCreationPricePerToken > 0 || pricing.CacheCreationPriceExplicit) &&
+		(pricing.CacheReadPricePerToken > 0 || pricing.CacheReadPriceExplicit)
 }
 
 // computeTokenBreakdown 是 token 计费的核心逻辑，由 calculateTokenCost 和 calculateCostInternal 共用。

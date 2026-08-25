@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"github.com/stretchr/testify/require"
 )
 
@@ -161,6 +162,114 @@ func TestCalculateCostUnifiedIntervalInheritsResolvedBasePricingWithoutMutation(
 	require.True(t, intervalPricing.ImageInputPriceExplicit)
 	require.True(t, intervalPricing.ImageOutputPriceExplicit)
 	require.InDelta(t, 1e-6, base.InputPricePerToken, 1e-12)
+}
+
+func TestCalculateCostUnifiedAllowsCompleteIntervalOnlyTokenPricing(t *testing.T) {
+	inputPrice := 1e-6
+	outputPrice := 2e-6
+	cacheWritePrice := 3e-6
+	cacheReadPrice := 0.5e-6
+	billing := newTestBillingService()
+	resolver := NewModelPricingResolverWithCatalog(
+		billing,
+		NewModelPricingCatalog(&modelPricingOverrideRepoStub{rules: []ModelPricingOverride{{
+			Adapter: "custom", ModelPattern: "private-interval-only-xyz", BillingMode: BillingModeToken,
+			Intervals: []domain.ModelPricingInterval{{
+				MinTokens: 0, InputPrice: &inputPrice, OutputPrice: &outputPrice,
+				CacheWritePrice: &cacheWritePrice, CacheReadPrice: &cacheReadPrice,
+			}},
+			Status: ModelPricingStatusActive,
+		}}}),
+	)
+
+	cost, err := billing.CalculateCostUnified(CostInput{
+		Ctx: context.Background(), Model: "private-interval-only-xyz", Adapter: "custom",
+		Tokens: UsageTokens{
+			InputTokens: 100, OutputTokens: 50,
+			CacheCreationTokens: 20, CacheReadTokens: 30,
+		},
+		RateMultiplier: 1,
+		Resolver:       resolver,
+	})
+
+	require.NoError(t, err)
+	require.InDelta(t, 0.0001, cost.InputCost, 1e-12)
+	require.InDelta(t, 0.0001, cost.OutputCost, 1e-12)
+	require.InDelta(t, 0.00006, cost.CacheCreationCost, 1e-12)
+	require.InDelta(t, 0.000015, cost.CacheReadCost, 1e-12)
+	require.InDelta(t, 0.000275, cost.TotalCost, 1e-12)
+}
+
+func TestCalculateCostUnifiedAllowsIntervalToCompleteOfficialTokenPricing(t *testing.T) {
+	outputPrice := 2e-6
+	cacheWritePrice := 3e-6
+	cacheReadPrice := 0.5e-6
+	pricingService := &PricingService{
+		pricingData: map[string]*LiteLLMModelPricing{
+			"partial-official-interval-model": {
+				InputCostPerToken:         1e-6,
+				InputCostPerTokenExplicit: true,
+			},
+		},
+	}
+	billing := NewBillingService(&config.Config{}, pricingService)
+	resolver := NewModelPricingResolverWithCatalog(
+		billing,
+		NewModelPricingCatalog(&modelPricingOverrideRepoStub{rules: []ModelPricingOverride{{
+			Adapter: "custom", ModelPattern: "partial-official-interval-model", BillingMode: BillingModeToken,
+			Intervals: []domain.ModelPricingInterval{{
+				MinTokens: 0, OutputPrice: &outputPrice,
+				CacheWritePrice: &cacheWritePrice, CacheReadPrice: &cacheReadPrice,
+			}},
+			Status: ModelPricingStatusActive,
+		}}}),
+	)
+
+	cost, err := billing.CalculateCostUnified(CostInput{
+		Ctx: context.Background(), Model: "partial-official-interval-model", Adapter: "custom",
+		Tokens: UsageTokens{
+			InputTokens: 100, OutputTokens: 50,
+			CacheCreationTokens: 20, CacheReadTokens: 30,
+		},
+		RateMultiplier: 1,
+		Resolver:       resolver,
+	})
+
+	require.NoError(t, err)
+	require.InDelta(t, 0.000275, cost.TotalCost, 1e-12)
+}
+
+func TestCalculateCostUnifiedRejectsUnmatchedIntervalWithIncompleteBase(t *testing.T) {
+	inputPrice := 1e-6
+	outputPrice := 2e-6
+	cacheWritePrice := 3e-6
+	cacheReadPrice := 0.5e-6
+	billing := newTestBillingService()
+	resolver := NewModelPricingResolverWithCatalog(
+		billing,
+		NewModelPricingCatalog(&modelPricingOverrideRepoStub{rules: []ModelPricingOverride{{
+			Adapter: "custom", ModelPattern: "private-unmatched-interval-xyz", BillingMode: BillingModeToken,
+			Intervals: []domain.ModelPricingInterval{{
+				MinTokens: 1000, InputPrice: &inputPrice, OutputPrice: &outputPrice,
+				CacheWritePrice: &cacheWritePrice, CacheReadPrice: &cacheReadPrice,
+			}},
+			Status: ModelPricingStatusActive,
+		}}}),
+	)
+	resolved, err := resolver.Resolve(context.Background(), PricingInput{
+		Adapter: "custom", Model: "private-unmatched-interval-xyz",
+	})
+	require.NoError(t, err)
+	require.NoError(t, validateResolvedPricingAvailable(resolved))
+
+	cost, err := billing.CalculateCostUnified(CostInput{
+		Ctx: context.Background(), Model: "private-unmatched-interval-xyz", Adapter: "custom",
+		Tokens: UsageTokens{InputTokens: 100}, RateMultiplier: 1,
+		Resolver: resolver, Resolved: resolved,
+	})
+
+	require.Nil(t, cost)
+	require.ErrorIs(t, err, ErrModelPricingUnavailable)
 }
 
 func TestCalculateCostUnifiedAllowsCompleteSaleWithoutOfficialPricing(t *testing.T) {
