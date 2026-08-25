@@ -74,7 +74,7 @@ func FindMatchingInterval(intervals []PricingInterval, totalTokens int) *Pricing
 	return nil
 }
 
-func ValidateIntervals(intervals []PricingInterval, mode BillingMode) error {
+func ValidateIntervals(intervals []PricingInterval, _ BillingMode) error {
 	if len(intervals) == 0 {
 		return nil
 	}
@@ -84,9 +84,6 @@ func ValidateIntervals(intervals []PricingInterval, mode BillingMode) error {
 		if err := validateSingleInterval(&sorted[i], i); err != nil {
 			return err
 		}
-	}
-	if mode == BillingModePerRequest || mode == BillingModeImage {
-		return nil
 	}
 	return validateIntervalOverlap(sorted)
 }

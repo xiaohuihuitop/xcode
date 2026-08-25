@@ -168,6 +168,28 @@ func TestModelPricingCatalogRejectsOverlappingIntervals(t *testing.T) {
 	require.ErrorContains(t, err, "overlap")
 }
 
+func TestModelPricingCatalogRejectsOverlappingPerRequestAndImageIntervals(t *testing.T) {
+	max := 2000
+	price := 0.04
+	for _, mode := range []BillingMode{BillingModePerRequest, BillingModeImage} {
+		t.Run(string(mode), func(t *testing.T) {
+			catalog := NewModelPricingCatalog(&modelPricingOverrideRepoStub{})
+
+			_, err := catalog.Create(context.Background(), ModelPricingOverride{
+				Adapter:      "image-adapter",
+				ModelPattern: "image-model",
+				BillingMode:  mode,
+				Intervals: []domain.ModelPricingInterval{
+					{MinTokens: 0, MaxTokens: &max, TierLabel: "SD", PerRequestPrice: &price},
+					{MinTokens: 1000, TierLabel: "HD", PerRequestPrice: &price},
+				},
+			})
+
+			require.ErrorContains(t, err, "overlap")
+		})
+	}
+}
+
 func TestModelPricingCatalogSnapshotLoadsRulesOnce(t *testing.T) {
 	repo := &modelPricingOverrideRepoStub{rules: []ModelPricingOverride{
 		{Adapter: "codex", ModelPattern: "gpt-*", InputPrice: floatPtr(1e-6), Status: ModelPricingStatusActive},
@@ -288,7 +310,11 @@ func TestResolverKeepsAndInheritsOfficialPerRequestPrice(t *testing.T) {
 	officialPrice := 0.04
 	pricingService := &PricingService{
 		pricingData: map[string]*LiteLLMModelPricing{
-			"image-model": {OutputCostPerImage: officialPrice, TokenPricingAbsent: true},
+			"image-model": {
+				OutputCostPerImage:         officialPrice,
+				OutputCostPerImageExplicit: true,
+				TokenPricingAbsent:         true,
+			},
 		},
 		pricingSources: map[string]PricingSourceInfo{
 			"image-model": {Type: PricingSourceBundledCatalog, MatchedModel: "image-model"},
@@ -306,7 +332,9 @@ func TestResolverKeepsAndInheritsOfficialPerRequestPrice(t *testing.T) {
 
 	require.NoError(t, err)
 	require.InDelta(t, officialPrice, resolved.OfficialDefaultPerRequestPrice, 1e-12)
+	require.True(t, resolved.OfficialDefaultPerRequestPriceExplicit)
 	require.InDelta(t, officialPrice, resolved.DefaultPerRequestPrice, 1e-12)
+	require.True(t, resolved.DefaultPerRequestPriceExplicit)
 }
 
 func TestResolverKeepsOfficialModeWhenSaleOverrideDiffers(t *testing.T) {

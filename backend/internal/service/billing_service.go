@@ -1119,27 +1119,55 @@ func validateResolvedPricingAvailable(resolved *ResolvedPricing) error {
 	if resolved == nil {
 		return ErrModelPricingUnavailable
 	}
-	if resolved.OfficialPricing != nil || resolved.MatchedOverride == nil {
-		return nil
-	}
-	override := resolved.MatchedOverride
-	switch resolved.Mode {
-	case BillingModePerRequest, BillingModeImage:
-		if override.PerRequestPrice != nil {
+	if resolved.Mode == BillingModePerRequest || resolved.Mode == BillingModeImage {
+		if resolved.DefaultPerRequestPriceExplicit {
 			return nil
 		}
-		for _, interval := range override.Intervals {
-			if interval.PerRequestPrice != nil {
+		for _, tier := range resolved.RequestTiers {
+			if tier.PerRequestPrice != nil {
 				return nil
 			}
 		}
-	default:
-		if override.InputPrice != nil && override.OutputPrice != nil &&
-			override.CacheWritePrice != nil && override.CacheReadPrice != nil {
-			return nil
-		}
+		return ErrModelPricingUnavailable
+	}
+	if resolved.MatchedOverride == nil {
+		return nil
+	}
+	override := resolved.MatchedOverride
+	var official *ModelPricing
+	if resolved.OfficialMode == resolved.Mode {
+		official = resolved.OfficialPricing
+	}
+	if tokenPriceAvailable(override.InputPrice, official, func(pricing *ModelPricing) (float64, bool) {
+		return pricing.InputPricePerToken, pricing.InputPriceExplicit
+	}) &&
+		tokenPriceAvailable(override.OutputPrice, official, func(pricing *ModelPricing) (float64, bool) {
+			return pricing.OutputPricePerToken, pricing.OutputPriceExplicit
+		}) &&
+		tokenPriceAvailable(override.CacheWritePrice, official, func(pricing *ModelPricing) (float64, bool) {
+			return pricing.CacheCreationPricePerToken, pricing.CacheCreationPriceExplicit
+		}) &&
+		tokenPriceAvailable(override.CacheReadPrice, official, func(pricing *ModelPricing) (float64, bool) {
+			return pricing.CacheReadPricePerToken, pricing.CacheReadPriceExplicit
+		}) {
+		return nil
 	}
 	return ErrModelPricingUnavailable
+}
+
+func tokenPriceAvailable(
+	overridePrice *float64,
+	official *ModelPricing,
+	price func(*ModelPricing) (float64, bool),
+) bool {
+	if overridePrice != nil {
+		return true
+	}
+	if official == nil {
+		return false
+	}
+	value, explicit := price(official)
+	return value > 0 || explicit
 }
 
 func IsResolvedPricingAvailable(resolved *ResolvedPricing) bool {
@@ -1299,18 +1327,22 @@ func (s *BillingService) calculatePerRequestCost(resolved *ResolvedPricing, inpu
 	}
 
 	var unitPrice float64
+	var matched bool
 
 	if input.SizeTier != "" {
-		unitPrice = input.Resolver.GetRequestTierPrice(resolved, input.SizeTier)
+		unitPrice, matched = input.Resolver.GetRequestTierPrice(resolved, input.SizeTier)
 	}
 
-	if unitPrice == 0 {
+	if !matched {
 		totalContext := input.Tokens.InputTokens + input.Tokens.CacheCreationTokens + input.Tokens.CacheReadTokens
-		unitPrice = input.Resolver.GetRequestTierPriceByContext(resolved, totalContext)
+		unitPrice, matched = input.Resolver.GetRequestTierPriceByContext(resolved, totalContext)
 	}
 
 	// 回退到默认按次价格
-	if unitPrice == 0 {
+	if !matched {
+		if !resolved.DefaultPerRequestPriceExplicit {
+			return nil, fmt.Errorf("no per-request pricing available for model: %s: %w", input.Model, ErrModelPricingUnavailable)
+		}
 		unitPrice = resolved.DefaultPerRequestPrice
 	}
 

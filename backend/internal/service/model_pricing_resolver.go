@@ -151,7 +151,12 @@ func (r *ModelPricingResolver) resolveWithOverride(input PricingInput, override 
 			resolved.OfficialMode = lookup.Mode
 			resolved.OfficialDefaultPerRequestPrice = lookup.DefaultPerRequestPrice
 			resolved.OfficialDefaultPerRequestPriceExplicit = lookup.DefaultPerRequestPriceExplicit
-			if override.PerRequestPrice == nil {
+			if lookup.Mode != resolved.Mode {
+				resolved.BasePricing = &ModelPricing{}
+				resolved.SupportsCacheBreakdown = false
+				applyOverridePrices(override, resolved.BasePricing)
+			}
+			if lookup.Mode == resolved.Mode && override.PerRequestPrice == nil {
 				resolved.DefaultPerRequestPrice = lookup.DefaultPerRequestPrice
 				resolved.DefaultPerRequestPriceExplicit = lookup.DefaultPerRequestPriceExplicit
 			}
@@ -312,21 +317,29 @@ func (r *ModelPricingResolver) GetIntervalPricing(resolved *ResolvedPricing, tot
 		return resolved.BasePricing
 	}
 
-	return intervalToModelPricing(iv, resolved.SupportsCacheBreakdown, nil)
+	return intervalToModelPricing(iv, resolved.BasePricing, resolved.SupportsCacheBreakdown, nil)
 }
 
 // intervalToModelPricing 将区间定价转换为 ModelPricing
-func intervalToModelPricing(iv *PricingInterval, supportsCacheBreakdown bool, pricingOverride *ModelPricingOverrideInput) *ModelPricing {
-	pricing := &ModelPricing{
-		SupportsCacheBreakdown: supportsCacheBreakdown,
+func intervalToModelPricing(
+	iv *PricingInterval,
+	basePricing *ModelPricing,
+	supportsCacheBreakdown bool,
+	pricingOverride *ModelPricingOverrideInput,
+) *ModelPricing {
+	pricing := cloneModelPricing(basePricing)
+	if pricing == nil {
+		pricing = &ModelPricing{SupportsCacheBreakdown: supportsCacheBreakdown}
 	}
 	if iv.InputPrice != nil {
 		pricing.InputPricePerToken = *iv.InputPrice
 		pricing.InputPricePerTokenPriority = *iv.InputPrice
+		pricing.InputPriceExplicit = true
 	}
 	if iv.OutputPrice != nil {
 		pricing.OutputPricePerToken = *iv.OutputPrice
 		pricing.OutputPricePerTokenPriority = *iv.OutputPrice
+		pricing.OutputPriceExplicit = true
 	}
 	if iv.CacheWritePrice != nil {
 		pricing.CacheCreationPricePerToken = *iv.CacheWritePrice
@@ -338,6 +351,7 @@ func intervalToModelPricing(iv *PricingInterval, supportsCacheBreakdown bool, pr
 	if iv.CacheReadPrice != nil {
 		pricing.CacheReadPricePerToken = *iv.CacheReadPrice
 		pricing.CacheReadPricePerTokenPriority = *iv.CacheReadPrice
+		pricing.CacheReadPriceExplicit = true
 	}
 	// 渠道定价存在时，ImageOutputPrice 显式覆盖；图片输入价用渠道级配置
 	// （区间不携带图片输入价，与 image_output 一致）。
@@ -351,21 +365,21 @@ func intervalToModelPricing(iv *PricingInterval, supportsCacheBreakdown bool, pr
 	return pricing
 }
 
-// GetRequestTierPrice 根据层级标签获取按次价格
-func (r *ModelPricingResolver) GetRequestTierPrice(resolved *ResolvedPricing, tierLabel string) float64 {
+// GetRequestTierPrice 根据层级标签获取按次价格，并返回是否命中。
+func (r *ModelPricingResolver) GetRequestTierPrice(resolved *ResolvedPricing, tierLabel string) (float64, bool) {
 	for _, tier := range resolved.RequestTiers {
 		if tier.TierLabel == tierLabel && tier.PerRequestPrice != nil {
-			return *tier.PerRequestPrice
+			return *tier.PerRequestPrice, true
 		}
 	}
-	return 0
+	return 0, false
 }
 
-// GetRequestTierPriceByContext 根据 context token 数获取按次价格
-func (r *ModelPricingResolver) GetRequestTierPriceByContext(resolved *ResolvedPricing, totalContextTokens int) float64 {
+// GetRequestTierPriceByContext 根据 context token 数获取按次价格，并返回是否命中。
+func (r *ModelPricingResolver) GetRequestTierPriceByContext(resolved *ResolvedPricing, totalContextTokens int) (float64, bool) {
 	iv := FindMatchingInterval(resolved.RequestTiers, totalContextTokens)
 	if iv != nil && iv.PerRequestPrice != nil {
-		return *iv.PerRequestPrice
+		return *iv.PerRequestPrice, true
 	}
-	return 0
+	return 0, false
 }

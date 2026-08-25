@@ -47,8 +47,9 @@ func TestBillingLookupPreservesImageOnlyCatalogMode(t *testing.T) {
 	pricingService := &PricingService{
 		pricingData: map[string]*LiteLLMModelPricing{
 			"image-model": {
-				OutputCostPerImage: 0.04,
-				TokenPricingAbsent: true,
+				OutputCostPerImage:         0.04,
+				OutputCostPerImageExplicit: true,
+				TokenPricingAbsent:         true,
 			},
 		},
 		pricingSources: map[string]PricingSourceInfo{
@@ -61,6 +62,7 @@ func TestBillingLookupPreservesImageOnlyCatalogMode(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, BillingModeImage, lookup.Mode)
 	require.InDelta(t, 0.04, lookup.DefaultPerRequestPrice, 1e-12)
+	require.True(t, lookup.DefaultPerRequestPriceExplicit)
 	require.Equal(t, PricingSourceBundledCatalog, lookup.Source.Type)
 }
 
@@ -88,6 +90,77 @@ func TestCalculateCostUnifiedUsesPlatformPricingIdentity(t *testing.T) {
 	require.NoError(t, err)
 	require.InDelta(t, 0.004, cost.InputCost, 1e-12)
 	require.InDelta(t, 0.004, cost.OutputCost, 1e-12)
+}
+
+func TestCalculateCostUnifiedIntervalInheritsResolvedBasePricingWithoutMutation(t *testing.T) {
+	billing := newTestBillingService()
+	resolver := NewModelPricingResolver(billing)
+	base := &ModelPricing{
+		InputPricePerToken:         1e-6,
+		InputPriceExplicit:         true,
+		OutputPricePerToken:        2e-6,
+		OutputPriceExplicit:        true,
+		CacheCreationPricePerToken: 3e-6,
+		CacheCreationPriceExplicit: true,
+		CacheReadPricePerToken:     0.5e-6,
+		CacheReadPriceExplicit:     true,
+		CacheCreation5mPrice:       3e-6,
+		CacheCreation1hPrice:       4e-6,
+		SupportsCacheBreakdown:     true,
+		ImageInputPricePerToken:    5e-6,
+		ImageInputPriceExplicit:    true,
+		ImageOutputPricePerToken:   6e-6,
+		ImageOutputPriceExplicit:   true,
+	}
+	intervalInputPrice := 10e-6
+	resolved := &ResolvedPricing{
+		Mode:            BillingModeToken,
+		OfficialMode:    BillingModeToken,
+		BasePricing:     base,
+		OfficialPricing: cloneModelPricing(base),
+		Intervals: []PricingInterval{{
+			MinTokens:  0,
+			InputPrice: &intervalInputPrice,
+		}},
+		SupportsCacheBreakdown: true,
+	}
+
+	cost, err := billing.CalculateCostUnified(CostInput{
+		Ctx:   context.Background(),
+		Model: "interval-model",
+		Tokens: UsageTokens{
+			InputTokens:           100,
+			ImageInputTokens:      10,
+			OutputTokens:          50,
+			ImageOutputTokens:     5,
+			CacheCreationTokens:   20,
+			CacheCreation5mTokens: 10,
+			CacheCreation1hTokens: 10,
+			CacheReadTokens:       30,
+		},
+		RateMultiplier: 1,
+		Resolver:       resolver,
+		Resolved:       resolved,
+	})
+
+	require.NoError(t, err)
+	require.InDelta(t, 90*intervalInputPrice, cost.InputCost, 1e-12)
+	require.InDelta(t, 10*5e-6, cost.ImageInputCost, 1e-12)
+	require.InDelta(t, 45*2e-6, cost.OutputCost, 1e-12)
+	require.InDelta(t, 5*6e-6, cost.ImageOutputCost, 1e-12)
+	require.InDelta(t, 10*3e-6+10*4e-6, cost.CacheCreationCost, 1e-12)
+	require.InDelta(t, 30*0.5e-6, cost.CacheReadCost, 1e-12)
+	require.InDelta(t, 0.001155, cost.TotalCost, 1e-12)
+	intervalPricing := resolver.GetIntervalPricing(resolved, 150)
+	require.NotSame(t, base, intervalPricing)
+	require.True(t, intervalPricing.InputPriceExplicit)
+	require.InDelta(t, intervalInputPrice, intervalPricing.InputPricePerTokenPriority, 1e-12)
+	require.True(t, intervalPricing.OutputPriceExplicit)
+	require.True(t, intervalPricing.CacheCreationPriceExplicit)
+	require.True(t, intervalPricing.CacheReadPriceExplicit)
+	require.True(t, intervalPricing.ImageInputPriceExplicit)
+	require.True(t, intervalPricing.ImageOutputPriceExplicit)
+	require.InDelta(t, 1e-6, base.InputPricePerToken, 1e-12)
 }
 
 func TestCalculateCostUnifiedAllowsCompleteSaleWithoutOfficialPricing(t *testing.T) {
@@ -129,6 +202,183 @@ func TestCalculateCostUnifiedRejectsIncompleteSaleWithoutOfficialPricing(t *test
 
 	require.Nil(t, cost)
 	require.ErrorIs(t, err, ErrModelPricingUnavailable)
+}
+
+func TestCalculateCostUnifiedRejectsPartialTokenSaleAcrossOfficialMode(t *testing.T) {
+	pricingService := &PricingService{
+		pricingData: map[string]*LiteLLMModelPricing{
+			"image-model": {
+				OutputCostPerImage:         0.04,
+				OutputCostPerImageExplicit: true,
+				TokenPricingAbsent:         true,
+			},
+		},
+		pricingSources: map[string]PricingSourceInfo{
+			"image-model": {Type: PricingSourceBundledCatalog, MatchedModel: "image-model"},
+		},
+	}
+	inputPrice := 1e-6
+	billing := NewBillingService(&config.Config{}, pricingService)
+	resolver := NewModelPricingResolverWithCatalog(
+		billing,
+		NewModelPricingCatalog(&modelPricingOverrideRepoStub{rules: []ModelPricingOverride{{
+			Adapter: "gemini", ModelPattern: "image-model", BillingMode: BillingModeToken,
+			InputPrice: &inputPrice, Status: ModelPricingStatusActive,
+		}}}),
+	)
+	resolved, err := resolver.Resolve(context.Background(), PricingInput{Adapter: "gemini", Model: "image-model"})
+	require.NoError(t, err)
+	require.Equal(t, BillingModeImage, resolved.OfficialMode)
+	require.False(t, IsResolvedPricingAvailable(resolved))
+
+	cost, err := billing.CalculateCostUnified(CostInput{
+		Ctx: context.Background(), Model: "image-model", Adapter: "gemini",
+		Tokens: UsageTokens{InputTokens: 100}, RateMultiplier: 1,
+		Resolver: resolver, Resolved: resolved,
+	})
+
+	require.Nil(t, cost)
+	require.ErrorIs(t, err, ErrModelPricingUnavailable)
+}
+
+func TestCalculateCostUnifiedRejectsSaleDependingOnMissingOfficialTokenField(t *testing.T) {
+	pricingService := &PricingService{
+		pricingData: map[string]*LiteLLMModelPricing{
+			"partial-official-model": {
+				InputCostPerToken:         1e-6,
+				InputCostPerTokenExplicit: true,
+			},
+		},
+	}
+	inputPrice := 2e-6
+	cacheWritePrice := 2.5e-6
+	cacheReadPrice := 0.2e-6
+	billing := NewBillingService(&config.Config{}, pricingService)
+	resolver := NewModelPricingResolverWithCatalog(
+		billing,
+		NewModelPricingCatalog(&modelPricingOverrideRepoStub{rules: []ModelPricingOverride{{
+			Adapter: "custom", ModelPattern: "partial-official-model", BillingMode: BillingModeToken,
+			InputPrice: &inputPrice, CacheWritePrice: &cacheWritePrice, CacheReadPrice: &cacheReadPrice,
+			Status: ModelPricingStatusActive,
+		}}}),
+	)
+	resolved, err := resolver.Resolve(context.Background(), PricingInput{
+		Adapter: "custom", Model: "partial-official-model",
+	})
+	require.NoError(t, err)
+	require.False(t, IsResolvedPricingAvailable(resolved))
+
+	cost, err := billing.CalculateCostUnified(CostInput{
+		Ctx: context.Background(), Model: "partial-official-model", Adapter: "custom",
+		Tokens: UsageTokens{InputTokens: 100, OutputTokens: 100}, RateMultiplier: 1,
+		Resolver: resolver, Resolved: resolved,
+	})
+
+	require.Nil(t, cost)
+	require.ErrorIs(t, err, ErrModelPricingUnavailable)
+}
+
+func TestCalculateCostUnifiedPerRequestExplicitZeroTierDoesNotUseDefault(t *testing.T) {
+	zero := 0.0
+	defaultPrice := 0.04
+	tests := []struct {
+		name     string
+		tier     PricingInterval
+		sizeTier string
+		tokens   UsageTokens
+	}{
+		{
+			name:     "size tier",
+			tier:     PricingInterval{TierLabel: "1K", PerRequestPrice: &zero},
+			sizeTier: "1K",
+		},
+		{
+			name:   "context tier",
+			tier:   PricingInterval{MinTokens: 0, PerRequestPrice: &zero},
+			tokens: UsageTokens{InputTokens: 100},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			billing := newTestBillingService()
+			resolver := NewModelPricingResolver(billing)
+			cost, err := billing.CalculateCostUnified(CostInput{
+				Ctx:            context.Background(),
+				Model:          "per-request-model",
+				SizeTier:       tt.sizeTier,
+				Tokens:         tt.tokens,
+				RequestCount:   2,
+				RateMultiplier: 1,
+				Resolver:       resolver,
+				Resolved: &ResolvedPricing{
+					Mode:                           BillingModePerRequest,
+					OfficialMode:                   BillingModePerRequest,
+					OfficialPricing:                &ModelPricing{},
+					RequestTiers:                   []PricingInterval{tt.tier},
+					DefaultPerRequestPrice:         defaultPrice,
+					DefaultPerRequestPriceExplicit: true,
+				},
+			})
+
+			require.NoError(t, err)
+			require.Zero(t, cost.TotalCost)
+			require.Zero(t, cost.ActualCost)
+		})
+	}
+}
+
+func TestCalculateCostUnifiedPerRequestModesFailWhenNoTierOrExplicitDefaultMatches(t *testing.T) {
+	price := 0.05
+	maxTokens := 200
+	for _, mode := range []BillingMode{BillingModePerRequest, BillingModeImage} {
+		t.Run(string(mode), func(t *testing.T) {
+			billing := newTestBillingService()
+			resolver := NewModelPricingResolver(billing)
+			resolved := &ResolvedPricing{
+				Mode:            mode,
+				OfficialMode:    mode,
+				OfficialPricing: &ModelPricing{},
+				RequestTiers: []PricingInterval{{
+					MinTokens:       100,
+					MaxTokens:       &maxTokens,
+					TierLabel:       "HD",
+					PerRequestPrice: &price,
+				}},
+			}
+
+			cost, err := billing.CalculateCostUnified(CostInput{
+				Ctx: context.Background(), Model: "per-request-model", SizeTier: "4K",
+				Tokens: UsageTokens{InputTokens: 50}, RateMultiplier: 1,
+				Resolver: resolver, Resolved: resolved,
+			})
+
+			require.Nil(t, cost)
+			require.ErrorIs(t, err, ErrModelPricingUnavailable)
+		})
+	}
+}
+
+func TestCalculateCostUnifiedPerRequestModesAllowExplicitZeroDefault(t *testing.T) {
+	for _, mode := range []BillingMode{BillingModePerRequest, BillingModeImage} {
+		t.Run(string(mode), func(t *testing.T) {
+			billing := newTestBillingService()
+			cost, err := billing.CalculateCostUnified(CostInput{
+				Ctx: context.Background(), Model: "free-model", RequestCount: 3, RateMultiplier: 1,
+				Resolver: NewModelPricingResolver(billing),
+				Resolved: &ResolvedPricing{
+					Mode:                           mode,
+					OfficialMode:                   mode,
+					OfficialPricing:                &ModelPricing{},
+					DefaultPerRequestPriceExplicit: true,
+				},
+			})
+
+			require.NoError(t, err)
+			require.Zero(t, cost.TotalCost)
+			require.Zero(t, cost.ActualCost)
+		})
+	}
 }
 
 func TestCalculateCost_BasicComputation(t *testing.T) {
