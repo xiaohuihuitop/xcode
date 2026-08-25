@@ -202,14 +202,16 @@ describe('PlatformModelPricingTable', () => {
     expect(wrapper.get('[data-testid="desktop-sale-token-custom-model"]').text()).toContain('缓存读取$0.30 USD/1M Token')
   })
 
-  it('shows useful source badges, preserves zero, and distinguishes missing official pricing', () => {
+  it('hides inherited-price badges while preserving custom badges, zero, and missing official pricing', () => {
     const wrapper = mountTable([fixtures[1], fixtures[2], fixtures[3]])
 
-    expect(wrapper.get('[data-testid="desktop-sale-token-inherited-model"]').text()).toContain('继承官方价')
+    expect(wrapper.get('[data-testid="desktop-sale-token-inherited-model"]').text()).not.toContain('继承官方价')
+    expect(wrapper.get('[data-testid="mobile-model-token-inherited-model"]').text()).not.toContain('继承官方价')
     expect(wrapper.get('[data-testid="desktop-official-explicit-zero-model"]').text()).toContain('$0.00 USD/1M Token')
     expect(wrapper.get('[data-testid="desktop-sale-explicit-zero-model"]').text()).toContain('$0.00 USD/1M Token')
     expect(wrapper.get('[data-testid="desktop-official-missing-official-model"]').text()).toBe('暂无价格')
     expect(wrapper.get('[data-testid="desktop-sale-missing-official-model"]').text()).toContain('自定义售价')
+    expect(wrapper.get('[data-testid="mobile-model-missing-official-model"]').text()).toContain('自定义售价')
   })
 
   it('uses per-request and image-specific units without treating image token prices as per-image prices', () => {

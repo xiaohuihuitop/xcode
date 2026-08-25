@@ -231,9 +231,7 @@ const displayModels = computed(() => [...props.models]
     model,
     official: pricingDisplay(model.official_pricing),
     sale: pricingDisplay(model.sale_pricing ?? model.pricing),
-    badgeKey: model.sale_pricing_source === 'official'
-      ? 'modelPlaza.table.inheritedPrice'
-      : model.sale_pricing_source === 'custom'
+    badgeKey: model.sale_pricing_source === 'custom'
         ? 'modelPlaza.table.customPrice'
         : null,
   })))

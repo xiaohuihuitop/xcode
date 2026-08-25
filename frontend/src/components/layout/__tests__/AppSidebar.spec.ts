@@ -64,6 +64,16 @@ describe('AppSidebar subscription navigation', () => {
   })
 })
 
+describe('AppSidebar available-platform navigation', () => {
+  it('keeps the available-platform page out of regular and admin personal navigation', () => {
+    const selfNavSource = componentSource.match(/function buildSelfNavItems[\s\S]*?\n}\n\n\/\/ finalizeNav/)?.[0]
+
+    expect(selfNavSource).toBeDefined()
+    expect(selfNavSource).not.toContain("path: '/available-platforms'")
+    expect(selfNavSource).not.toContain("t('nav.availablePlatforms')")
+  })
+})
+
 describe('AppSidebar platform asset navigation', () => {
   it('keeps the legacy groups editor out of the default admin navigation', () => {
     const start = componentSource.indexOf('const adminNavItems')
