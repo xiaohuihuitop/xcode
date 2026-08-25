@@ -1,0 +1,3 @@
+backup-retention/xhh-prune-backups text eol=lf
+backup-retention/*.service text eol=lf
+backup-retention/*.timer text eol=lf
