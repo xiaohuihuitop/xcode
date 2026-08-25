@@ -1,0 +1,13 @@
+[Unit]
+Description=Prune XCode server and upgrade backups
+Documentation=https://github.com/xiaohuihui222/XCode
+After=local-fs.target
+ConditionPathIsDirectory=/opt/server-backups
+ConditionPathIsDirectory=/opt/xcode/backups
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/xhh-prune-backups --apply
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

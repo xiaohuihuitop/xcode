@@ -1,0 +1,248 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+readonly PROD_SERVER_ROOT="/opt/server-backups"
+readonly PROD_UPGRADE_ROOT="/opt/xcode/backups"
+readonly PROD_LOCK_FILE="/run/lock/xhh-prune-backups.lock"
+
+apply=false
+now_epoch="$(date +%s)"
+root_prefix=""
+
+die() {
+    printf 'ERROR %s\n' "$*" >&2
+    exit 64
+}
+
+usage() {
+    printf 'Usage: %s [--apply] [--now-epoch EPOCH] [--test-root-prefix PATH]\n' "$0"
+}
+
+while (($# > 0)); do
+    case "$1" in
+        --apply)
+            apply=true
+            shift
+            ;;
+        --now-epoch)
+            (($# >= 2)) || die "reason=missing_now_epoch"
+            now_epoch="$2"
+            shift 2
+            ;;
+        --test-root-prefix)
+            (($# >= 2)) || die "reason=missing_test_root_prefix"
+            root_prefix="$2"
+            shift 2
+            ;;
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        *)
+            usage >&2
+            die "reason=unknown_argument argument=$1"
+            ;;
+    esac
+done
+
+[[ "${now_epoch}" =~ ^[0-9]+$ ]] || die "reason=invalid_now_epoch"
+
+if [[ -n "${root_prefix}" ]]; then
+    [[ "${XHH_PRUNE_ALLOW_TEST_ROOTS:-}" == "1" ]] || die "reason=test_roots_not_enabled"
+    [[ "${root_prefix}" == /* ]] || die "reason=test_root_not_absolute"
+    root_prefix="$(realpath -e -- "${root_prefix}")" || die "reason=test_root_missing"
+    [[ "${root_prefix}" =~ ^/tmp/xhh-prune-backups-test\.[^/]+$ ]] || die "reason=unsafe_test_root"
+    server_root="${root_prefix}/opt/server-backups"
+    upgrade_root="${root_prefix}/opt/xcode/backups"
+    lock_file="${root_prefix}/xhh-prune-backups.lock"
+else
+    server_root="${PROD_SERVER_ROOT}"
+    upgrade_root="${PROD_UPGRADE_ROOT}"
+    lock_file="${PROD_LOCK_FILE}"
+fi
+
+validate_root() {
+    local root="$1"
+    local expected="$2"
+
+    [[ -d "${root}" ]] || die "reason=root_not_directory path=${root}"
+    [[ ! -L "${root}" ]] || die "reason=root_is_symlink path=${root}"
+    local canonical
+    canonical="$(realpath -e -- "${root}")" || die "reason=root_unresolvable path=${root}"
+    [[ "${canonical}" == "${expected}" ]] || die "reason=root_mismatch path=${root} resolved=${canonical} expected=${expected}"
+}
+
+validate_root "${server_root}" "${server_root}"
+validate_root "${upgrade_root}" "${upgrade_root}"
+
+exec 9>"${lock_file}"
+if ! flock -n 9; then
+    printf 'ERROR action=skip reason=lock_busy\n' >&2
+    exit 75
+fi
+
+declare -a delete_paths=()
+declare -a delete_types=()
+declare -a delete_reasons=()
+
+log_skip() {
+    local type="$1"
+    local reason="$2"
+    local path="$3"
+    printf 'action=skip type=%s reason=%s path=%q\n' "${type}" "${reason}" "${path}"
+}
+
+validate_candidate() {
+    local path="$1"
+    local type="$2"
+    local expected_root="$3"
+
+    [[ "${path}" == /* ]] || die "reason=candidate_not_absolute path=${path}"
+    [[ ! -L "${path}" ]] || die "reason=candidate_became_symlink path=${path}"
+    if [[ "${type}" == "daily" ]]; then
+        [[ -f "${path}" ]] || die "reason=candidate_wrong_type type=${type} path=${path}"
+    else
+        [[ -d "${path}" ]] || die "reason=candidate_wrong_type type=${type} path=${path}"
+    fi
+
+    local parent
+    parent="$(realpath -e -- "$(dirname -- "${path}")")" || die "reason=candidate_parent_unresolvable path=${path}"
+    [[ "${parent}" == "${expected_root}" ]] || die "reason=candidate_escape path=${path} parent=${parent}"
+}
+
+plan_delete() {
+    delete_paths+=("$1")
+    delete_types+=("$2")
+    delete_reasons+=("$3")
+}
+
+cutoff_epoch=$((now_epoch - 72 * 60 * 60))
+while IFS= read -r -d '' path; do
+    validate_candidate "${path}" "daily" "${server_root}"
+    mtime="$(stat -c %Y -- "${path}")"
+    if ((mtime < cutoff_epoch)); then
+        plan_delete "${path}" "daily" "older_than_72_hours"
+    fi
+done < <(find -P "${server_root}" -mindepth 1 -maxdepth 1 -type f -name 'server-backup-*.tar.gz' -print0)
+
+while IFS= read -r -d '' path; do
+    log_skip "daily" "symlink" "${path}"
+done < <(find -P "${server_root}" -mindepth 1 -maxdepth 1 -type l -name 'server-backup-*.tar.gz' -print0)
+
+declare -A best_path=()
+declare -A best_mtime=()
+
+while IFS= read -r -d '' path; do
+    if [[ -L "${path}" ]]; then
+        log_skip "upgrade" "symlink" "${path}"
+        continue
+    fi
+    if [[ ! -d "${path}" ]]; then
+        log_skip "upgrade" "wrong_type" "${path}"
+        continue
+    fi
+
+    validate_candidate "${path}" "upgrade" "${upgrade_root}"
+    name="${path##*/}"
+    version_and_id="${name##*-before-v}"
+    target_version="${version_and_id%-*}"
+    if [[ ! "${target_version}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+        log_skip "upgrade" "invalid_target_version" "${path}"
+        continue
+    fi
+
+    mtime="$(stat -c %Y -- "${path}")"
+    if [[ -z "${best_path[${target_version}]+set}" ]]; then
+        best_path["${target_version}"]="${path}"
+        best_mtime["${target_version}"]="${mtime}"
+    elif ((mtime > best_mtime[${target_version}])) || \
+        { ((mtime == best_mtime[${target_version}])) && [[ "${path}" > "${best_path[${target_version}]}" ]]; }; then
+        plan_delete "${best_path[${target_version}]}" "upgrade" "duplicate_target_version"
+        best_path["${target_version}"]="${path}"
+        best_mtime["${target_version}"]="${mtime}"
+    else
+        plan_delete "${path}" "upgrade" "duplicate_target_version"
+    fi
+done < <(find -P "${upgrade_root}" -mindepth 1 -maxdepth 1 -name 'v*-before-v*-*' -print0)
+
+number_gt() {
+    local left="$1"
+    local right="$2"
+    if ((${#left} != ${#right})); then
+        ((${#left} > ${#right}))
+    else
+        [[ "${left}" > "${right}" ]]
+    fi
+}
+
+version_gt() {
+    local left="$1"
+    local right="$2"
+    local -a left_parts right_parts
+    local i
+    IFS=. read -r -a left_parts <<<"${left}"
+    IFS=. read -r -a right_parts <<<"${right}"
+
+    for i in 0 1 2; do
+        if [[ "${left_parts[$i]}" != "${right_parts[$i]}" ]]; then
+            number_gt "${left_parts[$i]}" "${right_parts[$i]}"
+            return
+        fi
+    done
+    return 1
+}
+
+versions=("${!best_path[@]}")
+for version in "${versions[@]}"; do
+    newer_count=0
+    for other_version in "${versions[@]}"; do
+        if version_gt "${other_version}" "${version}"; then
+            ((newer_count += 1))
+        fi
+    done
+    if ((newer_count >= 3)); then
+        plan_delete "${best_path[${version}]}" "upgrade" "target_version_outside_latest_three"
+    fi
+done
+
+for i in "${!delete_paths[@]}"; do
+    path="${delete_paths[$i]}"
+    type="${delete_types[$i]}"
+    reason="${delete_reasons[$i]}"
+    if [[ "${type}" == "daily" ]]; then
+        expected_root="${server_root}"
+    else
+        expected_root="${upgrade_root}"
+    fi
+    validate_candidate "${path}" "${type}" "${expected_root}"
+    mtime="$(stat -c %Y -- "${path}")"
+    mtime_iso="$(date -u -d "@${mtime}" '+%Y-%m-%dT%H:%M:%SZ')"
+    size_output="$(du -sh --apparent-size -- "${path}")"
+    size="${size_output%%$'\t'*}"
+
+    if [[ "${apply}" == "true" ]]; then
+        if [[ "${type}" == "daily" ]]; then
+            rm -- "${path}"
+        else
+            rm -rf --one-file-system -- "${path}"
+        fi
+        action="deleted"
+    else
+        action="would_delete"
+    fi
+    printf 'action=%s type=%s reason=%s mtime_epoch=%s mtime=%s size=%s path=%q\n' \
+        "${action}" "${type}" "${reason}" "${mtime}" "${mtime_iso}" "${size}" "${path}"
+done
+
+if [[ "${apply}" == "true" ]]; then
+    index_tmp="$(mktemp "${server_root}/.backup-index.tmp.XXXXXX")"
+    while IFS= read -r -d '' record; do
+        printf '%s\n' "${record}"
+    done < <(find -P "${server_root}" -mindepth 1 -maxdepth 1 -type f \
+        -name 'server-backup-*.tar.gz' -printf '%f\0' | sort -z) >"${index_tmp}"
+    chmod 0644 "${index_tmp}"
+    mv -- "${index_tmp}" "${server_root}/backup-index.txt"
+fi
+
+printf 'SUMMARY mode=%s planned=%d\n' "$([[ "${apply}" == "true" ]] && printf apply || printf dry-run)" "${#delete_paths[@]}"
