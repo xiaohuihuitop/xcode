@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -1164,13 +1165,13 @@ func tokenPriceAvailable(
 	price func(*ModelPricing) (float64, bool),
 ) bool {
 	if overridePrice != nil {
-		return true
+		return tokenPriceValueAvailable(*overridePrice, true)
 	}
 	if official == nil {
 		return false
 	}
 	value, explicit := price(official)
-	return value > 0 || explicit
+	return tokenPriceValueAvailable(value, explicit)
 }
 
 func IsResolvedPricingAvailable(resolved *ResolvedPricing) bool {
@@ -1186,10 +1187,10 @@ func (s *BillingService) calculateTokenCost(resolved *ResolvedPricing, input Cos
 		return nil, fmt.Errorf("no pricing available for model: %s: %w", input.Model, ErrModelPricingUnavailable)
 	}
 
-	pricing = s.applyModelSpecificPricingPolicy(input.Model, pricing)
 	if !isCompleteTokenPricing(pricing) {
 		return nil, fmt.Errorf("incomplete token pricing for model: %s: %w", input.Model, ErrModelPricingUnavailable)
 	}
+	pricing = s.applyModelSpecificPricingPolicy(input.Model, pricing)
 
 	// 长上下文定价仅在无区间定价时应用（区间定价已包含上下文分层）
 	applyLongCtx := len(resolved.Intervals) == 0
@@ -1202,10 +1203,17 @@ func (s *BillingService) calculateTokenCost(resolved *ResolvedPricing, input Cos
 
 func isCompleteTokenPricing(pricing *ModelPricing) bool {
 	return pricing != nil &&
-		(pricing.InputPricePerToken > 0 || pricing.InputPriceExplicit) &&
-		(pricing.OutputPricePerToken > 0 || pricing.OutputPriceExplicit) &&
-		(pricing.CacheCreationPricePerToken > 0 || pricing.CacheCreationPriceExplicit) &&
-		(pricing.CacheReadPricePerToken > 0 || pricing.CacheReadPriceExplicit)
+		tokenPriceValueAvailable(pricing.InputPricePerToken, pricing.InputPriceExplicit) &&
+		tokenPriceValueAvailable(pricing.OutputPricePerToken, pricing.OutputPriceExplicit) &&
+		tokenPriceValueAvailable(pricing.CacheCreationPricePerToken, pricing.CacheCreationPriceExplicit) &&
+		tokenPriceValueAvailable(pricing.CacheReadPricePerToken, pricing.CacheReadPriceExplicit)
+}
+
+func tokenPriceValueAvailable(value float64, explicit bool) bool {
+	if math.IsNaN(value) || math.IsInf(value, 0) {
+		return false
+	}
+	return value > 0 || (value == 0 && explicit)
 }
 
 // computeTokenBreakdown 是 token 计费的核心逻辑，由 calculateTokenCost 和 calculateCostInternal 共用。

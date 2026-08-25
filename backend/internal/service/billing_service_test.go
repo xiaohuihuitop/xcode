@@ -350,6 +350,119 @@ func TestCalculateCostUnifiedRejectsPartialTokenSaleAcrossOfficialMode(t *testin
 	require.ErrorIs(t, err, ErrModelPricingUnavailable)
 }
 
+func TestCalculateCostUnifiedRejectsGPT56IntervalMissingCacheWriteAcrossOfficialMode(t *testing.T) {
+	pricingService := &PricingService{
+		pricingData: map[string]*LiteLLMModelPricing{
+			"gpt-5.6-sol": {
+				OutputCostPerImage:         0.04,
+				OutputCostPerImageExplicit: true,
+				TokenPricingAbsent:         true,
+			},
+		},
+	}
+	inputPrice := 1e-6
+	outputPrice := 2e-6
+	cacheReadPrice := 0.1e-6
+	billing := NewBillingService(&config.Config{}, pricingService)
+	resolver := NewModelPricingResolverWithCatalog(
+		billing,
+		NewModelPricingCatalog(&modelPricingOverrideRepoStub{rules: []ModelPricingOverride{{
+			Adapter: "custom", ModelPattern: "gpt-5.6-sol", BillingMode: BillingModeToken,
+			Intervals: []domain.ModelPricingInterval{{
+				MinTokens: 0, InputPrice: &inputPrice, OutputPrice: &outputPrice,
+				CacheReadPrice: &cacheReadPrice,
+			}},
+			Status: ModelPricingStatusActive,
+		}}}),
+	)
+	resolved, err := resolver.Resolve(context.Background(), PricingInput{
+		Adapter: "custom", Model: "gpt-5.6-sol",
+	})
+	require.NoError(t, err)
+	require.Equal(t, BillingModeToken, resolved.Mode)
+	require.Equal(t, BillingModeImage, resolved.OfficialMode)
+
+	cost, err := billing.CalculateCostUnified(CostInput{
+		Ctx: context.Background(), Model: "gpt-5.6-sol", Adapter: "custom",
+		Tokens:         UsageTokens{InputTokens: 100, OutputTokens: 50, CacheReadTokens: 10},
+		RateMultiplier: 1,
+		Resolver:       resolver,
+		Resolved:       resolved,
+	})
+
+	require.Nil(t, cost)
+	require.ErrorIs(t, err, ErrModelPricingUnavailable)
+}
+
+func TestCalculateCostUnifiedValidatesTokenIntervalPrices(t *testing.T) {
+	calculate := func(t *testing.T, interval PricingInterval) (*CostBreakdown, error) {
+		t.Helper()
+		billing := newTestBillingService()
+		return billing.CalculateCostUnified(CostInput{
+			Ctx:   context.Background(),
+			Model: "interval-price-validation-model",
+			Tokens: UsageTokens{
+				InputTokens: 1, OutputTokens: 1,
+				CacheCreationTokens: 1, CacheReadTokens: 1,
+			},
+			RateMultiplier: 1,
+			Resolver:       NewModelPricingResolver(billing),
+			Resolved: &ResolvedPricing{
+				Mode:         BillingModeToken,
+				OfficialMode: BillingModeToken,
+				BasePricing:  &ModelPricing{},
+				Intervals:    []PricingInterval{interval},
+			},
+		})
+	}
+
+	t.Run("explicit zero prices are complete", func(t *testing.T) {
+		zero := 0.0
+		cost, err := calculate(t, PricingInterval{
+			MinTokens: 0, InputPrice: &zero, OutputPrice: &zero,
+			CacheWritePrice: &zero, CacheReadPrice: &zero,
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, cost)
+		require.Zero(t, cost.TotalCost)
+	})
+
+	tests := []struct {
+		name  string
+		field string
+		value float64
+	}{
+		{name: "negative input", field: "input", value: -1e-6},
+		{name: "NaN output", field: "output", value: math.NaN()},
+		{name: "positive infinity cache write", field: "cache_write", value: math.Inf(1)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			inputPrice := 1e-6
+			outputPrice := 2e-6
+			cacheWritePrice := 3e-6
+			cacheReadPrice := 0.5e-6
+			switch tt.field {
+			case "input":
+				inputPrice = tt.value
+			case "output":
+				outputPrice = tt.value
+			case "cache_write":
+				cacheWritePrice = tt.value
+			}
+
+			cost, err := calculate(t, PricingInterval{
+				MinTokens: 0, InputPrice: &inputPrice, OutputPrice: &outputPrice,
+				CacheWritePrice: &cacheWritePrice, CacheReadPrice: &cacheReadPrice,
+			})
+
+			require.Nil(t, cost)
+			require.ErrorIs(t, err, ErrModelPricingUnavailable)
+		})
+	}
+}
+
 func TestCalculateCostUnifiedRejectsSaleDependingOnMissingOfficialTokenField(t *testing.T) {
 	pricingService := &PricingService{
 		pricingData: map[string]*LiteLLMModelPricing{
