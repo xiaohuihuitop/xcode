@@ -238,9 +238,9 @@ done
 if [[ "${apply}" == "true" ]]; then
     index_tmp="$(mktemp "${server_root}/.backup-index.tmp.XXXXXX")"
     while IFS= read -r -d '' record; do
-        printf '%s\n' "${record#* }"
+        printf '%s\n' "${record}"
     done < <(find -P "${server_root}" -mindepth 1 -maxdepth 1 -type f \
-        -name 'server-backup-*.tar.gz' -printf '%T@ %f\0' | sort -z -nr) >"${index_tmp}"
+        -name 'server-backup-*.tar.gz' -printf '%f\0' | sort -z) >"${index_tmp}"
     chmod 0644 "${index_tmp}"
     mv -- "${index_tmp}" "${server_root}/backup-index.txt"
 fi

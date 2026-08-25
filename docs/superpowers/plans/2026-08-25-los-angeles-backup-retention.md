@@ -144,7 +144,7 @@ Any root mismatch or candidate escape is fatal. A malformed or wrong-type first-
 
 - [ ] **Step 6: Rebuild the daily backup index only after successful apply**
 
-After apply mode completes without deletion errors, atomically write `/opt/server-backups/backup-index.txt` (or the test mirror) using a temporary file inside the same root. List remaining matching regular archives in newest-first mtime order, one basename per line, then `mv --` the temporary file into place. Dry-run must not change an existing index.
+After apply mode completes without deletion errors, atomically write `/opt/server-backups/backup-index.txt` (or the test mirror) using a temporary file inside the same root. List remaining matching regular archives in ascending basename order, one basename per line, matching the existing `/usr/local/sbin/xhh-server-backup` index contract, then `mv --` the temporary file into place. Dry-run must not change an existing index.
 
 - [ ] **Step 7: Run syntax and retention tests**
 
@@ -325,7 +325,7 @@ docker ps --format '{{.Names}} {{.Status}}'
 curl -fsS -o /dev/null -w '%{http_code}\n' https://www.aitodo.work/health
 ```
 
-Expected: index exactly lists remaining daily archives newest first, no out-of-policy valid backup remains, all three XCode containers report healthy/running, and public health returns HTTP 200.
+Expected: index exactly lists remaining daily archives in the existing ascending basename order, no out-of-policy valid backup remains, all three XCode containers report healthy/running, and public health returns HTTP 200.
 
 ## Task 6: Record Verified State, Push, and Monitor GitHub
 

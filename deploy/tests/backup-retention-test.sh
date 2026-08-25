@@ -87,6 +87,11 @@ test_daily_boundary_and_dry_run() {
     assert_exists "${symlink}"
     assert_contains "server-backup-boundary.tar.gz" "${SERVER_ROOT}/backup-index.txt"
     assert_contains "server-backup-recent.tar.gz" "${SERVER_ROOT}/backup-index.txt"
+    mapfile -t index_lines <"${SERVER_ROOT}/backup-index.txt"
+    [[ "${index_lines[0]}" == "server-backup-boundary.tar.gz" ]] || \
+        fail "backup-index.txt did not preserve ascending filename order"
+    [[ "${index_lines[1]}" == "server-backup-recent.tar.gz" ]] || \
+        fail "backup-index.txt did not preserve ascending filename order"
     if grep -Fq 'server-backup-old.tar.gz' "${SERVER_ROOT}/backup-index.txt"; then
         fail "Deleted daily backup remained in backup-index.txt"
     fi
