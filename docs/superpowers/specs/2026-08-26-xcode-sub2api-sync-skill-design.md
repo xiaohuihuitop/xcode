@@ -2,7 +2,7 @@
 
 ## 目标
 
-创建个人 Skill `xcode-sub2api-sync`，把 XCode 从上一轮已完成的 Sub2API 官方正式 Tag 同步到新正式 Tag 的流程编排为可重复工作流。Skill 默认完成本地差异盘点、人工范围确认、分组同步和完整验证，并在提交、推送、Tag、Release 或服务器部署前停止。
+创建个人 Skill `xcode-sub2api-sync`，把 XCode 从上一轮已完成的 `Wei-Shaw/sub2api` 官方正式 Tag 同步到新正式 Tag 的流程编排为可重复工作流。Skill 默认完成只读评估、本地制品生成、人工范围确认、分组同步和完整验证，并在提交、推送、Tag、Release 或服务器部署前停止。
 
 ## 适用范围
 
@@ -13,6 +13,8 @@ Skill 仅用于 `xiaohuihuitop/xcode` 仓库，触发场景包括：
 - 用户要求继续一轮尚未完成的官方 Runtime 同步。
 
 Skill 不用于普通 Git 上游合并、其他仓库同步或未经盘点的生产升级。进入流程后仍以当前仓库 `AGENTS.md`、正式同步策略和代码事实为准。
+
+Canonical upstream 固定为 GitHub 仓库 `Wei-Shaw/sub2api`；Tag、完整 commit SHA、`snapshot.json.repo` 和 `sync-plan.json.source` 必须来自并一致指向该仓库。
 
 ## 设计选择
 
@@ -53,17 +55,20 @@ Skill 根据用户措辞选择两种模式：
 
 ### 只读盘点
 
-当用户说“看看更新”“检查差异”“评估同步难度”时，只运行只读预检、Tag 识别、snapshot、inventory、plan 和 validate。不得修改业务代码、生成提交或改变服务器。
+当用户说“看看更新”“检查差异”“评估同步难度”时，只允许检查仓库文件/status、已有同步包，并用 `git ls-remote` 等非变异命令查询 `Wei-Shaw/sub2api` 正式 Tag。只有确认 validate 自身不写入时，才可用 `python -B` 验证已有同步包。不得 fetch、snapshot、plan、generate、创建缓存/输出目录或修改文件/Git refs。
+
+若不存在当前可审计同步包，只报告只读来源能够确认的目标身份/差异信息、拟生成的路径和文件及风险，并请求进入本地制品生成；不得声称已有完整 inventory。
 
 ### 本地同步与验证
 
 当用户明确说“同步 Sub2API”“开始同步”“继续同步”时：
 
-1. 先完成只读盘点。
-2. 向用户展示目标 Tag、commit、功能组、文件所有权、数据库和根配置影响。
-3. 等待用户确认本轮同步范围。
-4. 只在确认后修改本地代码并运行验证。
-5. 输出可提交结果，但默认不执行 Git 远程或生产操作。
+1. 先完成不写文件或 Git refs 的只读评估。
+2. 获得本地制品生成授权后，针对 `Wei-Shaw/sub2api` 固定 snapshot/目标身份并生成 preliminary package。
+3. 人工解决全部 `needs_review`，完成 feature matrix、database impact 和 Adapter coverage，再运行 full validate。
+4. 向用户展示已审阅且已验证的范围并等待本轮功能组确认。
+5. 只在确认后修改本地业务代码并运行分组验证。
+6. 输出可提交结果，但默认不执行 Git 远程或生产操作。
 
 用户对 Skill 的调用不构成提交、推送、Tag、Release 或部署授权。
 
@@ -74,26 +79,27 @@ Skill 根据用户措辞选择两种模式：
 - 确认当前目录属于 XCode 仓库，并核对 `origin`、`upstream` 和当前分支。
 - 读取项目 `AGENTS.md`、`docs/memory/当前状态.md`、`docs/upstream/SYNC_POLICY.md` 和上一轮同步包的当前状态。
 - 检查工作树并区分既有用户改动与本轮产物；不得清理或覆盖未知改动。
-- 从上一轮已完成同步包确定 `--base`，从官方正式 Tag 确定 `--target` 和完整 commit SHA。
+- 从上一轮已完成同步包确定 `--base`，并通过 canonical `Wei-Shaw/sub2api` remote 的正式 Tag 确定 `--target` 和完整 commit SHA。
 - 禁止使用 `upstream/main`、分支名或未固定 commit 作为同步身份。
 
 若仓库错误、基线不明确、目标不是正式 Tag、工作树冲突无法隔离或同步工具门禁失败，则停止并报告。
 
 ### 阶段二：生成可审计同步包
 
-- 运行 `snapshot`、`plan` 和 `validate`。
+- 仅在本地制品生成获授权后运行 `snapshot` 和 `plan`；snapshot 必须使用 `Wei-Shaw/sub2api`，且 `snapshot.json.repo`、`sync-plan.json.source` 与目标 Tag/full SHA 必须匹配同一 canonical remote。
 - 在新的 `docs/upstream/sub2api-v<version>/` 目录保存版本身份、commit/file 清单、功能矩阵、数据库影响、Adapter 覆盖和 `sync-plan.json`。
 - 对候选文件分类为 `direct_sync`、`adapter_port`、`xcode_equivalent`、`productcore_mapping` 或 `not_runtime`。
 - 汇总 Runtime、Provider、ProductCore、前端、database、依赖、CI 和基础设施影响。
 - 自动生成内容不得覆盖人工维护的功能矩阵、数据库影响或 Adapter 覆盖结论。
+- 人工解决 `commits.csv`/`files.csv` 的全部 `needs_review`，对齐 `sync-plan.json` 重复字段与 disposition；只有 `needs_review` 为零后才运行 full validate。
 
 ### 阶段三：人工范围确认
 
-在任何业务代码写入前，向用户报告：
+preliminary generation、人工审阅和 full validate 依次完成后，在任何业务代码写入前向用户报告：
 
 - 基线 Tag、目标 Tag、目标 commit 和差异规模。
 - 建议同步的功能组及优先级。
-- `needs_review`、ProductCore、schema/migration、公共契约、依赖、根配置和 CI 风险。
+- 已解决的 `needs_review` 处置结果，以及 ProductCore、schema/migration、公共契约、依赖、根配置和 CI 风险。
 - 明确排除的官方产品功能。
 
 默认优先级为 P0 OpenAI/Codex Runtime、P1 当前已配置 Provider、P2 扩展端点，最后才评估 UI 或运营能力。用户可缩小范围；扩大到 schema、公共契约、依赖、根配置或 CI 时必须再次明确确认。
@@ -101,7 +107,9 @@ Skill 根据用户措辞选择两种模式：
 ### 阶段四：分组同步
 
 - 每个功能组单独建立失败测试或可验证基线，再实施最小适配。
-- `direct_sync` 只允许复制到 Official Runtime zone，且对应 `sync-plan.json` 行必须显式批准。
+- `direct_sync` 只允许复制到 Official Runtime zone；完整已验证 plan 保持审计来源，实际 apply 使用经结构化 JSON 严格投影和校验的分组 plan。
+- apply 前对全部选中行完成 source preflight：`source_path` 必须解析在 `source_root` 内、文件存在且 SHA-256 等于 `official_sha256`；同时保留 target drift 检查。
+- apply 是顺序、非事务操作。开始前备份全部既有 target 并记录 absent targets；失败后枚举 partial writes、保留备份，并在恢复或删除前请求明确授权，不得静默恢复或继续下一组。
 - `adapter_port` 通过 RuntimeBridge、GatewayRuntime、Driver、Port 或 XCode 配置映射接入。
 - `productcore_mapping` 只能按 XCode 语义重新实现，不允许整体覆盖官方文件。
 - 保持用户、API Key、平台、模型价格、套餐、余额、订单、支付、计费和 usage 的 ProductCore 所有权。
@@ -109,7 +117,7 @@ Skill 根据用户措辞选择两种模式：
 
 ### 阶段五：本地验证与交付
 
-- 重新生成并验证同步清单，确保源码变化全部可解释。
+- `adapter_port`、`productcore_mapping` 或 `xcode_equivalent` 改动后先归档当前清单并按同一 frozen snapshot/identity 可审计 rebaseline，再验证同步清单，确保源码变化全部可解释。
 - 运行同步工具测试、Official Runtime、RuntimeBridge、架构、相关后端测试和服务构建。
 - 触及共享前端 contract 或前端代码时，运行相关 Vitest、typecheck、lint 和生产构建。
 - 触及 migration 或 schema 时，必须执行号段审计、临时数据库升级与恢复；官方 migration 不得直接执行。
@@ -121,6 +129,7 @@ Skill 根据用户措辞选择两种模式：
 ## 所有权与安全边界
 
 - 禁止执行 `merge upstream/main`、整体文件树覆盖或把官方仓库作为 XCode 发布身份。
+- 官方上游身份只能是 `Wei-Shaw/sub2api`；任何 repo/source/Tag/SHA 不一致都必须停止。
 - ProductCore、前端产品、database、Release/CI 和部署文件不能标记为 `direct_sync`。
 - 已发布 migration checksum 保持冻结；必要 Runtime migration 只能翻译到 `8000-8999`，ProductCore migration 使用 `9000-9999`。
 - 不新增静默 fallback，不吞掉同步、验证、数据库或 Provider 错误。
@@ -141,7 +150,8 @@ Skill 根据用户措辞选择两种模式：
 
 ## 错误处理
 
-- snapshot 或下载失败：保留现有生产和本地代码不变，报告官方身份或网络错误。
+- snapshot 或下载失败：保留现有生产和本地代码不变，报告 canonical upstream 身份或网络错误。
+- apply 失败：按 target baseline 枚举 partial writes 并保留任务备份；未经明确授权不恢复既有 target、不删除新建 target，也不继续下一组。
 - validate 失败：停止 apply，列出清单与当前代码不一致项。
 - 所有权冲突：停止对应文件，不把它降级为 `direct_sync`。
 - 测试或构建失败：停留在当前功能组，定位根因后再继续。
@@ -152,8 +162,8 @@ Skill 根据用户措辞选择两种模式：
 
 Skill 完成后应满足：
 
-1. 在 XCode 仓库中能正确区分只读盘点和本地同步请求。
-2. 能从上一轮正式同步 Tag 生成到新正式 Tag 的可审计同步包。
+1. 在 XCode 仓库中能正确区分零 filesystem/Git-ref 写入的只读评估和本地同步请求。
+2. 能从上一轮正式同步 Tag 生成到 `Wei-Shaw/sub2api` 新正式 Tag 的可审计同步包。
 3. 未经人工确认不会修改业务代码。
 4. 未经单独授权不会提交、推送、打 Tag、发布或部署。
 5. ProductCore、database、前端产品和基础设施不会被误判为 `direct_sync`。
