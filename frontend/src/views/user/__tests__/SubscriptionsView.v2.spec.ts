@@ -13,4 +13,9 @@ describe('SubscriptionsView V2 asset boundary', () => {
     expect(source).not.toContain('subscription.group?.platform')
     expect(source).not.toContain('subscription.group?.description')
   })
+
+  it('loads only active, unexpired subscriptions', () => {
+    expect(source).toContain('subscriptionsAPI.getActiveSubscriptions()')
+    expect(source).not.toContain('subscriptionsAPI.getMySubscriptions()')
+  })
 })

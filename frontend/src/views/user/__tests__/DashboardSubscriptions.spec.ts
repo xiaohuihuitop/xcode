@@ -15,4 +15,14 @@ describe('Dashboard subscription summary', () => {
     expect(componentSource).toContain(':subscriptions="subscriptions"')
     expect(componentSource).toContain('loadSubscriptions()')
   })
+
+  it('only renders the dashboard stats and subscription summary sections', () => {
+    expect(componentSource).not.toContain('UserDashboardCharts')
+    expect(componentSource).not.toContain('UserDashboardRecentUsage')
+    expect(componentSource).not.toContain('UserDashboardQuickActions')
+    expect(componentSource).not.toContain('loadCharts')
+    expect(componentSource).not.toContain('loadRecent')
+    expect(componentSource).not.toContain('startDate')
+    expect(componentSource).not.toContain('granularity')
+  })
 })

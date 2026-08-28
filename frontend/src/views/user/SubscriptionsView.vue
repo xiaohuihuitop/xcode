@@ -267,7 +267,7 @@ const loading = ref(true)
 async function loadSubscriptions() {
   try {
     loading.value = true
-    subscriptions.value = await subscriptionsAPI.getMySubscriptions()
+    subscriptions.value = await subscriptionsAPI.getActiveSubscriptions()
   } catch (error) {
     console.error('Failed to load subscriptions:', error)
     appStore.showError(t('userSubscriptions.failedToLoad'))
