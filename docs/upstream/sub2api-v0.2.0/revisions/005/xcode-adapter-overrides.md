@@ -39,7 +39,7 @@
 - XCode 覆盖：保留 inherited client-tool mapping、tool discovery promotion、reasoning cache、namespace/tool_search 和产品调用链；可识别的 `ctc_*`/ `tsc_*` ID 按 v0.2.0 恢复为 `fc_*`，未知 output ID 仍删除。
 - Official Runtime 窄适配：`backend/internal/runtime/sub2api/upstream/apicompat/anthropic_to_responses_response.go` 仅加入三处 Responses `CreatedAt` 赋值；`backend/internal/runtime/sub2api/upstream/apicompat/chatcompletions_anthropic_bridge_test.go` 仅在三个共享签名调用点补入 `functionTools=nil`，均不引入 F005 Anthropic 行为。
 - Fixture 质量修正：活动包 issue 5302 的三个 JSON fixture 删除多余尾部空白行，只消除 `git diff --check` 告警，不改变测试数据语义。
-- Revision：Adapter 移植前证据保存在 `revisions/001/`，文档回填后的中间状态保存在 `revisions/002/`，最终文档收口前证据保存在 `revisions/003/`，fixture 空白修正前证据保存在 `revisions/004/`，F006 设计与计划写入前证据保存在 `revisions/005/`；根目录旧 `sync-plan.f001*.json` 与 `direct-sync-baselines.md` 已失效，仅供追溯，不得再次 apply。
+- Revision：Adapter 移植前证据保存在 `revisions/001/`，文档回填后的中间状态保存在 `revisions/002/`，最终文档收口前证据保存在 `revisions/003/`，fixture 空白修正前证据保存在 `revisions/004/`；根目录旧 `sync-plan.f001*.json` 与 `direct-sync-baselines.md` 已失效，仅供追溯，不得再次 apply。
 
 ### 验证证据
 
@@ -50,19 +50,3 @@
 - PASS：`go build ./cmd/server`
 - PASS：46 个同步工具单测、两套 inventory validator 和 `git diff --check`
 - NOT RUN：真实 Provider 请求、账号路由、计费和 usage 验收；本地同步不使用或记录生产凭据。
-
-## F006-A 本地实施记录
-
-- 状态：2026-09-05 已完成本地适配与定向验证，等待本组提交；未推送、打 Tag、创建 Release、编译离线包或部署。
-- Handler Adapter：`UpstreamFailoverError` 增加 delay、deadline、错误级上限和请求级瞬态元数据；活动入口统一按账号配置与错误上限计算有效同账号重试预算。
-- 重试语义：deadline 可显式扩展普通计数窗口，错误级上限仍是硬上限；请求级瞬态错误使用最高 8 秒的指数退避，耗尽后允许切号但不会临时封禁账号。
-- ProductCore 映射：管理员额度重置使用单条 SQL 同时清零总/日/周用量和账号级 rate-limit cooldown；overload、临时禁用、模型级 cooldown、固定重置配置和 scheduler outbox 语义保持不变。
-- 等价能力：现有模型 404、账号 usage singleflight、代理 URL/IPv6 路径未直接复制官方文件，只通过现有 XCode 回归测试确认。
-- 范围：无 migration、Ent schema、依赖、前端、根配置、CI、Release 或部署变化；真实 Provider 验收 `NOT RUN`。
-
-### F006-A 验证证据
-
-- PASS：`go test -tags=unit ./internal/handler -run 'SameAccountRetry|HandleFailoverError|PoolRetry|ReasoningFailover' -count=1 -timeout=10m`
-- PASS：`go test -tags=unit ./internal/service -run 'ResetAccountQuota|ModelNotFound|AccountUsage' -count=1 -timeout=10m`
-- PASS：`go test -tags=integration ./internal/repository -run 'TestAccountRepository/TestResetQuotaUsedAndClearRateLimitCooldownPreservesOtherRuntimeState' -count=1 -timeout=10m`
-- PASS：`go test ./internal/pkg/proxyurl ./internal/pkg/proxyutil -count=1`

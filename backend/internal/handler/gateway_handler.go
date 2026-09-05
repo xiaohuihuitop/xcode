@@ -497,7 +497,7 @@ func (e sub2APIMessagesExecutor) executeMessages(c *gin.Context, usageSink gatew
 						h.handleFailoverExhausted(c, failoverErr, service.PlatformGemini, true)
 						return
 					}
-					action := fs.HandleFailoverError(c.Request.Context(), h.gatewayService, account.ID, account.Platform, account.GetPoolModeRetryCount(), failoverErr)
+					action := fs.HandleFailoverError(c.Request.Context(), h.gatewayService, account.ID, account.Platform, effectiveSameAccountRetryLimit(failoverErr, account), failoverErr)
 					switch action {
 					case FailoverContinue:
 						continue
@@ -938,7 +938,7 @@ func (e sub2APIMessagesExecutor) executeMessages(c *gin.Context, usageSink gatew
 						h.handleFailoverExhausted(c, failoverErr, account.Platform, true)
 						return
 					}
-					action := fs.HandleFailoverError(c.Request.Context(), h.gatewayService, account.ID, account.Platform, account.GetPoolModeRetryCount(), failoverErr)
+					action := fs.HandleFailoverError(c.Request.Context(), h.gatewayService, account.ID, account.Platform, effectiveSameAccountRetryLimit(failoverErr, account), failoverErr)
 					switch action {
 					case FailoverContinue:
 						continue

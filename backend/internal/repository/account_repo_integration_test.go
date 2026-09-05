@@ -831,6 +831,48 @@ func (s *AccountRepoSuite) TestClearRateLimit() {
 	s.Require().Nil(got.OverloadUntil)
 }
 
+func (s *AccountRepoSuite) TestResetQuotaUsedAndClearRateLimitCooldownPreservesOtherRuntimeState() {
+	account := mustCreateAccount(s.T(), s.client, &service.Account{
+		Name: "acc-reset-quota-cooldown",
+		Extra: map[string]any{
+			"quota_used":        12.5,
+			"quota_daily_used":  5.0,
+			"quota_weekly_used": 9.0,
+			"model_rate_limits": map[string]any{
+				"claude-sonnet-4-5": map[string]any{"rate_limit_reset_at": "2026-09-01T10:00:00Z"},
+			},
+		},
+	})
+	until := time.Now().Add(time.Hour)
+	s.Require().NoError(s.repo.SetOverloaded(s.ctx, account.ID, until))
+	s.Require().NoError(s.repo.SetRateLimited(s.ctx, account.ID, until))
+	s.Require().NoError(s.repo.SetTempUnschedulable(s.ctx, account.ID, until, "preserve-me"))
+
+	cacheRecorder := &schedulerCacheRecorder{}
+	s.repo.schedulerCache = cacheRecorder
+
+	s.Require().NoError(s.repo.ResetQuotaUsedAndClearRateLimitCooldown(s.ctx, account.ID))
+
+	got, err := s.repo.GetByID(s.ctx, account.ID)
+	s.Require().NoError(err)
+	s.Require().Nil(got.RateLimitedAt)
+	s.Require().Nil(got.RateLimitResetAt)
+	s.Require().NotNil(got.OverloadUntil)
+	s.Require().WithinDuration(until, *got.OverloadUntil, time.Second)
+	s.Require().NotNil(got.TempUnschedulableUntil)
+	s.Require().WithinDuration(until, *got.TempUnschedulableUntil, time.Second)
+	s.Require().Equal("preserve-me", got.TempUnschedulableReason)
+	s.Require().Contains(got.Extra, "model_rate_limits")
+	s.Require().Equal(float64(0), got.Extra["quota_used"])
+	s.Require().Equal(float64(0), got.Extra["quota_daily_used"])
+	s.Require().Equal(float64(0), got.Extra["quota_weekly_used"])
+	s.Require().Len(cacheRecorder.setAccounts, 1)
+	s.Require().Equal(account.ID, cacheRecorder.setAccounts[0].ID)
+
+	err = s.repo.ResetQuotaUsedAndClearRateLimitCooldown(s.ctx, -1)
+	s.Require().ErrorIs(err, service.ErrAccountNotFound)
+}
+
 func (s *AccountRepoSuite) TestTempUnschedulableFieldsLoadedByGetByIDAndGetByIDs() {
 	acc1 := mustCreateAccount(s.T(), s.client, &service.Account{Name: "acc-temp-1"})
 	acc2 := mustCreateAccount(s.T(), s.client, &service.Account{Name: "acc-temp-2"})

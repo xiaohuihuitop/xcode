@@ -260,7 +260,7 @@ func (e sub2APIMessagesExecutor) executeResponses(c *gin.Context, usageSink gate
 					h.handleResponsesFailoverExhausted(c, failoverErr, true)
 					return
 				}
-				action := fs.HandleFailoverError(requestCtx, h.gatewayService, account.ID, account.Platform, account.GetPoolModeRetryCount(), failoverErr)
+				action := fs.HandleFailoverError(requestCtx, h.gatewayService, account.ID, account.Platform, effectiveSameAccountRetryLimit(failoverErr, account), failoverErr)
 				switch action {
 				case FailoverContinue:
 					continue

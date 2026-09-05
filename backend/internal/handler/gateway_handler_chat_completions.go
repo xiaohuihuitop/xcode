@@ -288,7 +288,7 @@ func (e sub2APIMessagesExecutor) executeChatCompletions(c *gin.Context, usageSin
 					h.handleCCFailoverExhausted(c, failoverErr, true)
 					return
 				}
-				action := fs.HandleFailoverError(c.Request.Context(), h.gatewayService, account.ID, account.Platform, account.GetPoolModeRetryCount(), failoverErr)
+				action := fs.HandleFailoverError(c.Request.Context(), h.gatewayService, account.ID, account.Platform, effectiveSameAccountRetryLimit(failoverErr, account), failoverErr)
 				switch action {
 				case FailoverContinue:
 					continue
