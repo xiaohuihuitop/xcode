@@ -66,7 +66,7 @@
 - 根因：`ResetQuotaUsedAndClearRateLimitCooldown` 已更新数据库并写入 scheduler outbox，但遗漏同类账号状态方法都会执行的即时 `syncSchedulerAccountSnapshot`，导致当前进程调度快照仍保留重置前状态。
 - 修复：成功更新并尝试写入 outbox 后调用现有同步方法；不改变数据库语义、错误返回、计费、schema、migration、依赖、前端、根配置、CI 或部署。
 - 证据归档：修复前机器清单和人工审阅文档保存在 `revisions/011/`；同一冻结 snapshot rebaseline 后，481 个 commit、4,194 个路径和官方身份均未漂移，只有 `backend/internal/repository/account_repo.go` 的当前 SHA 变化。
-- GREEN：等待修复提交对应的 GitHub PostgreSQL 集成门禁，不以本机 Docker 不可用时的 skip 代替通过。
+- GREEN：修复提交 `7f623c5` 的 GitHub `CI #54` 已完成，完整 Unit tests 与 Integration tests 均为 `success`；本机 Docker 不可用时的 skip 未计为通过。
 
 ### F006-A 验证证据
 
