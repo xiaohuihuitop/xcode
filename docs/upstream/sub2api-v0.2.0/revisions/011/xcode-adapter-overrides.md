@@ -60,14 +60,6 @@
 - 等价能力：现有模型 404、账号 usage singleflight、代理 URL/IPv6 路径未直接复制官方文件，只通过现有 XCode 回归测试确认。
 - 范围：无 migration、Ent schema、依赖、前端、根配置、CI、Release 或部署变化；真实 Provider 验收 `NOT RUN`。
 
-### F006-A Release 门禁修复
-
-- RED：`v1.0.16` 的 GitHub PostgreSQL 集成门禁运行 `TestAccountRepoSuite/TestResetQuotaUsedAndClearRateLimitCooldownPreservesOtherRuntimeState`，在 `account_repo_integration_test.go:869` 预期一条 scheduler 缓存刷新记录，实际为零。
-- 根因：`ResetQuotaUsedAndClearRateLimitCooldown` 已更新数据库并写入 scheduler outbox，但遗漏同类账号状态方法都会执行的即时 `syncSchedulerAccountSnapshot`，导致当前进程调度快照仍保留重置前状态。
-- 修复：成功更新并尝试写入 outbox 后调用现有同步方法；不改变数据库语义、错误返回、计费、schema、migration、依赖、前端、根配置、CI 或部署。
-- 证据归档：修复前机器清单和人工审阅文档保存在 `revisions/011/`；同一冻结 snapshot rebaseline 后，481 个 commit、4,194 个路径和官方身份均未漂移，只有 `backend/internal/repository/account_repo.go` 的当前 SHA 变化。
-- GREEN：等待修复提交对应的 GitHub PostgreSQL 集成门禁，不以本机 Docker 不可用时的 skip 代替通过。
-
 ### F006-A 验证证据
 
 - PASS：`go test -tags=unit ./internal/handler -run 'SameAccountRetry|HandleFailoverError|PoolRetry|ReasoningFailover' -count=1 -timeout=10m`

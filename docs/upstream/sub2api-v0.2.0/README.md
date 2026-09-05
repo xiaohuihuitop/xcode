@@ -1,6 +1,6 @@
 # Sub2API v0.2.0 官方同步审计
 
-本目录固定 XCode 从官方正式版 `v0.1.179` 同步到 `v0.2.0` 的可审计输入。P0 F001 OpenAI/Codex Runtime 与 F006 共享重试、冷却、安全审计和 reasoning 一致性已完成本地同步、Adapter 移植、验证与分组提交；F002-F005 仍未实施。当前结果未推送、打 Tag、创建 Release、编译离线包或部署。
+本目录固定 XCode 从官方正式版 `v0.1.179` 同步到 `v0.2.0` 的可审计输入。P0 F001 OpenAI/Codex Runtime 与 F006 共享重试、冷却、安全审计和 reasoning 一致性已完成本地同步与 Adapter 移植；F002-F005 仍未实施。`v1.0.16` 发布门禁发现管理员额度重置后未即时刷新 scheduler 进程内快照，修复已进入重新验证，`v1.0.16` 不部署。
 
 ## 不可变身份
 
@@ -37,6 +37,7 @@
 - F006-B：`prompt_guard.config_loaded` 仅在首次加载、配置版本变化、全局风控变化或加载错误恢复时记录；Composite 路由、Ops 平台归属和 IPv6 使用 XCode 既有等价实现。
 - F006-C：Chat/Responses fallback 按 mapped、original、body model 的顺序提取 reasoning effort；指定模型族保留原生 `max`，其他模型继续映射为 `xhigh`。
 - 分组提交：`5ec2160`、`aba1dd8`、`3d8fb63`。审计 revision 005-010 保留设计、各组、最终文档与验证状态 rebaseline 前证据。
+- Release 门禁修复：GitHub PostgreSQL 集成测试在 `account_repo_integration_test.go:869` 观测到数据库重置成功但 scheduler 缓存没有刷新；修复复用现有 `syncSchedulerAccountSnapshot`，Revision 011 保存修复前清单与失败证据。
 - 无 migration、Ent schema、依赖、前端、根配置、CI、Release 或部署变化；真实 Provider 验收为 NOT RUN。
 
 ## 建议功能分组
