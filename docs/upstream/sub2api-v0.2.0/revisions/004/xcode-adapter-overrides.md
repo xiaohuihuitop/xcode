@@ -38,8 +38,7 @@
 - Service 接线：两个 Responses→Chat fallback 入口都从 effective tools 生成 function-tool 集合，并传入非流式转换与流式 state。
 - XCode 覆盖：保留 inherited client-tool mapping、tool discovery promotion、reasoning cache、namespace/tool_search 和产品调用链；可识别的 `ctc_*`/ `tsc_*` ID 按 v0.2.0 恢复为 `fc_*`，未知 output ID 仍删除。
 - Official Runtime 窄适配：`backend/internal/runtime/sub2api/upstream/apicompat/anthropic_to_responses_response.go` 仅加入三处 Responses `CreatedAt` 赋值；`backend/internal/runtime/sub2api/upstream/apicompat/chatcompletions_anthropic_bridge_test.go` 仅在三个共享签名调用点补入 `functionTools=nil`，均不引入 F005 Anthropic 行为。
-- Fixture 质量修正：活动包 issue 5302 的三个 JSON fixture 删除多余尾部空白行，只消除 `git diff --check` 告警，不改变测试数据语义。
-- Revision：Adapter 移植前证据保存在 `revisions/001/`，文档回填后的中间状态保存在 `revisions/002/`，最终文档收口前证据保存在 `revisions/003/`，fixture 空白修正前证据保存在 `revisions/004/`；根目录旧 `sync-plan.f001*.json` 与 `direct-sync-baselines.md` 已失效，仅供追溯，不得再次 apply。
+- Revision：Adapter 移植前证据保存在 `revisions/001/`，文档回填后的中间状态保存在 `revisions/002/`，最终文档收口前证据保存在 `revisions/003/`；根目录旧 `sync-plan.f001*.json` 与 `direct-sync-baselines.md` 已失效，仅供追溯，不得再次 apply。
 
 ### 验证证据
 
