@@ -1492,8 +1492,27 @@ func normalizeOpenAIReasoningEffort(raw string) string {
 }
 
 func normalizeOpenAIReasoningEffortForModel(raw, model string) string {
-	if strings.EqualFold(strings.TrimSpace(raw), "max") && isOpenAIGPT56Model(model) {
+	if strings.EqualFold(strings.TrimSpace(raw), "max") && supportsOpenAIReasoningEffortMax(model) {
 		return "max"
 	}
 	return normalizeOpenAIReasoningEffort(raw)
+}
+
+func supportsOpenAIReasoningEffortMax(model string) bool {
+	normalized := strings.ToLower(lastOpenAIModelSegment(model))
+	normalized = strings.ReplaceAll(normalized, "_", "-")
+	switch {
+	case normalized == "gpt-5.6" || strings.HasPrefix(normalized, "gpt-5.6-"):
+		return true
+	case strings.HasPrefix(normalized, "deepseek-v4"):
+		return true
+	case strings.HasPrefix(normalized, "glm-"):
+		return true
+	case strings.HasPrefix(normalized, "kimi-"), strings.HasPrefix(normalized, "moonshot-"):
+		return true
+	case normalized == "k3" || strings.HasPrefix(normalized, "k3-"):
+		return true
+	default:
+		return false
+	}
 }
