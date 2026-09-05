@@ -6,11 +6,57 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/stretchr/testify/require"
 )
+
+func TestShouldLogConfigLoaded(t *testing.T) {
+	storage := DefaultStorageConfig()
+	storage.ConfigVersion = 4
+	active := ActiveConfig{ConfigVersion: 4}
+	previous := &activeConfigSnapshot{storage: storage, active: active}
+
+	for _, tc := range []struct {
+		name     string
+		previous *activeConfigSnapshot
+		storage  storageConfig
+		active   ActiveConfig
+		want     bool
+	}{
+		{name: "first load", previous: nil, storage: storage, active: active, want: true},
+		{name: "unchanged", previous: previous, storage: storage, active: active, want: false},
+		{name: "config version changed", previous: previous, storage: func() storageConfig {
+			next := storage
+			next.ConfigVersion++
+			return next
+		}(), active: active, want: true},
+		{name: "risk control changed", previous: previous, storage: storage, active: func() ActiveConfig {
+			next := active
+			next.RiskControlEnabled = true
+			return next
+		}(), want: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.want, shouldLogConfigLoaded(tc.previous, tc.storage, tc.active))
+		})
+	}
+}
+
+func TestClearLoadErrorReportsRecovery(t *testing.T) {
+	manager := &ConfigManager{}
+	require.False(t, manager.clearLoadError())
+
+	now := time.Now()
+	manager.lastLoadError = "config_load_failed"
+	manager.lastErrorAt = &now
+	require.True(t, manager.clearLoadError())
+	require.Empty(t, manager.lastLoadError)
+	require.Nil(t, manager.lastErrorAt)
+	require.False(t, manager.clearLoadError())
+}
 
 type prefixEncryptor struct{}
 
