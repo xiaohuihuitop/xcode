@@ -15,6 +15,7 @@ import (
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 var (
@@ -47,6 +48,21 @@ func buildRuntimeDispatchRequest(c *gin.Context, endpoint gatewayruntime.Endpoin
 	payload, err := readRuntimePayload(c.Request)
 	if err != nil {
 		return applicationgateway.DispatchRequest{}, fmt.Errorf("read runtime request body: %w", err)
+	}
+	if endpoint == gatewayruntime.EndpointResponses {
+		reqLog := requestLogger(c, "handler.openai_gateway.runtime_ingress")
+		if normalized, changed := normalizeCodexAutomationBootstrap(payload); changed {
+			payload = normalized
+			reqLog.Info("openai.codex_automation_bootstrap_normalized",
+				zap.String("normalization", "call_output_to_user_message"),
+			)
+		}
+		if normalized, changed := normalizeCodexDelegationBootstrap(payload); changed {
+			payload = normalized
+			reqLog.Info("openai.codex_delegation_bootstrap_normalized",
+				zap.String("normalization", "call_output_to_user_message"),
+			)
+		}
 	}
 	request := gatewayruntime.Request{
 		RequestID:       runtimeRequestID(c),

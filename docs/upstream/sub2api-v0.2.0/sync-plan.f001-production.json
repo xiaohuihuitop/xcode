@@ -1,0 +1,75 @@
+{
+  "base_tag": "v0.1.179",
+  "files": [
+    {
+      "action": "candidate",
+      "approved": true,
+      "category": "runtime_protocol",
+      "current_sha256": "760778771741cfeaa6e5a99d77f04552708846a38de89ad4aa876f468cf301cc",
+      "disposition": "direct_sync",
+      "migration_number": "",
+      "official_sha256": "10dafcfb961441d35233bb09ba70fccee2ce02ff60a546cd550a2ae8218e50dc",
+      "path": "backend/internal/pkg/apicompat/chatcompletions_responses_bridge.go",
+      "source_path": "backend/internal/pkg/apicompat/chatcompletions_responses_bridge.go",
+      "state": "different",
+      "target_path": "backend/internal/runtime/sub2api/upstream/apicompat/chatcompletions_responses_bridge.go"
+    },
+    {
+      "action": "candidate",
+      "approved": true,
+      "category": "runtime_protocol",
+      "current_sha256": "50f6d91fb3bbd9c1980d78005738ea57eeb4fc276f28730e9cfde2762d6e8676",
+      "disposition": "direct_sync",
+      "migration_number": "",
+      "official_sha256": "b813a91b01ee08b4bfd9b59886d4269114a1c2edbcef5251d733cabbc592cedc",
+      "path": "backend/internal/pkg/apicompat/chatcompletions_to_responses.go",
+      "source_path": "backend/internal/pkg/apicompat/chatcompletions_to_responses.go",
+      "state": "different",
+      "target_path": "backend/internal/runtime/sub2api/upstream/apicompat/chatcompletions_to_responses.go"
+    },
+    {
+      "action": "candidate",
+      "approved": true,
+      "category": "runtime_protocol",
+      "current_sha256": "481950062d4163e9056563d7f02641ffd8f1f6626f52a779fe61810622e90771",
+      "disposition": "direct_sync",
+      "migration_number": "",
+      "official_sha256": "3017206885d49ff886b7369914b21e54d9bdacd645fe9f49ce0c21e205db3e4c",
+      "path": "backend/internal/pkg/apicompat/responses_client_tools.go",
+      "source_path": "backend/internal/pkg/apicompat/responses_client_tools.go",
+      "state": "different",
+      "target_path": "backend/internal/runtime/sub2api/upstream/apicompat/responses_client_tools.go"
+    },
+    {
+      "action": "candidate",
+      "approved": true,
+      "category": "runtime_protocol",
+      "current_sha256": "d025b4da664b76b16b74f284fe95ae7721a2af902f8fdba90fa6fbc7e3ce52b3",
+      "disposition": "direct_sync",
+      "migration_number": "",
+      "official_sha256": "ce0f13a54bcba32623d50e5bd90bd5a9abf6c3ff294d0a604363373fd9b78b4d",
+      "path": "backend/internal/pkg/apicompat/responses_to_chatcompletions.go",
+      "source_path": "backend/internal/pkg/apicompat/responses_to_chatcompletions.go",
+      "state": "different",
+      "target_path": "backend/internal/runtime/sub2api/upstream/apicompat/responses_to_chatcompletions.go"
+    },
+    {
+      "action": "candidate",
+      "approved": true,
+      "category": "runtime_protocol",
+      "current_sha256": "9154a7a0a1bb29d0d2273d06d04b0d4556468f410356b7cf430d11dbad68962e",
+      "disposition": "direct_sync",
+      "migration_number": "",
+      "official_sha256": "0598c0d01dbe18990d59812ca7ed6b4daad7040a48c6f8f077474dcfc2dc737b",
+      "path": "backend/internal/pkg/apicompat/types.go",
+      "source_path": "backend/internal/pkg/apicompat/types.go",
+      "state": "different",
+      "target_path": "backend/internal/runtime/sub2api/upstream/apicompat/types.go"
+    }
+  ],
+  "source": "Wei-Shaw/sub2api",
+  "source_root": "C:\\Users\\xiaohuihui\\AppData\\Local\\Temp\\xcode-sub2api-v0.2.0-sync-20260905\\source\\24a60d8cccb8b62ba184e5f8c4c636907af14e997be6a166ccd05e26d620bf9d\\sub2api-0.2.0",
+  "target": "v0.2.0@aa236488351eb71e120fc2b6fb32e36b0374c918",
+  "target_commit": "aa236488351eb71e120fc2b6fb32e36b0374c918",
+  "target_tag": "v0.2.0"
+}

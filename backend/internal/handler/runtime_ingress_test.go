@@ -16,6 +16,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
 )
 
 type runtimeIngressExecutorFunc func(context.Context, gatewayruntime.Request, gatewayruntime.UsageSink) (gatewayruntime.Result, error)
@@ -82,6 +83,18 @@ func TestBuildRuntimeDispatchRequestReadsOpenAIStreamFromJSONBody(t *testing.T) 
 
 	require.NoError(t, err)
 	require.True(t, got.Runtime.Stream)
+}
+
+func TestBuildRuntimeDispatchRequestNormalizesCodexDelegationBootstrap(t *testing.T) {
+	body := `{"model":"gpt-5","input":[{"type":"function_call_output","namespace":"codex_app","name":"create_thread","output":"<codex_delegation><source_thread_id>thread-1</source_thread_id><input>do the work</input></codex_delegation>"}]}`
+	c := newRuntimeIngressTestContext(t, "/v1/responses", body)
+
+	got, err := buildRuntimeDispatchRequest(c, gatewayruntime.EndpointResponses)
+
+	require.NoError(t, err)
+	require.Equal(t, "message", gjson.GetBytes(got.Runtime.Payload, "input.0.type").String())
+	require.Equal(t, "user", gjson.GetBytes(got.Runtime.Payload, "input.0.role").String())
+	require.Equal(t, delegationEnvelope, gjson.GetBytes(got.Runtime.Payload, "input.0.content.0.text").String())
 }
 
 func TestNewSub2APIExecutionKeepsProductAssetOutsideRuntimeCompatibilityRoute(t *testing.T) {

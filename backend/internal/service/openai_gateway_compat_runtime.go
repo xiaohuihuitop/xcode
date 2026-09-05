@@ -48,6 +48,7 @@ func (s *OpenAIGatewayService) ForwardResponsesExchange(
 		return nil, fmt.Errorf("resolve responses tools: %w", err)
 	}
 	customTools := apicompat.CustomToolNames(effectiveTools)
+	functionTools := apicompat.FunctionToolNames(effectiveTools)
 	toolSearch := apicompat.HasToolSearchTool(effectiveTools)
 	namespaceTools := apicompat.NamespaceToolNames(effectiveTools)
 	chatReq, err := s.responsesToChatCompletionsRequestWithReasoningCache(&responsesReq, account, reasoningCacheAPIKeyID(exchange))
@@ -104,9 +105,9 @@ func (s *OpenAIGatewayService) ForwardResponsesExchange(
 		return s.handleResponsesErrorResponseExchange(ctx, exchange, account, resp, respBody, originalModel)
 	}
 	if clientStream {
-		return s.streamChatCompletionsAsResponsesExchange(exchange, resp, account, reasoningCacheAPIKeyID(exchange), originalModel, customTools, toolSearch, namespaceTools, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime)
+		return s.streamChatCompletionsAsResponsesExchange(exchange, resp, account, reasoningCacheAPIKeyID(exchange), originalModel, customTools, functionTools, toolSearch, namespaceTools, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime)
 	}
-	return s.bufferChatCompletionsAsResponsesExchange(exchange, resp, account, reasoningCacheAPIKeyID(exchange), originalModel, customTools, toolSearch, namespaceTools, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime)
+	return s.bufferChatCompletionsAsResponsesExchange(exchange, resp, account, reasoningCacheAPIKeyID(exchange), originalModel, customTools, functionTools, toolSearch, namespaceTools, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime)
 }
 
 func (s *OpenAIGatewayService) bufferChatCompletionsAsResponsesExchange(
@@ -116,6 +117,7 @@ func (s *OpenAIGatewayService) bufferChatCompletionsAsResponsesExchange(
 	apiKeyID int64,
 	originalModel string,
 	customTools map[string]bool,
+	functionTools map[string]bool,
 	toolSearch bool,
 	namespaceTools map[string]apicompat.NamespacedToolName,
 	billingModel, upstreamModel string,
@@ -131,7 +133,7 @@ func (s *OpenAIGatewayService) bufferChatCompletionsAsResponsesExchange(
 		writeRuntimeOpenAIResponsesError(exchange, http.StatusBadGateway, "api_error", "Failed to parse upstream response")
 		return nil, fmt.Errorf("parse chat response: %w", err)
 	}
-	responsesResp := apicompat.ChatCompletionsResponseToResponses(&ccResp, originalModel, customTools, toolSearch, namespaceTools)
+	responsesResp := apicompat.ChatCompletionsResponseToResponses(&ccResp, originalModel, customTools, functionTools, toolSearch, namespaceTools)
 	s.cacheResponsesOutputReasoning(responsesResp, account, apiKeyID)
 	encoded, err := json.Marshal(responsesResp)
 	if err != nil {
@@ -157,6 +159,7 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsResponsesExchange(
 	apiKeyID int64,
 	originalModel string,
 	customTools map[string]bool,
+	functionTools map[string]bool,
 	toolSearch bool,
 	namespaceTools map[string]apicompat.NamespacedToolName,
 	billingModel, upstreamModel string,
@@ -166,6 +169,7 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsResponsesExchange(
 	requestID := runtimeHeaderValue(resp.Header, "x-request-id")
 	state := apicompat.NewChatCompletionsToResponsesStreamState(originalModel)
 	state.CustomTools = customTools
+	state.FunctionTools = functionTools
 	state.ToolSearchDeclared = toolSearch
 	state.NamespaceTools = namespaceTools
 	clientDisconnected := false

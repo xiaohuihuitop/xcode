@@ -1,0 +1,35 @@
+# Direct Sync 目标基线
+
+记录时间：2026-09-05。下表覆盖当前 29 个 `direct_sync` candidate；`tracked` 表示目标已受 Git 管理，`absent` 表示记录时不存在。任何 apply 前都必须重新比对状态与 SHA-256，出现偏差立即停止。
+
+| 官方来源 | XCode 目标 | 状态 | apply 前 SHA-256 |
+| --- | --- | --- | --- |
+| `backend/internal/pkg/apicompat/anthropic_to_responses_response.go` | `backend/internal/runtime/sub2api/upstream/apicompat/anthropic_to_responses_response.go` | tracked | `d2ec326db176715e9742203cbc5b0d454941e8679d8304fa4cbbad6cf16ac94f` |
+| `backend/internal/pkg/apicompat/anthropic_to_responses_stream_test.go` | `backend/internal/runtime/sub2api/upstream/apicompat/anthropic_to_responses_stream_test.go` | tracked | `77919871c9f5dbac86628a12cc4b6ddff51703998c52d96a5cab10846cc6b455` |
+| `backend/internal/pkg/apicompat/chatcompletions_anthropic_bridge.go` | `backend/internal/runtime/sub2api/upstream/apicompat/chatcompletions_anthropic_bridge.go` | tracked | `bb134fac4da15eb925747f029ba660ef50cb5d161fe1ab38d371f087af394352` |
+| `backend/internal/pkg/apicompat/chatcompletions_anthropic_bridge_test.go` | `backend/internal/runtime/sub2api/upstream/apicompat/chatcompletions_anthropic_bridge_test.go` | tracked | `0d612ad84e81e3df5d3084722fc10c5ae9ebb8c3344a6b4db8da6584f1f316fd` |
+| `backend/internal/pkg/apicompat/chatcompletions_anthropic_reasoning_passback_test.go` | `backend/internal/runtime/sub2api/upstream/apicompat/chatcompletions_anthropic_reasoning_passback_test.go` | absent | absent |
+| `backend/internal/pkg/apicompat/chatcompletions_reasoning_alias_test.go` | `backend/internal/runtime/sub2api/upstream/apicompat/chatcompletions_reasoning_alias_test.go` | tracked | `0d4afe5bac40239b4c5d5644bed707ca917460c38627e743af36aabf96e109c7` |
+| `backend/internal/pkg/apicompat/chatcompletions_responses_bridge.go` | `backend/internal/runtime/sub2api/upstream/apicompat/chatcompletions_responses_bridge.go` | tracked | `83fadf1e3dc4ac322f13f78d874cff7bf4a095f0f31556ac7e72a39eeacd02e4` |
+| `backend/internal/pkg/apicompat/chatcompletions_responses_bridge_custom_tools_test.go` | `backend/internal/runtime/sub2api/upstream/apicompat/chatcompletions_responses_bridge_custom_tools_test.go` | tracked | `fd1f31c48870edf44682f1cb053e3bbcbd1383b8403489cdffe60a0da8ed865f` |
+| `backend/internal/pkg/apicompat/chatcompletions_responses_bridge_test.go` | `backend/internal/runtime/sub2api/upstream/apicompat/chatcompletions_responses_bridge_test.go` | tracked | `3e96ca3ed0b55168af68066355c01ff2a505d6ec7ab35afdf23b0c7976bd99f3` |
+| `backend/internal/pkg/apicompat/chatcompletions_responses_reasoning_cache_test.go` | `backend/internal/runtime/sub2api/upstream/apicompat/chatcompletions_responses_reasoning_cache_test.go` | tracked | `517ebbf7ba18fb48195e8f6526d8bae2ac2f5abdd816d5b474433c22a50b2b45` |
+| `backend/internal/pkg/apicompat/chatcompletions_responses_stream_lifecycle_test.go` | `backend/internal/runtime/sub2api/upstream/apicompat/chatcompletions_responses_stream_lifecycle_test.go` | tracked | `3e7d96c9d0e871163e7fd0486daa3e386d768e0b91a80e19d3e4de9e419b7295` |
+| `backend/internal/pkg/apicompat/chatcompletions_responses_test.go` | `backend/internal/runtime/sub2api/upstream/apicompat/chatcompletions_responses_test.go` | tracked | `01f731e0e3d88b99f6aa29d1aed00702fb724b891bf1538046b46582274d9818` |
+| `backend/internal/pkg/apicompat/chatcompletions_to_responses.go` | `backend/internal/runtime/sub2api/upstream/apicompat/chatcompletions_to_responses.go` | tracked | `33a0cf20d131c5a87fd6af7301ecfbc32c6250a1824780b68a342e5b50c1c7f8` |
+| `backend/internal/pkg/apicompat/chatcompletions_x_search_test.go` | `backend/internal/runtime/sub2api/upstream/apicompat/chatcompletions_x_search_test.go` | tracked | `90885905f1e47498a0934ce8a0bbd76d8a72e51d6579b598fd6bcf186fd7a04a` |
+| `backend/internal/pkg/apicompat/responses_client_tools.go` | `backend/internal/runtime/sub2api/upstream/apicompat/responses_client_tools.go` | tracked | `6fb3fd0df9c66e2b8d664432e49c0fa96b3b56613afe24454ee4ac7f7fa9ce1c` |
+| `backend/internal/pkg/apicompat/responses_client_tools_item_id_helper_test.go` | `backend/internal/runtime/sub2api/upstream/apicompat/responses_client_tools_item_id_helper_test.go` | absent | absent |
+| `backend/internal/pkg/apicompat/responses_client_tools_item_id_test.go` | `backend/internal/runtime/sub2api/upstream/apicompat/responses_client_tools_item_id_test.go` | absent | absent |
+| `backend/internal/pkg/apicompat/responses_client_tools_test.go` | `backend/internal/runtime/sub2api/upstream/apicompat/responses_client_tools_test.go` | tracked | `faf155fcf0d411b6bbf20ae741861b3d8d1192931adb97b9edb7b5740ebce932` |
+| `backend/internal/pkg/apicompat/responses_created_at_wire_test.go` | `backend/internal/runtime/sub2api/upstream/apicompat/responses_created_at_wire_test.go` | absent | absent |
+| `backend/internal/pkg/apicompat/responses_to_anthropic_invalid_blocks_test.go` | `backend/internal/runtime/sub2api/upstream/apicompat/responses_to_anthropic_invalid_blocks_test.go` | tracked | `63336e24c73afe2c4e26204412193efccf45826a183a0042952f7c96808a77b8` |
+| `backend/internal/pkg/apicompat/responses_to_anthropic_request.go` | `backend/internal/runtime/sub2api/upstream/apicompat/responses_to_anthropic_request.go` | tracked | `ec6a592b7bbb6d816dfa603d888eeb46540a74023fbf09fb508c3a18952ca344` |
+| `backend/internal/pkg/apicompat/responses_to_chatcompletions.go` | `backend/internal/runtime/sub2api/upstream/apicompat/responses_to_chatcompletions.go` | tracked | `d025b4da664b76b16b74f284fe95ae7721a2af902f8fdba90fa6fbc7e3ce52b3` |
+| `backend/internal/pkg/apicompat/responses_to_chatcompletions_tool_name_test.go` | `backend/internal/runtime/sub2api/upstream/apicompat/responses_to_chatcompletions_tool_name_test.go` | absent | absent |
+| `backend/internal/pkg/apicompat/responses_tool_search_discoveries.go` | `backend/internal/runtime/sub2api/upstream/apicompat/responses_tool_search_discoveries.go` | tracked | `14d0d6c0b0ad7ef068264acf4f1943890feab09989140266752392ab8b5eeb84` |
+| `backend/internal/pkg/apicompat/service_tier_passthrough_test.go` | `backend/internal/runtime/sub2api/upstream/apicompat/service_tier_passthrough_test.go` | absent | absent |
+| `backend/internal/pkg/apicompat/testdata/issue5302/nonstream_reasoning.json` | `backend/internal/runtime/sub2api/upstream/apicompat/testdata/issue5302/nonstream_reasoning.json` | tracked | `829255fe5c3cc3e8e873a53463d47e0f68d0955c2e2f3897641a36e21c9cc777` |
+| `backend/internal/pkg/apicompat/testdata/issue5302/reasoning_content_precedence.json` | `backend/internal/runtime/sub2api/upstream/apicompat/testdata/issue5302/reasoning_content_precedence.json` | tracked | `eaf0e20b51166badb39d5c3aeb32144f191fffe2df7a3b5bb5d62e5e243d097d` |
+| `backend/internal/pkg/apicompat/testdata/issue5302/stream_reasoning.json` | `backend/internal/runtime/sub2api/upstream/apicompat/testdata/issue5302/stream_reasoning.json` | tracked | `f476ffadbcae1b104b38d5bfce5426e5db4cae19837a00d21ddfb404e8abdeff` |
+| `backend/internal/pkg/apicompat/types.go` | `backend/internal/runtime/sub2api/upstream/apicompat/types.go` | tracked | `9c4acb4dc1b0a979f8a7cd18fc63d79870d1fd216725b2d0bdb3247a56b5e4b4` |

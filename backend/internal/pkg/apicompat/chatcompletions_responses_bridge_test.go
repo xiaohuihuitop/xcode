@@ -62,7 +62,7 @@ func TestChatCompletionsResponseToResponses_SkipsInvalidFunctionArguments(t *tes
 		}},
 	}
 
-	out := ChatCompletionsResponseToResponses(resp, "gpt-5.6-sol", nil, false, nil)
+	out := ChatCompletionsResponseToResponses(resp, "gpt-5.6-sol", nil, nil, false, nil)
 	require.Equal(t, "incomplete", out.Status)
 	require.Len(t, out.Output, 1)
 	require.Equal(t, "function_call", out.Output[0].Type)
