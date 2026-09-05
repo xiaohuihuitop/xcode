@@ -3,8 +3,9 @@ import { flushPromises, shallowMount } from '@vue/test-utils'
 import PaymentView from '../PaymentView.vue'
 import { PAYMENT_RECOVERY_STORAGE_KEY } from '@/components/payment/paymentFlow'
 import { formatPaymentAmount } from '@/components/payment/currency'
+import AmountInput from '@/components/payment/AmountInput.vue'
 import SubscriptionPlanCard from '@/components/payment/SubscriptionPlanCard.vue'
-import type { CheckoutInfoResponse, MethodLimit, SubscriptionPlan } from '@/types/payment'
+import type { CheckoutInfoResponse, MethodLimit, PaymentConfig, SubscriptionPlan } from '@/types/payment'
 
 const routeState = vi.hoisted(() => ({
   path: '/purchase',
@@ -21,6 +22,7 @@ const showError = vi.hoisted(() => vi.fn())
 const showInfo = vi.hoisted(() => vi.fn())
 const showWarning = vi.hoisted(() => vi.fn())
 const getCheckoutInfo = vi.hoisted(() => vi.fn())
+const getConfig = vi.hoisted(() => vi.fn())
 const bridgeInvoke = vi.hoisted(() => vi.fn())
 
 vi.mock('vue-router', async () => {
@@ -80,6 +82,7 @@ vi.mock('@/stores', () => ({
 vi.mock('@/api/payment', () => ({
   paymentAPI: {
     getCheckoutInfo,
+    getConfig,
   },
 }))
 
@@ -157,6 +160,30 @@ function checkoutInfoWithPlansFixture(options: {
     },
   }
 }
+
+function paymentConfigFixture(overrides: Partial<PaymentConfig> = {}) {
+  const data: PaymentConfig = {
+    payment_enabled: true,
+    min_amount: 0,
+    max_amount: 0,
+    daily_limit: 0,
+    max_pending_orders: 0,
+    order_timeout_minutes: 10,
+    balance_disabled: false,
+    balance_recharge_multiplier: 1,
+    subscription_usd_to_cny_rate: 0,
+    enabled_payment_types: ['wxpay'],
+    help_image_url: '',
+    help_text: '',
+    stripe_publishable_key: '',
+    ...overrides,
+  }
+  return { data }
+}
+
+beforeEach(() => {
+  getConfig.mockReset().mockResolvedValue(paymentConfigFixture())
+})
 
 function jsapiOrderFixture(resumeToken: string) {
   return {
@@ -291,7 +318,7 @@ describe('PaymentView subscription plan grid', () => {
 })
 
 describe('PaymentView recharge amount preview', () => {
-  it('starts at one, hides quick amounts, and computes credited balance from the multiplier', async () => {
+  it('passes configured recharge limits and the selected payment currency to the amount input', async () => {
     routeState.path = '/purchase'
     routeState.query = {}
     routerReplace.mockReset().mockResolvedValue(undefined)
@@ -305,7 +332,14 @@ describe('PaymentView recharge amount preview', () => {
     showWarning.mockReset()
     getCheckoutInfo.mockReset().mockResolvedValue(checkoutInfoFixture({
       balance_recharge_multiplier: 2,
+      methods: {
+        wxpay: {
+          ...checkoutInfoFixture().data.methods.wxpay,
+          currency: 'CNY',
+        },
+      },
     }))
+    getConfig.mockResolvedValue(paymentConfigFixture({ min_amount: 10, max_amount: 5000 }))
     bridgeInvoke.mockReset()
     window.localStorage.clear()
     ;(window as Window & { WeixinJSBridge?: { invoke: typeof bridgeInvoke } }).WeixinJSBridge = undefined
@@ -319,8 +353,8 @@ describe('PaymentView recharge amount preview', () => {
           Teleport: true,
           Transition: false,
           AmountInput: {
-            props: ['modelValue', 'amounts'],
-            template: '<div data-test="amount-input" :data-model-value="modelValue" :data-amounts="JSON.stringify(amounts)" />',
+            props: ['modelValue', 'amounts', 'currency', 'configuredMin', 'configuredMax'],
+            template: '<div data-test="amount-input" :data-model-value="modelValue" :data-amounts="JSON.stringify(amounts)" :data-currency="currency" :data-configured-min="configuredMin" :data-configured-max="configuredMax" />',
           },
         },
       },
@@ -331,7 +365,54 @@ describe('PaymentView recharge amount preview', () => {
     const amountInput = wrapper.get('[data-test="amount-input"]')
     expect(amountInput.attributes('data-model-value')).toBe('1')
     expect(amountInput.attributes('data-amounts')).toBe('[]')
+    expect(amountInput.attributes('data-currency')).toBe('CNY')
+    expect(amountInput.attributes('data-configured-min')).toBe('10')
+    expect(amountInput.attributes('data-configured-max')).toBe('5000')
     expect((wrapper.vm as unknown as { creditedAmount: number }).creditedAmount).toBe(2)
+  })
+
+  it('blocks recharge amounts outside the configured global range', async () => {
+    getCheckoutInfo.mockReset().mockResolvedValue(checkoutInfoFixture({
+      methods: {
+        wxpay: {
+          ...checkoutInfoFixture().data.methods.wxpay,
+          currency: 'CNY',
+        },
+      },
+    }))
+    getConfig.mockResolvedValue(paymentConfigFixture({ min_amount: 10, max_amount: 20 }))
+
+    const wrapper = shallowMount(PaymentView, {
+      global: {
+        stubs: {
+          AppLayout: {
+            template: '<div><slot /></div>',
+          },
+          Teleport: true,
+          Transition: false,
+        },
+      },
+    })
+    await flushPromises()
+
+    const vm = wrapper.vm as unknown as {
+      amount: number | null
+      amountError: string
+      canSubmit: boolean
+    }
+    expect(wrapper.findComponent(AmountInput).props()).toMatchObject({
+      currency: 'CNY',
+      configuredMin: 10,
+      configuredMax: 20,
+    })
+    expect(vm.amountError).toBe('payment.amountTooLow')
+    expect(vm.canSubmit).toBe(false)
+
+    vm.amount = 25
+    await wrapper.vm.$nextTick()
+
+    expect(vm.amountError).toBe('payment.amountTooHigh')
+    expect(vm.canSubmit).toBe(false)
   })
 })
 

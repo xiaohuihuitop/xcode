@@ -34,13 +34,6 @@
             <span v-else class="text-xs text-gray-400 dark:text-dark-500">{{ t('modelPlaza.table.noPrice') }}</span>
           </td>
           <td class="px-4 py-3 align-top" :data-testid="`desktop-sale-${item.model.pattern}`">
-            <div
-              v-if="item.badgeKey"
-              class="mb-2 inline-flex rounded border px-1.5 py-0.5 text-[11px] font-medium leading-4"
-              :class="sourceBadgeClass(item.badgeKey)"
-            >
-              {{ t(item.badgeKey) }}
-            </div>
             <PricingFields v-if="item.sale" :display="item.sale" />
             <span v-else class="text-xs text-gray-400 dark:text-dark-500">{{ t('modelPlaza.table.noPrice') }}</span>
           </td>
@@ -79,13 +72,6 @@
             {{ t('modelPlaza.table.salePrice') }}
           </dt>
           <dd class="min-w-0">
-            <div
-              v-if="item.badgeKey"
-              class="mb-2 inline-flex rounded border px-1.5 py-0.5 text-[11px] font-medium leading-4"
-              :class="sourceBadgeClass(item.badgeKey)"
-            >
-              {{ t(item.badgeKey) }}
-            </div>
             <PricingFields v-if="item.sale" :display="item.sale" />
             <span v-else class="text-xs text-gray-400 dark:text-dark-500">{{ t('modelPlaza.table.noPrice') }}</span>
           </dd>
@@ -108,6 +94,7 @@ interface DisplayField {
   label: string
   price: string
   unit: string
+  changed: boolean
 }
 
 interface DisplayTier {
@@ -131,22 +118,13 @@ const tokenFields: Array<{ key: PriceKey; labelKey: string }> = [
   { key: 'cache_read_price', labelKey: 'modelPlaza.table.cacheRead' },
 ]
 
-const imageTokenFields: Array<{ key: PriceKey; labelKey: string }> = [
-  { key: 'image_input_price', labelKey: 'modelPlaza.table.imageInput' },
-  { key: 'image_output_price', labelKey: 'modelPlaza.table.imageOutput' },
-]
-
-function fieldDefinitions(mode: string, interval = false): Array<{ key: PriceKey; labelKey: string; scale: number; unitKey: string }> {
+function fieldDefinitions(mode: string): Array<{ key: PriceKey; labelKey: string; scale: number; unitKey: string }> {
   if (mode === 'per_request') {
     return [{ key: 'per_request_price', labelKey: 'modelPlaza.table.perRequest', scale: 1, unitKey: 'modelPlaza.table.unitPerRequest' }]
   }
   if (mode === 'image') {
     const perImage = { key: 'per_request_price' as const, labelKey: 'modelPlaza.table.perImage', scale: 1, unitKey: 'modelPlaza.table.unitPerImage' }
-    if (interval) return [perImage]
-    return [
-      perImage,
-      ...imageTokenFields.map((field) => ({ ...field, scale: TOKEN_PRICE_SCALE, unitKey: 'modelPlaza.table.unitPerMillion' })),
-    ]
+    return [perImage]
   }
   return tokenFields.map((field) => ({ ...field, scale: TOKEN_PRICE_SCALE, unitKey: 'modelPlaza.table.unitPerMillion' }))
 }
@@ -154,30 +132,44 @@ function fieldDefinitions(mode: string, interval = false): Array<{ key: PriceKey
 function displayFields(
   values: Partial<Record<PriceKey, number | null>>,
   mode: string,
-  interval = false,
+  reference?: Partial<Record<PriceKey, number | null>> | null,
 ): DisplayField[] {
-  return fieldDefinitions(mode, interval).map((field) => {
+  return fieldDefinitions(mode).map((field) => {
     const value = values[field.key]
+    const referenceValue = reference?.[field.key]
     return {
       key: field.key,
       label: t(field.labelKey),
       price: value == null ? t('modelPlaza.table.noPrice') : formatScaled(value, field.scale, 2),
       unit: value == null ? '' : t(field.unitKey),
+      changed: value != null && referenceValue != null && value !== referenceValue,
     }
   })
 }
 
-function pricingDisplay(pricing: PlatformPlazaPricing | null | undefined): PricingDisplay | null {
+function matchingInterval(pricing: PlatformPlazaPricing | null | undefined, minTokens: number, maxTokens: number | null) {
+  return pricing?.intervals?.find((interval) => interval.min_tokens === minTokens && interval.max_tokens === maxTokens)
+}
+
+function pricingDisplay(
+  pricing: PlatformPlazaPricing | null | undefined,
+  reference?: PlatformPlazaPricing | null,
+): PricingDisplay | null {
   if (!pricing) return null
   const mode = pricing.billing_mode || 'token'
+  const comparableReference = reference?.billing_mode === mode ? reference : null
   return {
-    fields: displayFields(pricing, mode),
+    fields: displayFields(pricing, mode, comparableReference),
     tiers: (pricing.intervals ?? []).map((interval) => {
       const range = formatIntervalRange(interval.min_tokens, interval.max_tokens)
       return {
         label: interval.tier_label || range,
         range,
-        fields: displayFields(interval, mode, true),
+        fields: displayFields(
+          interval,
+          mode,
+          matchingInterval(comparableReference, interval.min_tokens, interval.max_tokens),
+        ),
       }
     }),
   }
@@ -193,7 +185,12 @@ function formatIntervalRange(minTokens: number, maxTokens: number | null): strin
 function priceFieldNode(field: DisplayField): VNode {
   return h('div', { key: field.key, class: 'grid min-w-0 grid-cols-[minmax(4.5rem,auto)_minmax(0,1fr)] gap-x-2 text-xs leading-5' }, [
     h('span', { class: 'min-w-0 break-words text-gray-500 dark:text-dark-400', title: field.label }, field.label),
-    h('span', { class: 'min-w-0 break-words text-right font-mono text-gray-700 dark:text-gray-200' }, field.unit ? `${field.price} ${field.unit}` : field.price),
+    h('span', {
+      class: field.changed
+        ? 'min-w-0 break-words text-right font-mono text-red-600 dark:text-red-400'
+        : 'min-w-0 break-words text-right font-mono text-gray-700 dark:text-gray-200',
+      'data-price-key': field.key,
+    }, field.unit ? `${field.price} ${field.unit}` : field.price),
   ])
 }
 
@@ -219,20 +216,14 @@ const PricingFields = defineComponent({
   },
 })
 
-function sourceBadgeClass(key: string): string {
-  return key === 'modelPlaza.table.inheritedPrice'
-    ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300'
-    : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300'
-}
-
 const displayModels = computed(() => [...props.models]
   .sort((a, b) => a.pattern.localeCompare(b.pattern))
-  .map((model) => ({
-    model,
-    official: pricingDisplay(model.official_pricing),
-    sale: pricingDisplay(model.sale_pricing ?? model.pricing),
-    badgeKey: model.sale_pricing_source === 'custom'
-        ? 'modelPlaza.table.customPrice'
-        : null,
-  })))
+  .map((model) => {
+    const salePricing = model.sale_pricing ?? model.pricing
+    return {
+      model,
+      official: pricingDisplay(model.official_pricing),
+      sale: pricingDisplay(salePricing, model.official_pricing),
+    }
+  }))
 </script>

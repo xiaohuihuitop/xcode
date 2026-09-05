@@ -49,8 +49,11 @@
               <AmountInput
                 v-model="amount"
                 :amounts="[]"
-                :min="globalMinAmount"
-                :max="globalMaxAmount"
+                :min="effectiveMinAmount"
+                :max="effectiveMaxAmount"
+                :currency="selectedCurrency"
+                :configured-min="configuredMinAmount"
+                :configured-max="configuredMaxAmount"
               />
               <p v-if="amountError" class="mt-2 text-xs text-amber-600 dark:text-amber-300">{{ amountError }}</p>
             </div>
@@ -470,6 +473,7 @@ const checkout = ref<CheckoutInfoResponse>({
   methods: {}, global_min: 0, global_max: 0,
   plans: [], balance_disabled: false, balance_recharge_multiplier: 1, subscription_usd_to_cny_rate: 0, recharge_fee_rate: 0, help_text: '', help_image_url: '', stripe_publishable_key: '',
 })
+const configuredRechargeLimits = ref({ min: 0, max: 0 })
 
 const tabs = computed(() => {
   const result: { key: 'recharge' | 'subscription'; label: string }[] = []
@@ -522,6 +526,13 @@ const globalMaxAmount = computed(() => {
   if (limits.some(limit => limit.single_max <= 0)) return 0
   return Math.max(...limits.map(limit => limit.single_max))
 })
+const configuredMinAmount = computed(() => configuredRechargeLimits.value.min)
+const configuredMaxAmount = computed(() => configuredRechargeLimits.value.max)
+const effectiveMinAmount = computed(() => Math.max(globalMinAmount.value, configuredMinAmount.value))
+const effectiveMaxAmount = computed(() => {
+  const limits = [globalMaxAmount.value, configuredMaxAmount.value].filter(limit => limit > 0)
+  return limits.length > 0 ? Math.min(...limits) : 0
+})
 
 // Selected method's limits (for validation and error messages)
 const selectedLimit = computed(() => visibleMethods.value[selectedMethod.value])
@@ -572,6 +583,13 @@ function formatSelectedSubscriptionPaymentAmount(value: number): string {
   return formatSelectedPaymentAmount(subscriptionPaymentAmountForCurrency(value, selectedCurrency.value))
 }
 
+function amountFitsConfiguredRange(value: number): boolean {
+  if (value <= 0) return true
+  if (configuredMinAmount.value > 0 && value < configuredMinAmount.value) return false
+  if (configuredMaxAmount.value > 0 && value > configuredMaxAmount.value) return false
+  return true
+}
+
 const methodOptions = computed<PaymentMethodOption[]>(() =>
   enabledMethods.value.map((type) => {
     const ml = visibleMethods.value[type]
@@ -598,6 +616,12 @@ const totalAmount = computed(() =>
 
 const amountError = computed(() => {
   if (validAmount.value <= 0) return ''
+  if (configuredMinAmount.value > 0 && validAmount.value < configuredMinAmount.value) {
+    return t('payment.amountTooLow', { min: formatSelectedPaymentAmount(configuredMinAmount.value) })
+  }
+  if (configuredMaxAmount.value > 0 && validAmount.value > configuredMaxAmount.value) {
+    return t('payment.amountTooHigh', { max: formatSelectedPaymentAmount(configuredMaxAmount.value) })
+  }
   // No method can handle this amount
   if (!enabledMethods.value.some((m) => amountFitsMethod(validAmount.value, m))) {
     return t('payment.amountNoMethod')
@@ -613,6 +637,7 @@ const amountError = computed(() => {
 
 const canSubmit = computed(() =>
   validAmount.value > 0
+    && amountFitsConfiguredRange(validAmount.value)
     && amountFitsMethod(validAmount.value, selectedMethod.value)
     && selectedLimit.value?.available !== false
 )
@@ -1032,8 +1057,19 @@ async function resumeWechatPaymentFromQuery() {
 
 onMounted(async () => {
   try {
-    const res = await paymentAPI.getCheckoutInfo()
-    checkout.value = res.data
+    const [checkoutResponse, configResponse] = await Promise.all([
+      paymentAPI.getCheckoutInfo(),
+      paymentAPI.getConfig(),
+    ])
+    checkout.value = checkoutResponse.data
+    configuredRechargeLimits.value = {
+      min: Number.isFinite(configResponse.data.min_amount) && configResponse.data.min_amount > 0
+        ? configResponse.data.min_amount
+        : 0,
+      max: Number.isFinite(configResponse.data.max_amount) && configResponse.data.max_amount > 0
+        ? configResponse.data.max_amount
+        : 0,
+    }
     if (enabledMethods.value.length) {
       const order: readonly string[] = METHOD_ORDER
       const sorted = [...enabledMethods.value].sort((a, b) => {

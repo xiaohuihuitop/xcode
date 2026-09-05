@@ -228,6 +228,12 @@ const BaseDialogStub = {
   template: '<div v-if="show" data-test="dialog"><slot /><slot name="footer" /></div>',
 }
 
+const EndpointPopoverStub = {
+  name: 'EndpointPopover',
+  props: ['apiBaseUrl', 'customEndpoints'],
+  template: '<div data-test="endpoint-popover" :data-api-base-url="apiBaseUrl" :data-custom-endpoints="JSON.stringify(customEndpoints)" />',
+}
+
 const mountView = async () => {
   const wrapper = mount(KeysView, {
     global: {
@@ -243,7 +249,7 @@ const mountView = async () => {
         SearchInput: SearchInputStub,
         Icon: IconStub,
         UseKeyModal: true,
-        EndpointPopover: true,
+        EndpointPopover: EndpointPopoverStub,
         GroupBadge: true,
         Teleport: true,
       },
@@ -301,6 +307,31 @@ describe('user KeysView column settings', () => {
     isCurrentStep.mockReturnValue(false)
     createKey.mockResolvedValue(createApiKey())
     updateKey.mockResolvedValue(createApiKey())
+  })
+
+  it('always exposes the current-site v1 endpoint when no API base URL is configured', async () => {
+    const wrapper = await mountView()
+
+    expect(wrapper.get('[data-test="endpoint-popover"]').attributes('data-api-base-url')).toBe(
+      `${window.location.origin}/v1`,
+    )
+  })
+
+  it('prefers the configured API endpoint and preserves custom endpoints', async () => {
+    getPublicSettings.mockResolvedValue({
+      api_base_url: 'https://api.example.com/v1/',
+      custom_endpoints: [
+        { name: 'Backup', endpoint: 'https://backup.example.com/v1', description: 'Backup line' },
+      ],
+    })
+
+    const wrapper = await mountView()
+    const endpoint = wrapper.get('[data-test="endpoint-popover"]')
+
+    expect(endpoint.attributes('data-api-base-url')).toBe('https://api.example.com/v1')
+    expect(JSON.parse(endpoint.attributes('data-custom-endpoints'))).toEqual([
+      { name: 'Backup', endpoint: 'https://backup.example.com/v1', description: 'Backup line' },
+    ])
   })
 
   it('uses the default API key columns with low-frequency columns hidden', async () => {

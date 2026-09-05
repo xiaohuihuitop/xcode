@@ -18,8 +18,7 @@
             />
           </div>
           <EndpointPopover
-            v-if="publicSettings?.api_base_url || (publicSettings?.custom_endpoints?.length ?? 0) > 0"
-            :api-base-url="publicSettings?.api_base_url || ''"
+            :api-base-url="displayApiBaseUrl"
             :custom-endpoints="publicSettings?.custom_endpoints || []"
           />
         </div>
@@ -1159,6 +1158,13 @@ const pendingCcsRow = ref<ApiKey | null>(null)
 const selectedKey = ref<ApiKey | null>(null)
 const copiedKeyId = ref<number | null>(null)
 const publicSettings = ref<PublicSettings | null>(null)
+const displayApiBaseUrl = computed(() => {
+  const configured = publicSettings.value?.api_base_url?.trim() || ''
+  const fallback = typeof window === 'undefined' ? '' : window.location.origin
+  const normalized = (configured || fallback).replace(/\/+$/, '')
+  if (!normalized) return ''
+  return normalized.endsWith('/v1') ? normalized : `${normalized}/v1`
+})
 const columnDropdownRef = ref<HTMLElement | null>(null)
 let abortController: AbortController | null = null
 

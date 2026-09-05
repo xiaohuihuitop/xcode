@@ -623,7 +623,40 @@ describe('ModelPricingView', () => {
     expect(modelPricing.list).toHaveBeenCalledTimes(2)
   })
 
-  it('uses per-image request pricing as the image primary price and scales image token fields', async () => {
+  it('switches platform sale pricing from token to mutually exclusive per-image billing', async () => {
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="edit-sale-7-gpt-custom"]').trigger('click')
+    const editor = wrapper.get('[data-testid="sale-editor"]')
+    const modeSelect = editor.get<HTMLSelectElement>('[data-testid="sale-billing-mode"]')
+
+    await modeSelect.setValue('image')
+
+    expect(editor.find('[data-price-field="input_price"]').exists()).toBe(false)
+    expect(editor.find('[data-price-field="image_input_price"]').exists()).toBe(false)
+    expect(editor.get('[data-price-field="per_request_price"]').text()).toContain('每张图片价格')
+    expect(editor.get<HTMLButtonElement>('[data-testid="sale-save"]').element.disabled).toBe(true)
+
+    await editor.get('[data-price-field="per_request_price"] [data-mode="custom"]').trigger('click')
+    await editor.get('[data-price-field="per_request_price"] [data-testid="custom-price-input"]').setValue('0.08')
+    await editor.get('[data-testid="sale-save"]').trigger('click')
+    await flushPromises()
+
+    expect(modelPricing.upsertPlatformSale).toHaveBeenCalledWith(expect.objectContaining({
+      billing_mode: 'image',
+      input_price: null,
+      output_price: null,
+      cache_write_price: null,
+      cache_read_price: null,
+      image_input_price: null,
+      image_output_price: null,
+      per_request_price: 0.08,
+      intervals: [],
+    }))
+  })
+
+  it('shows official image cost fields while editing only the mutually exclusive per-image sale price', async () => {
     modelPricing.catalog.mockResolvedValue([imageRow])
     modelPricing.list.mockResolvedValue([imageRow.override])
     const wrapper = mountView()
@@ -636,21 +669,22 @@ describe('ModelPricingView', () => {
     await wrapper.get('[data-testid="edit-sale-7-image-gen"]').trigger('click')
     await flushPromises()
     const editor = wrapper.get('[data-testid="sale-editor"]')
-    expect(editor.get('[data-price-field="image_input_price"]').text()).toContain('USD / 1M Token')
-    expect(editor.get<HTMLInputElement>('[data-price-field="image_input_price"] [data-testid="custom-price-input"]').element.value).toBe('2.5')
+    expect(editor.get('[data-testid="official-price-image_input_price"]').text()).toContain('$2')
+    expect(editor.get('[data-testid="official-price-image_input_price"]').text()).toContain('USD / 1M Token')
+    expect(editor.find('[data-price-field="image_input_price"]').exists()).toBe(false)
+    expect(editor.find('[data-price-field="image_output_price"]').exists()).toBe(false)
     expect(editor.get('[data-price-field="per_request_price"]').text()).toContain('每张图片价格')
     expect(editor.get('[data-price-field="per_request_price"]').text()).toContain('USD / 图片')
     expect(editor.get('[data-testid="interval-row"] [data-price-field="per_request_price"]').text()).toContain('USD / 图片')
 
-    await editor.get('[data-price-field="image_input_price"] [data-testid="custom-price-input"]').setValue('3')
     await editor.get('[data-price-field="per_request_price"] [data-testid="custom-price-input"]').setValue('0.05')
     await editor.get('[data-testid="sale-save"]').trigger('click')
     await flushPromises()
 
     expect(modelPricing.upsertPlatformSale).toHaveBeenCalledWith(expect.objectContaining({
       billing_mode: 'image',
-      image_input_price: 0.000003,
-      image_output_price: 0.0000035,
+      image_input_price: null,
+      image_output_price: null,
       per_request_price: 0.05,
       intervals: [expect.objectContaining({ per_request_price: 0.04 })],
     }))

@@ -25,21 +25,42 @@
 
     <!-- Custom Amount Input -->
     <div>
-      <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-        {{ t('payment.customAmount') }}
+      <label for="recharge-amount" class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+        {{ t('payment.customAmountPrefix') }}<span
+          data-testid="custom-amount-highlight"
+          class="text-red-600 dark:text-red-400"
+        >{{ t('payment.customAmountHighlight') }}</span>{{ t('payment.customAmountSuffix') }}
       </label>
       <div class="relative">
-        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-dark-500">
-          $
+        <span
+          data-testid="amount-currency-symbol"
+          class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-dark-500"
+        >
+          {{ currencySymbol(currency) }}
         </span>
         <input
+          id="recharge-amount"
           type="text"
           inputmode="decimal"
           :value="customText"
           :placeholder="placeholderText"
+          aria-describedby="recharge-amount-limits"
           class="input w-full py-3 pl-8 pr-4"
           @input="handleInput"
         />
+      </div>
+      <div
+        id="recharge-amount-limits"
+        class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400"
+      >
+        <span data-testid="minimum-recharge-amount">
+          {{ t('payment.minimumRechargeAmount') }}:
+          <span class="font-medium text-gray-700 dark:text-gray-300">{{ formattedConfiguredMin }}</span>
+        </span>
+        <span data-testid="maximum-recharge-amount">
+          {{ t('payment.maximumRechargeAmount') }}:
+          <span class="font-medium text-gray-700 dark:text-gray-300">{{ formattedConfiguredMax }}</span>
+        </span>
       </div>
     </div>
   </div>
@@ -48,23 +69,30 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { DEFAULT_PAYMENT_CURRENCY, currencySymbol, formatPaymentAmount } from './currency'
 
 const props = withDefaults(defineProps<{
   amounts?: number[]
   modelValue: number | null
   min?: number
   max?: number
+  currency?: string
+  configuredMin?: number
+  configuredMax?: number
 }>(), {
   amounts: () => [10, 20, 50, 100, 200, 500, 1000, 2000, 5000],
   min: 0,
   max: 0,
+  currency: DEFAULT_PAYMENT_CURRENCY,
+  configuredMin: 0,
+  configuredMax: 0,
 })
 
 const emit = defineEmits<{
   'update:modelValue': [value: number | null]
 }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const customText = ref('')
 
@@ -79,6 +107,14 @@ const placeholderText = computed(() => {
   if (props.max > 0) return `≤ ${props.max}`
   return t('payment.enterAmount')
 })
+
+const localeCode = computed(() => typeof locale.value === 'string' ? locale.value : undefined)
+const formattedConfiguredMin = computed(() => props.configuredMin > 0
+  ? formatPaymentAmount(props.configuredMin, props.currency, localeCode.value)
+  : t('payment.noLimit'))
+const formattedConfiguredMax = computed(() => props.configuredMax > 0
+  ? formatPaymentAmount(props.configuredMax, props.currency, localeCode.value)
+  : t('payment.noLimit'))
 
 const AMOUNT_PATTERN = /^\d*(\.\d{0,2})?$/
 

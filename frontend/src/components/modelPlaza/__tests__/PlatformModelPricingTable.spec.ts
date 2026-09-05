@@ -202,7 +202,7 @@ describe('PlatformModelPricingTable', () => {
     expect(wrapper.get('[data-testid="desktop-sale-token-custom-model"]').text()).toContain('缓存读取$0.30 USD/1M Token')
   })
 
-  it('hides inherited-price badges while preserving custom badges, zero, and missing official pricing', () => {
+  it('hides pricing-source badges while preserving zero and missing official pricing', () => {
     const wrapper = mountTable([fixtures[1], fixtures[2], fixtures[3]])
 
     expect(wrapper.get('[data-testid="desktop-sale-token-inherited-model"]').text()).not.toContain('继承官方价')
@@ -210,11 +210,35 @@ describe('PlatformModelPricingTable', () => {
     expect(wrapper.get('[data-testid="desktop-official-explicit-zero-model"]').text()).toContain('$0.00 USD/1M Token')
     expect(wrapper.get('[data-testid="desktop-sale-explicit-zero-model"]').text()).toContain('$0.00 USD/1M Token')
     expect(wrapper.get('[data-testid="desktop-official-missing-official-model"]').text()).toBe('暂无价格')
-    expect(wrapper.get('[data-testid="desktop-sale-missing-official-model"]').text()).toContain('自定义售价')
-    expect(wrapper.get('[data-testid="mobile-model-missing-official-model"]').text()).toContain('自定义售价')
+    expect(wrapper.get('[data-testid="desktop-sale-missing-official-model"]').text()).not.toContain('自定义售价')
+    expect(wrapper.get('[data-testid="mobile-model-missing-official-model"]').text()).not.toContain('自定义售价')
   })
 
-  it('uses per-request and image-specific units without treating image token prices as per-image prices', () => {
+  it('marks only comparable changed platform sale values in red', () => {
+    const crossModeModel: ModelFixture = {
+      pattern: 'cross-mode-model',
+      endpoint_capabilities: [],
+      pricing: pricing('per_request', { per_request_price: 0.03 }),
+      official_pricing: pricing('token', { input_price: 0.000001 }),
+      sale_pricing: pricing('per_request', { per_request_price: 0.03 }),
+      sale_pricing_source: 'custom',
+    }
+    const wrapper = mountTable([fixtures[0], fixtures[1], fixtures[3], crossModeModel])
+
+    const changedSale = wrapper.get('[data-testid="desktop-sale-token-custom-model"] [data-price-key="input_price"]')
+    const inheritedSale = wrapper.get('[data-testid="desktop-sale-token-inherited-model"] [data-price-key="input_price"]')
+    const missingOfficialSale = wrapper.get('[data-testid="desktop-sale-missing-official-model"] [data-price-key="input_price"]')
+    const crossModeSale = wrapper.get('[data-testid="desktop-sale-cross-mode-model"] [data-price-key="per_request_price"]')
+
+    expect(changedSale.classes()).toContain('text-red-600')
+    expect(changedSale.classes()).toContain('dark:text-red-400')
+    expect(inheritedSale.classes()).not.toContain('text-red-600')
+    expect(missingOfficialSale.classes()).not.toContain('text-red-600')
+    expect(crossModeSale.classes()).not.toContain('text-red-600')
+    expect(wrapper.text()).not.toContain('自定义售价')
+  })
+
+  it('uses per-request and mutually exclusive per-image units without showing image token prices', () => {
     const wrapper = mountTable([fixtures[4], fixtures[5]])
     const requestSale = wrapper.get('[data-testid="desktop-sale-request-model"]').text()
     const imageSale = wrapper.get('[data-testid="desktop-sale-image-model"]').text()
@@ -222,9 +246,9 @@ describe('PlatformModelPricingTable', () => {
     expect(requestSale).toContain('按次$0.02 USD/次')
     expect(requestSale).not.toContain('USD/1M Token')
     expect(imageSale).toContain('按图片$0.08 USD/图片')
-    expect(imageSale).toContain('图片输入$3.00 USD/1M Token')
-    expect(imageSale).toContain('图片输出$4.00 USD/1M Token')
-    expect(imageSale).not.toContain('图片输入$3.00 USD/图片')
+    expect(imageSale).not.toContain('图片输入')
+    expect(imageSale).not.toContain('图片输出')
+    expect(imageSale).not.toContain('USD/1M Token')
   })
 
   it('renders tier labels, ranges, and mode-correct interval prices for multiple tiers', () => {
