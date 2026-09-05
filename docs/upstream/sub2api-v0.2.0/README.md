@@ -1,6 +1,6 @@
 # Sub2API v0.2.0 官方同步审计
 
-本目录固定 XCode 从官方正式版 `v0.1.179` 同步到 `v0.2.0` 的可审计输入。P0 F001 OpenAI/Codex Runtime 已完成本地同步、Adapter 移植和验证；其余 F002-F006 仍未实施。本地结果尚未提交、发布或部署。
+本目录固定 XCode 从官方正式版 `v0.1.179` 同步到 `v0.2.0` 的可审计输入。P0 F001 OpenAI/Codex Runtime 与 F006 共享重试、冷却、安全审计和 reasoning 一致性已完成本地同步、Adapter 移植、验证与分组提交；F002-F005 仍未实施。当前结果未推送、打 Tag、创建 Release、编译离线包或部署。
 
 ## 不可变身份
 
@@ -17,10 +17,10 @@
 
 ## 规模与所有权
 
-- rebaseline 后全树清单 4,192 个路径：1,899 same、1,154 different、703 official-only、436 current-only。
+- 最终 rebaseline 后全树清单 4,194 个路径；人工分类与完整计划均为 4,194 条。
 - GitHub compare API 返回路径达到 300 个上限，因此不能把 300 当作完整变更文件数。
 - 提交分类已清零 `needs_review`；Runtime 提交 208 个，功能矩阵 F001-F006 全量覆盖。
-- 完整同步计划保持 `approved=true` 为 0；rebaseline 后有 19 个尚未实施的 `direct_sync` candidate。
+- 完整同步计划保持 `approved=true` 为 0；rebaseline 后有 16 个尚未实施的 `direct_sync` candidate。
 
 ## F001 本地同步结果
 
@@ -31,16 +31,24 @@
 - 完整 backend unit 测试、server 构建、同步工具单测、两套 validator 和差异检查均通过。
 - 真实 Provider 验收为 NOT RUN；本轮不包含凭据、生产请求、计费核对、发布或部署。
 
+## F006 本地同步结果
+
+- F006-A：统一同账号 retry limit、deadline、delay 和请求级瞬态语义；请求级瞬态耗尽后可切号但不封禁账号。管理员额度重置以单条 SQL 同时清配额与账号级 rate-limit cooldown，保留 overload、临时禁用和模型级 cooldown。
+- F006-B：`prompt_guard.config_loaded` 仅在首次加载、配置版本变化、全局风控变化或加载错误恢复时记录；Composite 路由、Ops 平台归属和 IPv6 使用 XCode 既有等价实现。
+- F006-C：Chat/Responses fallback 按 mapped、original、body model 的顺序提取 reasoning effort；指定模型族保留原生 `max`，其他模型继续映射为 `xhigh`。
+- 分组提交：`5ec2160`、`aba1dd8`、`3d8fb63`。审计 revision 005-010 保留设计、各组、最终文档与验证状态 rebaseline 前证据。
+- 无 migration、Ent schema、依赖、前端、根配置、CI、Release 或部署变化；真实 Provider 验收为 NOT RUN。
+
 ## 建议功能分组
 
-- P0 F001：OpenAI/Codex 协议、Responses/Chat/WS、工具、Fast/service tier、定时自动化与账号错误语义。
-- P0 F006：共享重试/冷却、Composite、404/429、reasoning、监控与调度一致性。
+- P0 F001：已完成本地同步与验证。
+- P0 F006：已完成本地同步、验证和分组提交。
 - P1 F004：Kimi/DeepSeek/GLM/Ollama，重点是 Kimi 原生 Responses、403 recoverable 和 GLM team quota。
 - P1 F005：Anthropic/Claude/Fable/Bedrock，重点是 fallback beta、工具参数、归因头与 Fable 5.1。
 - P2 F002：Grok 4.6、Realtime、媒体、工具和容量恢复。
 - P2 F003：Gemini/Antigravity endpoint、工具 schema、模型目录和 token 限制。
 
-每次只能确认并实施一个组。建议先确认 P0 F001，再根据回归结果决定 F006；其他组不随 P0 自动授权。
+每次只能确认并实施一个组。后续 F002-F005 仍需分别审查、确认和验证，不随已完成的 P0 自动授权。
 
 ## 必须重新确认的高风险面
 

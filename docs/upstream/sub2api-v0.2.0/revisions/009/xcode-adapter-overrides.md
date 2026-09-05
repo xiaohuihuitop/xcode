@@ -31,7 +31,7 @@
 
 ## F001 本地实施记录
 
-- 状态：2026-09-05 已完成本地同步、验证和提交；未推送、打 Tag、创建 Release、编译离线包或部署。
+- 状态：2026-09-05 已完成本地同步与验证，未提交、推送、打 Tag、创建 Release 或部署。
 - Official Runtime：使用严格 F001 投影同步 20 个 `apicompat` 源码、测试和 fixture；排除 x_search、Chat file input、Anthropic usage normalization 及其他 Provider 专属变化。
 - Handler Adapter：Responses ingress 严格识别无有效 `call_id` 的 automation/delegation bootstrap；WebSocket 正常关闭和客户端取消不再归因上游账号。
 - Active Adapter：移植 client-tool normalization/restoration、item ID retyping、custom/function/namespace alias 消歧、reasoning alias/cache replay、非法 tool arguments 过滤、`created_at` 与 `service_tier`。
@@ -39,7 +39,7 @@
 - XCode 覆盖：保留 inherited client-tool mapping、tool discovery promotion、reasoning cache、namespace/tool_search 和产品调用链；可识别的 `ctc_*`/ `tsc_*` ID 按 v0.2.0 恢复为 `fc_*`，未知 output ID 仍删除。
 - Official Runtime 窄适配：`backend/internal/runtime/sub2api/upstream/apicompat/anthropic_to_responses_response.go` 仅加入三处 Responses `CreatedAt` 赋值；`backend/internal/runtime/sub2api/upstream/apicompat/chatcompletions_anthropic_bridge_test.go` 仅在三个共享签名调用点补入 `functionTools=nil`，均不引入 F005 Anthropic 行为。
 - Fixture 质量修正：活动包 issue 5302 的三个 JSON fixture 删除多余尾部空白行，只消除 `git diff --check` 告警，不改变测试数据语义。
-- Revision：F001 证据保存在 `revisions/001-004/`，F006 设计、A/B/C 分组、最终文档与验证状态 rebaseline 证据保存在 `revisions/005-010/`；根目录旧 `sync-plan.f001*.json` 与 `direct-sync-baselines.md` 已失效，仅供追溯，不得再次 apply。
+- Revision：Adapter 移植前证据保存在 `revisions/001/`，文档回填后的中间状态保存在 `revisions/002/`，最终文档收口前证据保存在 `revisions/003/`，fixture 空白修正前证据保存在 `revisions/004/`，F006 设计与计划写入前证据保存在 `revisions/005/`；根目录旧 `sync-plan.f001*.json` 与 `direct-sync-baselines.md` 已失效，仅供追溯，不得再次 apply。
 
 ### 验证证据
 
@@ -53,7 +53,7 @@
 
 ## F006-A 本地实施记录
 
-- 状态：2026-09-05 已完成本地适配、定向验证和提交 `5ec2160`；未推送、打 Tag、创建 Release、编译离线包或部署。
+- 状态：2026-09-05 已完成本地适配与定向验证，等待本组提交；未推送、打 Tag、创建 Release、编译离线包或部署。
 - Handler Adapter：`UpstreamFailoverError` 增加 delay、deadline、错误级上限和请求级瞬态元数据；活动入口统一按账号配置与错误上限计算有效同账号重试预算。
 - 重试语义：deadline 可显式扩展普通计数窗口，错误级上限仍是硬上限；请求级瞬态错误使用最高 8 秒的指数退避，耗尽后允许切号但不会临时封禁账号。
 - ProductCore 映射：管理员额度重置使用单条 SQL 同时清零总/日/周用量和账号级 rate-limit cooldown；overload、临时禁用、模型级 cooldown、固定重置配置和 scheduler outbox 语义保持不变。
@@ -69,7 +69,7 @@
 
 ## F006-B 本地实施记录
 
-- 状态：2026-09-05 已完成本地适配、定向验证和提交 `aba1dd8`；未推送、打 Tag、创建 Release、编译离线包或部署。
+- 状态：2026-09-05 已完成本地适配与定向验证，等待本组提交；未推送、打 Tag、创建 Release、编译离线包或部署。
 - SecurityAudit：`prompt_guard.config_loaded` 从每 5 秒成功刷新日志改为变化信号，仅在首次加载、配置版本变化、全局风控开关变化或加载错误恢复时记录。
 - 恢复状态：`clearLoadError` 在锁内返回是否存在待恢复错误，成功 Reload 据此保留恢复可见性；原有 fail-closed、错误记录、配置快照和 token 无效告警语义不变。
 - XCode 等价能力：Composite 平台路由、Ops 平台资产归属及代理 IPv6 解析继续由 XCode 现有实现拥有，只做 `xcode_equivalent` 回归，不恢复官方 Group/Channel。
@@ -84,7 +84,7 @@
 
 ## F006-C 本地实施记录
 
-- 状态：2026-09-05 已完成本地适配、定向验证和提交 `3d8fb63`；未推送、打 Tag、创建 Release、编译离线包或部署。
+- 状态：2026-09-05 已完成本地适配与定向验证，等待本组提交；未推送、打 Tag、创建 Release、编译离线包或部署。
 - reasoning 事实：Chat Completions 与 Responses fallback extractor 接受 mapped/original 模型候选，优先使用 mapped model，候选为空时才读取 body model。
 - 原生 `max`：`gpt-5.6-*`、`deepseek-v4*`、`glm-*`、`kimi-*`、`moonshot-*` 和 `k3*` 保留 `max`；其他模型继续归一化为 `xhigh`。
 - XCode 等价能力：F001 已实现的空 tool name 保护保持原样，记录为 `xcode_equivalent`，不重复修改 Official Runtime 或活动工具转换路径。
